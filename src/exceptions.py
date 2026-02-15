@@ -4,17 +4,30 @@ This module defines custom exceptions used throughout the application
 following the architecture specification.
 """
 
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import Any
+
+__all__ = [
+    "BotError",
+    "ConfigurationError",
+    "NetworkError",
+    "TradingError",
+    "ValidationError",
+    "RateLimitError",
+    "RequestTimeoutError",
+    "InsufficientFundsError",
+    "RiskLimitExceededError",
+    # Backward compatibility alias
+    "TimeoutError",
+]
 
 
 class BotError(Exception):
     """Base exception for all Polymarket Trader errors."""
 
     def __init__(
-        self,
-        message: str,
-        original_exception: Optional[Exception] = None,
-        **context: Any
+        self, message: str, original_exception: Exception | None = None, **context: Any
     ) -> None:
         """Initialize the exception.
 
@@ -41,8 +54,8 @@ class ConfigurationError(BotError):
     def __init__(
         self,
         message: str = "Configuration error",
-        config_key: Optional[str] = None,
-        **context: Any
+        config_key: str | None = None,
+        **context: Any,
     ) -> None:
         """Initialize configuration error.
 
@@ -63,10 +76,10 @@ class NetworkError(BotError):
     def __init__(
         self,
         message: str = "Network error",
-        endpoint: Optional[str] = None,
-        status_code: Optional[int] = None,
-        original_exception: Optional[Exception] = None,
-        **context: Any
+        endpoint: str | None = None,
+        status_code: int | None = None,
+        original_exception: Exception | None = None,
+        **context: Any,
     ) -> None:
         """Initialize network error.
 
@@ -95,10 +108,10 @@ class TradingError(BotError):
     def __init__(
         self,
         message: str = "Trading error",
-        market_id: Optional[str] = None,
-        trade_type: Optional[str] = None,
-        original_exception: Optional[Exception] = None,
-        **context: Any
+        market_id: str | None = None,
+        trade_type: str | None = None,
+        original_exception: Exception | None = None,
+        **context: Any,
     ) -> None:
         """Initialize trading error.
 
@@ -127,9 +140,9 @@ class ValidationError(BotError):
     def __init__(
         self,
         message: str = "Validation error",
-        field: Optional[str] = None,
-        value: Optional[Any] = None,
-        **context: Any
+        field: str | None = None,
+        value: Any | None = None,
+        **context: Any,
     ) -> None:
         """Initialize validation error.
 
@@ -152,8 +165,8 @@ class RateLimitError(NetworkError):
     def __init__(
         self,
         message: str = "Rate limit exceeded",
-        retry_after: Optional[int] = None,
-        **context: Any
+        retry_after: int | None = None,
+        **context: Any,
     ) -> None:
         """Initialize rate limit error.
 
@@ -168,14 +181,17 @@ class RateLimitError(NetworkError):
         self.retry_after = retry_after
 
 
-class TimeoutError(NetworkError):
-    """Raised when an API request times out."""
+class RequestTimeoutError(NetworkError):
+    """Raised when an API request times out.
+
+    Note: Named RequestTimeoutError to avoid shadowing the built-in TimeoutError.
+    """
 
     def __init__(
         self,
         message: str = "Request timed out",
-        timeout_seconds: Optional[float] = None,
-        **context: Any
+        timeout_seconds: float | None = None,
+        **context: Any,
     ) -> None:
         """Initialize timeout error.
 
@@ -190,15 +206,19 @@ class TimeoutError(NetworkError):
         self.timeout_seconds = timeout_seconds
 
 
+# Backward compatibility alias
+TimeoutError = RequestTimeoutError
+
+
 class InsufficientFundsError(TradingError):
     """Raised when there are insufficient funds for a trade."""
 
     def __init__(
         self,
         message: str = "Insufficient funds",
-        required: Optional[float] = None,
-        available: Optional[float] = None,
-        **context: Any
+        required: float | None = None,
+        available: float | None = None,
+        **context: Any,
     ) -> None:
         """Initialize insufficient funds error.
 
@@ -209,7 +229,9 @@ class InsufficientFundsError(TradingError):
             **context: Additional context information
         """
         if required is not None and available is not None:
-            message = f"{message} (required: ${required:.2f}, available: ${available:.2f})"
+            message = (
+                f"{message} (required: ${required:.2f}, available: ${available:.2f})"
+            )
         super().__init__(message, **context)
         self.required = required
         self.available = available
@@ -221,10 +243,10 @@ class RiskLimitExceededError(TradingError):
     def __init__(
         self,
         message: str = "Risk limit exceeded",
-        limit_type: Optional[str] = None,
-        current: Optional[float] = None,
-        limit: Optional[float] = None,
-        **context: Any
+        limit_type: str | None = None,
+        current: float | None = None,
+        limit: float | None = None,
+        **context: Any,
     ) -> None:
         """Initialize risk limit exceeded error.
 

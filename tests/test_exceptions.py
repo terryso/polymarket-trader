@@ -5,16 +5,17 @@ This module tests the custom exceptions defined in src/exceptions.py.
 
 import pytest
 
+from src.exceptions import TimeoutError  # Backward compatibility alias
 from src.exceptions import (
     BotError,
     ConfigurationError,
+    InsufficientFundsError,
     NetworkError,
+    RateLimitError,
+    RequestTimeoutError,
+    RiskLimitExceededError,
     TradingError,
     ValidationError,
-    RateLimitError,
-    TimeoutError,
-    InsufficientFundsError,
-    RiskLimitExceededError,
 )
 
 
@@ -67,6 +68,19 @@ class TestConfigurationError:
         error = ConfigurationError(message="Invalid config", config_key="TIMEOUT")
         assert "Invalid config" in str(error)
         assert "TIMEOUT" in str(error)
+
+    def test_with_original_exception(self) -> None:
+        """Test error with original exception."""
+        original = ValueError("Missing env var")
+        error = ConfigurationError(
+            message="Config load failed",
+            config_key="API_KEY",
+            original_exception=original,
+        )
+        assert "Config load failed" in str(error)
+        assert "API_KEY" in str(error)
+        assert "Missing env var" in str(error)
+        assert error.original_exception is original
 
 
 class TestNetworkError:
@@ -163,6 +177,20 @@ class TestValidationError:
         assert error.field == "price"
         assert error.value == -100
 
+    def test_with_original_exception(self) -> None:
+        """Test error with original exception."""
+        original = TypeError("Expected string")
+        error = ValidationError(
+            message="Type check failed",
+            field="name",
+            value=123,
+            original_exception=original,
+        )
+        assert "Type check failed" in str(error)
+        assert "name" in str(error)
+        assert "Expected string" in str(error)
+        assert error.original_exception is original
+
 
 class TestRateLimitError:
     """Tests for RateLimitError class."""
@@ -183,25 +211,62 @@ class TestRateLimitError:
         error = RateLimitError(endpoint="/api/trade")
         assert error.endpoint == "/api/trade"
 
+    def test_with_original_exception(self) -> None:
+        """Test error with original exception."""
+        original = ConnectionError("Too many requests")
+        error = RateLimitError(
+            message="API rate limited",
+            retry_after=120,
+            endpoint="/api/markets",
+            original_exception=original,
+        )
+        assert "API rate limited" in str(error)
+        assert "120" in str(error)
+        assert "Too many requests" in str(error)
+        assert error.retry_after == 120
+        assert error.original_exception is original
 
-class TestTimeoutError:
-    """Tests for TimeoutError class."""
+
+class TestRequestTimeoutError:
+    """Tests for RequestTimeoutError class."""
 
     def test_default_message(self) -> None:
         """Test default error message."""
-        error = TimeoutError()
+        error = RequestTimeoutError()
         assert "timed out" in str(error).lower()
 
     def test_with_timeout_seconds(self) -> None:
         """Test error with timeout seconds."""
-        error = TimeoutError(timeout_seconds=30.0)
+        error = RequestTimeoutError(timeout_seconds=30.0)
         assert "30" in str(error)
         assert error.timeout_seconds == 30.0
 
     def test_inherits_from_network_error(self) -> None:
-        """Test TimeoutError inherits from NetworkError."""
-        error = TimeoutError(endpoint="/api/analyze")
+        """Test RequestTimeoutError inherits from NetworkError."""
+        error = RequestTimeoutError(endpoint="/api/analyze")
         assert error.endpoint == "/api/analyze"
+
+    def test_with_original_exception(self) -> None:
+        """Test error with original exception."""
+        original = TimeoutError("inner timeout")
+        error = RequestTimeoutError(
+            message="API timeout",
+            timeout_seconds=30.0,
+            original_exception=original,
+        )
+        assert "API timeout" in str(error)
+        assert "inner timeout" in str(error)
+        assert error.timeout_seconds == 30.0
+        assert error.original_exception is original
+
+    def test_backward_compatibility_alias(self) -> None:
+        """Test TimeoutError is an alias for RequestTimeoutError."""
+        # TimeoutError should be the same class as RequestTimeoutError
+        assert TimeoutError is RequestTimeoutError
+        # Should be able to create via alias
+        error = TimeoutError(timeout_seconds=10.0)
+        assert isinstance(error, RequestTimeoutError)
+        assert error.timeout_seconds == 10.0
 
 
 class TestInsufficientFundsError:
@@ -224,6 +289,24 @@ class TestInsufficientFundsError:
         """Test InsufficientFundsError inherits from TradingError."""
         error = InsufficientFundsError(market_id="market-789")
         assert error.market_id == "market-789"
+
+    def test_with_original_exception(self) -> None:
+        """Test error with original exception."""
+        original = ValueError("Balance check failed")
+        error = InsufficientFundsError(
+            message="Cannot place order",
+            required=500.0,
+            available=200.0,
+            market_id="market-999",
+            original_exception=original,
+        )
+        assert "Cannot place order" in str(error)
+        assert "500" in str(error)
+        assert "200" in str(error)
+        assert "Balance check failed" in str(error)
+        assert error.required == 500.0
+        assert error.available == 200.0
+        assert error.original_exception is original
 
 
 class TestRiskLimitExceededError:
@@ -250,3 +333,22 @@ class TestRiskLimitExceededError:
         """Test RiskLimitExceededError inherits from TradingError."""
         error = RiskLimitExceededError(market_id="market-101")
         assert error.market_id == "market-101"
+
+    def test_with_original_exception(self) -> None:
+        """Test error with original exception."""
+        original = RuntimeError("Risk check service unavailable")
+        error = RiskLimitExceededError(
+            message="Position limit breach",
+            limit_type="max_position",
+            current=0.50,
+            limit=0.30,
+            market_id="market-202",
+            original_exception=original,
+        )
+        assert "Position limit breach" in str(error)
+        assert "max_position" in str(error)
+        assert "Risk check service unavailable" in str(error)
+        assert error.limit_type == "max_position"
+        assert error.current == 0.50
+        assert error.limit == 0.30
+        assert error.original_exception is original
