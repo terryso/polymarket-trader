@@ -155,3 +155,4 @@ tmp/
 temp/
 *.tmp
 *.temp
+dashboard/_bmad-output/
