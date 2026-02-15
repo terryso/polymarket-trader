@@ -1,0 +1,116 @@
+# generated: 2026-02-15
+# project: polymarket-trader
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-02-15
+project: polymarket-trader
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: 项目基础设施与配置
+  epic-1: backlog
+  1-1-project-structure-initialization: backlog
+  1-2-configuration-management-system: backlog
+  1-3-logging-system: backlog
+  1-4-custom-exception-hierarchy: backlog
+  1-5-retry-mechanism: backlog
+  1-6-database-initialization: backlog
+  1-7-pydantic-data-models: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: 市场数据获取与筛选
+  epic-2: backlog
+  2-1-polymarket-api-client: backlog
+  2-2-market-data-fetch-and-store: backlog
+  2-3-market-filter-rule-engine: backlog
+  2-4-market-data-repository: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: LLM 智能分析引擎
+  epic-3: backlog
+  3-1-llm-api-client: backlog
+  3-2-llm-prompt-template: backlog
+  3-3-llm-analysis-engine: backlog
+  3-4-prediction-result-storage: backlog
+  3-5-edge-calculation: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: 风险控制与熔断系统
+  epic-4: backlog
+  4-1-risk-control-configuration: backlog
+  4-2-thread-safe-state-management: backlog
+  4-3-circuit-breaker-implementation: backlog
+  4-4-pre-trade-risk-check: backlog
+  4-5-position-management: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Paper Trading 模拟交易
+  epic-5: backlog
+  5-1-trade-record-data-model: backlog
+  5-2-paper-trading-executor: backlog
+  5-3-trading-decision-flow: backlog
+  5-4-simulated-position-pnl-calculation: backlog
+  5-5-statistics-data-recording: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: 预测追踪与学习日志
+  epic-6: backlog
+  6-1-prediction-result-validation-mechanism: backlog
+  6-2-accuracy-statistics: backlog
+  6-3-learning-log-generation: backlog
+  6-4-prediction-history-query-api: backlog
+  6-5-performance-analysis-and-insights: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Dashboard 后端 API 集成
+  epic-7: backlog
+  7-1-fastapi-app-initialization: backlog
+  7-2-market-data-api: backlog
+  7-3-position-and-trade-api: backlog
+  7-4-prediction-and-statistics-api: backlog
+  7-5-system-status-api: backlog
+  7-6-frontend-api-integration: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: 系统调度与自动化运行
+  epic-8: backlog
+  8-1-apscheduler-configuration: backlog
+  8-2-scheduled-task-configuration: backlog
+  8-3-main-entry-and-startup-flow: backlog
+  8-4-auto-recovery-mechanism: backlog
+  8-5-error-handling-and-alerting: backlog
+  8-6-run-scripts-and-process-management: backlog
+  epic-8-retrospective: optional
