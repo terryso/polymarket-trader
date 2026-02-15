@@ -54,7 +54,7 @@ development_status:
   # Epic 2: 市场数据获取与筛选
   epic-2: in-progress
   2-1-polymarket-api-client: done
-  2-2-market-data-fetch-and-store: backlog
+  2-2-market-data-fetch-and-store: done
   2-3-market-filter-rule-engine: backlog
   2-4-market-data-repository: backlog
   epic-2-retrospective: optional

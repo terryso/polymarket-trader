@@ -133,8 +133,7 @@ class DatabaseManager:
         try:
             async with self.get_connection() as conn:
                 # Create markets table
-                await conn.execute(
-                    """
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS markets (
                         id TEXT PRIMARY KEY,
                         title TEXT NOT NULL,
@@ -149,19 +148,16 @@ class DatabaseManager:
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
-                """
-                )
+                """)
 
                 # Create system_state table
-                await conn.execute(
-                    """
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS system_state (
                         key TEXT PRIMARY KEY,
                         value TEXT,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
-                """
-                )
+                """)
 
                 await conn.commit()
 
