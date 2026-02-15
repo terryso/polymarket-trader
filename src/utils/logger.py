@@ -1,23 +1,54 @@
 """Logging configuration for the Polymarket Trader application.
 
 This module provides a colored logging setup with both console and file output,
-following the architecture specification.
+following the architecture specification. Console output goes to stderr with
+colors, file output goes to logs/polymarket_trader.log with rotation.
 """
+
+from __future__ import annotations
+
+__all__ = [
+    "LOG_EMOJIS",
+    "OPERATION_EMOJIS",
+    "SENSITIVE_PATTERNS",
+    "SanitizingFilter",
+    "EmojiFormatter",
+    "FileEmojiFormatter",
+    "get_logger",
+    "setup_logging",
+]
 
 import logging
 import os
 import re
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
-
 import colorlog
+
+
+# Emoji mappings for log levels
+LOG_EMOJIS: dict[str, str] = {
+    "DEBUG": "🔍",
+    "INFO": "✅",
+    "WARNING": "⚠️",
+    "ERROR": "❌",
+    "CRITICAL": "🔥",
+    "NOTSET": "",
+}
+
+# Operation-specific emojis (for use in log messages)
+OPERATION_EMOJIS: dict[str, str] = {
+    "trade": "💰",
+    "analysis": "🧠",
+    "data": "📊",
+    "network": "🌐",
+}
 
 
 # Sensitive patterns for log sanitization
 SENSITIVE_PATTERNS = [
-    # API Keys - show only first 4 characters
-    (r'(api[_-]?key["\s:=]+)["\']?([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*["\']?', r'\1"\2****"'),
+    # API Keys - show only first 4 characters (matches api_key, api-key, apiKey, ApiKey)
+    (r'(api[_-]?key|apiKey|ApiKey)["\s:=]+["\']?([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*["\']?', r'\1"\2****"'),
     (r'(LLM_API_KEY=["\']?)([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*', r'\g<1>\2****'),
     # Private keys - completely hide
     (r'(pk|private[_-]?key["\s:=]+)["\']?[a-zA-Z0-9]+["\']?', r'\1[PRIVATE_KEY]'),
@@ -41,10 +72,43 @@ class SanitizingFilter(logging.Filter):
         return True
 
 
+class EmojiFormatter(colorlog.ColoredFormatter):
+    """Formatter that adds emoji to log messages based on level."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Add emoji to the log record before formatting.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            Formatted log message with emoji.
+        """
+        # Add emoji based on level
+        record.emoji = LOG_EMOJIS.get(record.levelname, "")
+        return super().format(record)
+
+
+class FileEmojiFormatter(logging.Formatter):
+    """Formatter for file output that adds emoji based on level."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Add emoji to the log record before formatting.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            Formatted log message with emoji.
+        """
+        record.emoji = LOG_EMOJIS.get(record.levelname, "")
+        return super().format(record)
+
+
 def get_logger(
     name: str,
-    log_level: Optional[str] = None,
-    log_dir: Optional[str] = None
+    log_level: str | None = None,
+    log_dir: str | None = None
 ) -> logging.Logger:
     """Get a configured logger instance.
 
@@ -63,16 +127,16 @@ def get_logger(
         return logger
 
     # Get configuration from environment or defaults
-    log_level = log_level or os.getenv("LOG_LEVEL", "INFO")
-    log_dir = log_dir or os.getenv("LOG_DIR", "logs")
+    effective_log_level = log_level if log_level is not None else os.getenv("LOG_LEVEL", "INFO")
+    effective_log_dir = log_dir if log_dir is not None else os.getenv("LOG_DIR", "logs")
 
     # Set logger level
-    logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+    logger.setLevel(getattr(logging, effective_log_level.upper(), logging.INFO))
 
     # Console handler with colorlog
     console_format = (
         "%(log_color)s%(asctime)s | %(levelname)-8s | %(threadName)-12s | "
-        "%(name)s | %(message)s%(reset)s"
+        "%(name)s | %(emoji)s %(message)s%(reset)s"
     )
     console_colors = {
         "DEBUG": "cyan",
@@ -82,7 +146,7 @@ def get_logger(
         "CRITICAL": "red,bg_white",
     }
     console_handler = colorlog.StreamHandler()
-    console_handler.setFormatter(colorlog.ColoredFormatter(
+    console_handler.setFormatter(EmojiFormatter(
         console_format,
         log_colors=console_colors,
         datefmt="%Y-%m-%d %H:%M:%S"
@@ -91,12 +155,12 @@ def get_logger(
     logger.addHandler(console_handler)
 
     # File handler with rotation
-    log_path = Path(log_dir)
+    log_path = Path(effective_log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
     file_format = (
         "%(asctime)s | %(levelname)-8s | %(threadName)-12s | "
-        "%(name)s | %(message)s"
+        "%(name)s | %(emoji)s %(message)s"
     )
     file_handler = RotatingFileHandler(
         log_path / "polymarket_trader.log",
@@ -104,7 +168,7 @@ def get_logger(
         backupCount=5,
         encoding="utf-8"
     )
-    file_handler.setFormatter(logging.Formatter(
+    file_handler.setFormatter(FileEmojiFormatter(
         file_format,
         datefmt="%Y-%m-%d %H:%M:%S"
     ))

@@ -44,7 +44,7 @@ development_status:
   epic-1: in-progress
   1-1-project-structure-initialization: done
   1-2-configuration-management-system: done
-  1-3-logging-system: backlog
+  1-3-logging-system: done
   1-4-custom-exception-hierarchy: backlog
   1-5-retry-mechanism: backlog
   1-6-database-initialization: backlog
