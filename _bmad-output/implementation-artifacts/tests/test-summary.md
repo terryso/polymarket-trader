@@ -1,492 +1,213 @@
-# 测试自动化摘要
+# Test Automation Summary
 
-**生成日期**: 2026-02-15
-**项目**: polymarket-trader
-**更新**: QA Automate 验证 Story 1.6 数据库模块测试
+## Story 2.1: Polymarket API 客户端
 
----
-
-## 生成的测试
-
-### Python 后端测试
-
-| 文件 | 测试数 | 描述 |
-|------|--------|------|
-| `tests/test_config.py` | 65 | 配置管理测试 (Settings, LLMSettings, TradingSettings 等) + Live Mode 验证 |
-| `tests/test_exceptions.py` | 30 | 自定义异常类测试 (BotError, NetworkError, TradingError 等) |
-| `tests/test_logger.py` | 34 | 日志配置测试 (Emoji, 脱敏, 格式化, 文件输出) |
-| `tests/test_main.py` | 9 | Application 类和 main 入口点测试 |
-| `tests/test_retry.py` | 23 | Story 1.5 重试机制测试 (RetryConfig, 同步/异步重试, 日志) |
-| `tests/test_storage/test_database.py` | **31** | **🆕 Story 1.6 数据库模块测试 (DatabaseConfig, DatabaseManager, Schema, 连接管理)** |
-
-**Python 测试总计**: 208 个测试用例 (✅ 全部通过)
-
-### React 前端测试
-
-| 文件 | 测试数 | 描述 |
-|------|--------|------|
-| `dashboard/src/components/dashboard/StatCard.test.tsx` | 8 | StatCard 组件渲染测试 |
-| `dashboard/src/components/dashboard/RecentActivity.test.tsx` | **7** | **🆕 最近活动列表组件测试** |
-| `dashboard/src/components/dashboard/PnLChart.test.tsx` | **5** | **🆕 收益曲线图组件测试** |
-| `dashboard/src/components/layout/AppSidebar.test.tsx` | **7** | **🆕 侧边栏导航组件测试** |
-| `dashboard/src/lib/utils.test.ts` | 7 | cn() 工具函数测试 |
-| `dashboard/src/test/example.test.ts` | 1 | 示例测试 (已存在) |
-
-**前端测试总计**: 35 个测试用例 (+19 新增)
-
-**前端测试结果**: ✅ 35 passed in 1.83s (使用 Node.js v23.5.0)
+**Date**: 2026-02-15
+**Status**: Review Complete
 
 ---
 
-## 测试运行结果
+## Generated Tests
 
-### Python 后端
+### API Tests (Python Backend)
 
-```
-✅ 208 passed in 1.00s
-```
+| 文件 | 测试数 | 状态 | 描述 |
+|------|--------|------|------|
+| `tests/test_api/test_polymarket.py` | 36 | ✅ Pass | PolymarketClient 完整测试套件 |
 
-**测试框架**: pytest + pytest-asyncio
+**总计**: 36 个测试
 
-**覆盖模块**:
-- `src/config.py` - 配置加载、验证、Live Mode 安全检查 (65 tests)
-- `src/exceptions.py` - 异常类层级 (30 tests)
-- `src/utils/logger.py` - 日志配置、Emoji、敏感信息过滤、文件输出 (34 tests)
-- `src/main.py` - Application 类生命周期 (9 tests)
-- `src/utils/retry.py` - 重试装饰器、指数退避 (23 tests, 83% 覆盖率)
-- `src/storage/database.py` - 数据库连接、Schema 初始化、错误处理 (31 tests)
+### E2E Tests
 
-### React 前端
-
-**测试框架**: Vitest + @testing-library/react
-
-> ⚠️ **注意**: 前端测试文件已创建，但由于 Vitest 版本与 Node.js 环境兼容性问题，运行时需要更新依赖。
+不适用 - Story 2.1 是 API 客户端层，无 UI 组件。
 
 ---
 
-## 测试覆盖详情
+## Coverage
 
-### 配置模块 (`test_config.py`) - 65 tests
+| 模块 | 覆盖率 | 缺失行 |
+|------|--------|--------|
+| `src/api/__init__.py` | 100% | - |
+| `src/api/polymarket.py` | 98% | 213-217 |
+| **TOTAL** | **98%** | 3 行 |
 
-| 测试类 | 测试数 | 测试内容 |
-|--------|--------|----------|
-| `TestLLMSettings` | 3 | 默认值、自定义值、环境变量前缀 |
-| `TestLLMSettingsLiveModeValidation` | 6 | **新增** - Paper/Live mode API key 验证 |
-| `TestPolymarketSettings` | 2 | 默认值、环境变量配置 |
-| `TestPolymarketSettingsLiveModeValidation` | 10 | **新增** - Paper/Live mode PK/Wallet/Address 验证 |
-| `TestTradingSettings` | 2 | 默认交易参数、环境变量覆盖 |
-| `TestTradingSettingsValidation` | 12 | 边界验证 (slippage, pct_profit, pct_loss, trade_unit, initial_capital) |
-| `TestRiskControlSettings` | 2 | 风险控制参数默认值、环境变量 |
-| `TestRiskControlSettingsValidation` | 12 | 边界验证 (max_single_ratio, min_confidence, min_edge, daily_loss_limit) |
-| `TestRiskControlSettingsValidationExtra` | 2 | 负值边界测试 |
-| `TestRiskControlSettingsEnvAliases` | 2 | 环境变量别名测试 |
-| `TestMarketFilterSettings` | 2 | 市场过滤参数默认值、环境变量 |
-| `TestMarketFilterSettingsValidation` | 2 | 边界验证 (min_liquidity, min_deadline_days) |
-| `TestSettings` | 5 | 主配置类、嵌套设置、便捷属性、trading_mode 验证 |
-| `TestSettingsValidation` | 4 | log_level 验证 (大小写、有效值、无效值) |
-| `TestGetSettings` | 2 | 缓存机制验证 |
+### 覆盖率说明
 
-### 异常模块 (`test_exceptions.py`)
-
-| 测试类 | 测试内容 |
-|--------|----------|
-| `TestBotError` | 基础错误、原始异常、上下文 |
-| `TestConfigurationError` | 配置错误、配置键 |
-| `TestNetworkError` | 网络错误、端点、状态码 |
-| `TestTradingError` | 交易错误、市场ID、交易类型 |
-| `TestValidationError` | 验证错误、字段、值 |
-| `TestRateLimitError` | 速率限制、重试时间 |
-| `TestTimeoutError` | 超时错误、超时秒数 |
-| `TestInsufficientFundsError` | 资金不足、必需/可用金额 |
-| `TestRiskLimitExceededError` | 风险限制、限制类型 |
-
-### 日志模块 (`test_logger.py`) - 34 tests
-
-| 测试类 | 测试数 | 测试内容 |
-|--------|--------|----------|
-| `TestSanitizingFilter` | 8 | API密钥过滤 (snake_case/camelCase/TitleCase)、私钥过滤、钱包地址掩码、空消息 |
-| `TestSensitivePatterns` | 2 | 敏感模式配置验证 |
-| `TestGetLogger` | 5 | 日志实例创建、处理器配置、缓存、日志级别、目录创建 |
-| `TestSetupLogging` | 2 | 根日志配置、处理器清理 |
-| `TestLogEmojis` | 5 | 日志级别 emoji 配置 (DEBUG/INFO/WARNING/ERROR/CRITICAL) |
-| `TestOperationEmojis` | 5 | 操作 emoji 配置 (💰🧠📊🌐) |
-| `TestLogFormatWithEmoji` | 3 | 控制台格式验证、emoji 输出、不同级别 emoji |
-| `TestFileOutputWithEmoji` | 3 | 文件输出 emoji、文件格式验证、文件多级别 emoji |
-| `TestFileEmojiFormatter` | 1 | FileEmojiFormatter 类功能 |
-
-### 前端组件 (`StatCard.test.tsx`)
-
-| 测试内容 |
-|----------|
-| 标题和值渲染 |
-| 副标题渲染 |
-| 盈利/亏损/静音颜色类 |
-| 图标元素渲染 |
-| 自定义类名应用 |
+- `src/api/polymarket.py:213-217` 未覆盖的原因：
+  - 这是 `_parse_markets_response` 中的异常处理路径
+  - 当单个市场解析失败时，会记录警告并跳过该市场
+  - **建议**: 可选添加测试用例来触发解析异常
 
 ---
 
-## 运行测试命令
+## Test Categories
 
-### Python 后端
+### 初始化测试 (3 个)
+- ✅ 只读模式初始化
+- ✅ 自定义 host 和 chain_id
+- ✅ 带凭证初始化
+
+### API 方法测试 (13 个)
+- ✅ `get_markets()` 成功场景
+- ✅ `get_markets()` 空响应
+- ✅ `get_markets()` 分页
+- ✅ `get_markets()` 网络错误
+- ✅ `get_markets()` 超时错误
+- ✅ `get_markets()` 速率限制错误
+- ✅ `get_market()` 成功场景
+- ✅ `get_market()` 未找到
+- ✅ `get_market()` 空响应
+- ✅ `get_market()` 网络错误
+- ✅ `get_order_book()` 成功场景
+- ✅ `get_order_book()` 空响应
+- ✅ `get_order_book()` 网络错误
+
+### 类别映射测试 (6 个)
+- ✅ Politics 类别
+- ✅ Crypto 类别
+- ✅ Technology 类别
+- ✅ Business 类别
+- ✅ Economics 类别
+- ✅ None/未知类别
+
+### 日期解析测试 (6 个)
+- ✅ ISO 格式 (带 Z 后缀)
+- ✅ 带时区格式
+- ✅ 简单格式 (YYYY-MM-DD HH:MM:SS)
+- ✅ 仅日期格式 (YYYY-MM-DD)
+- ✅ 无效日期
+- ✅ None 输入
+
+### 异常映射测试 (5 个)
+- ✅ TimeoutError 映射
+- ✅ 消息中包含 "timeout" 映射
+- ✅ 429 状态码映射
+- ✅ 消息中包含 "rate limit" 映射
+- ✅ 通用网络错误映射
+
+### 工具方法测试 (3 个)
+- ✅ `_safe_float()` 有效输入
+- ✅ `_safe_float()` 无效输入
+- ✅ `_safe_float()` 边界情况
+
+---
+
+## Execution Results
 
 ```bash
-# 运行所有测试
-python -m pytest tests/ -v
+$ python -m pytest tests/test_api/test_polymarket.py -v
 
-# 运行特定测试文件
-python -m pytest tests/test_config.py -v
-python -m pytest tests/test_exceptions.py -v
-python -m pytest tests/test_logger.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.10, pytest-8.4.2, pluggy-1.0
+collected 36 items
+
+tests/test_api/test_polymarket.py::TestPolymarketClientInit::test_init_read_only_mode PASSED
+tests/test_api/test_polymarket.py::TestPolymarketClientInit::test_init_with_custom_host_and_chain PASSED
+tests/test_api/test_polymarket.py::TestPolymarketClientInit::test_init_with_credentials PASSED
+tests/test_api/test_polymarket.py::TestGetMarkets::test_get_markets_success PASSED
+tests/test_api/test_polymarket.py::TestGetMarkets::test_get_markets_empty_response PASSED
+tests/test_api/test_polymarket.py::TestGetMarkets::test_get_markets_with_pagination PASSED
+tests/test_api/test_polymarket.py::TestGetMarkets::test_get_markets_network_error PASSED
+tests/test_api/test_polymarket.py::TestGetMarkets::test_get_markets_timeout_error PASSED
+tests/test_api/test_polymarket.py::TestGetMarkets::test_get_markets_rate_limit_error PASSED
+tests/test_api/test_polymarket.py::TestGetMarket::test_get_market_success PASSED
+tests/test_api/test_polymarket.py::TestGetMarket::test_get_market_not_found PASSED
+tests/test_api/test_polymarket.py::TestGetMarket::test_get_market_empty_response PASSED
+tests/test_api/test_polymarket.py::TestGetMarket::test_get_market_network_error PASSED
+tests/test_api/test_polymarket.py::TestGetOrderBook::test_get_order_book_success PASSED
+tests/test_api/test_polymarket.py::TestGetOrderBook::test_get_order_book_empty PASSED
+tests/test_api/test_polymarket.py::TestGetOrderBook::test_get_order_book_network_error PASSED
+tests/test_api/test_polymarket.py::TestCategoryMapping::test_map_category_politics PASSED
+tests/test_api/test_polymarket.py::TestCategoryMapping::test_map_category_crypto PASSED
+tests/test_api/test_polymarket.py::TestCategoryMapping::test_map_category_technology PASSED
+tests/test_api/test_polymarket.py::TestCategoryMapping::test_map_category_business PASSED
+tests/test_api/test_polymarket.py::TestCategoryMapping::test_map_category_economics PASSED
+tests/test_api/test_polymarket.py::TestCategoryMapping::test_map_category_none PASSED
+tests/test_api/test_polymarket.py::TestDatetimeParsing::test_parse_datetime_iso_format PASSED
+tests/test_api/test_polymarket.py::TestDatetimeParsing::test_parse_datetime_with_timezone PASSED
+tests/test_api/test_polymarket.py::TestDatetimeParsing::test_parse_datetime_simple_format PASSED
+tests/test_api/test_polymarket.py::TestDatetimeParsing::test_parse_datetime_date_only PASSED
+tests/test_api/test_polymarket.py::TestDatetimeParsing::test_parse_datetime_invalid PASSED
+tests/test_api/test_polymarket.py::TestDatetimeParsing::test_parse_datetime_none PASSED
+tests/test_api/test_polymarket.py::TestExceptionMapping::test_map_exception_timeout PASSED
+tests/test_api/test_polymarket.py::TestExceptionMapping::test_map_exception_timeout_in_message PASSED
+tests/test_api/test_polymarket.py::TestExceptionMapping::test_map_exception_rate_limit_429 PASSED
+tests/test_api/test_polymarket.py::TestExceptionMapping::test_map_exception_rate_limit_message PASSED
+tests/test_api/test_polymarket.py::TestExceptionMapping::test_map_exception_network PASSED
+tests/test_api/test_polymarket.py::TestSafeFloat::test_safe_float_valid PASSED
+tests/test_api/test_polymarket.py::TestSafeFloat::test_safe_float_invalid PASSED
+tests/test_api/test_polymarket.py::TestSafeFloat::test_safe_float_edge_cases PASSED
+
+============================= 36 passed in 16.13s ==============================
+```
+
+---
+
+## Findings
+
+### 代码质量观察
+
+1. **测试覆盖优秀** (98%)
+   - 所有公共 API 方法完全覆盖
+   - 错误处理路径全面测试
+   - 边界情况处理得当
+
+2. **Mock 使用正确**
+   - 使用 `unittest.mock` 避免真实 API 调用
+   - Fixture 设计合理，易于维护
+
+3. **环境依赖修复**
+   - 发现并修复了 `httpx[socks]` 依赖缺失问题
+   - 建议: 将 `httpx[socks]` 添加到 `requirements.txt`
+
+---
+
+## Checklist Validation
+
+- [x] API tests generated (PolymarketClient)
+- [x] Tests use standard test framework APIs (pytest)
+- [x] Tests cover happy path
+- [x] Tests cover critical error cases (NetworkError, RateLimitError, RequestTimeoutError)
+- [x] All generated tests run successfully (36/36 passed)
+- [x] Tests use proper mocking (MagicMock, patch)
+- [x] Tests have clear descriptions
+- [x] No hardcoded waits or sleeps
+- [x] Tests are independent (no order dependency)
+- [x] Test summary created
+- [x] Tests saved to appropriate directories
+- [x] Summary includes coverage metrics (98%)
+
+---
+
+## Next Steps
+
+1. ✅ 所有测试通过，Story 2.1 可以合并
+2. 📝 可选: 添加测试覆盖 `_parse_markets_response` 异常路径
+3. 📝 建议: 将 `httpx[socks]` 添加到 `requirements.txt`
+4. 🔄 后续 Story 将使用 PolymarketClient:
+   - Story 2.2: 市场数据获取与存储
+   - Story 2.3: 市场筛选规则引擎
+
+---
+
+## Test Commands Reference
+
+```bash
+# 运行 API 测试
+python -m pytest tests/test_api/ -v
 
 # 运行带覆盖率
-python -m pytest tests/ --cov=src --cov-report=html
-```
+python -m pytest tests/test_api/ --cov=src/api --cov-report=term-missing
 
-### React 前端
+# 类型检查
+mypy src/api/
 
-```bash
-cd dashboard
-
-# 运行所有测试
-npm test
-
-# 运行测试监视模式
-npm run test:watch
+# 代码格式检查
+black --check src/api/
+isort --check src/api/
 ```
 
 ---
 
-## 下一步建议
-
-1. **CI/CD 集成**: 将测试添加到 GitHub Actions 或其他 CI 流程
-2. **覆盖率报告**: 使用 `pytest-cov` 生成覆盖率报告
-3. **前端测试修复**: 更新 Vitest 版本以解决兼容性问题
-4. **E2E 测试**: 考虑添加 Playwright 或 Cypress 端到端测试
-5. **更多边界情况**: 为复杂业务逻辑添加更多边界测试
-
----
-
-## Story 1.2 新增测试详情
-
-### Live Mode 验证测试
-
-本次为 Story 1.2 补充了 **16 个 Live Mode 验证测试**，确保在 `TRADING_MODE=live` 时，所有敏感凭证必须配置。
-
-#### LLMSettings Live Mode (6 tests)
-
-```python
-# Paper mode - 空 API key 允许
-test_empty_api_key_allowed_in_paper_mode
-test_empty_api_key_allowed_in_paper_mode_explicit
-
-# Live mode - 空 API key 拒绝
-test_empty_api_key_rejected_in_live_mode
-test_valid_api_key_accepted_in_live_mode
-test_api_key_validation_via_constructor
-test_api_key_empty_via_constructor_in_live_mode
-```
-
-#### PolymarketSettings Live Mode (10 tests)
-
-```python
-# Paper mode - 空凭证允许
-test_empty_pk_allowed_in_paper_mode
-test_empty_proxy_wallet_allowed_in_paper_mode
-test_empty_trader_address_allowed_in_paper_mode
-
-# Live mode - 空凭证拒绝
-test_empty_pk_rejected_in_live_mode
-test_empty_proxy_wallet_rejected_in_live_mode
-test_empty_trader_address_rejected_in_live_mode
-test_all_credentials_valid_in_live_mode
-test_pk_validation_via_constructor_in_live_mode
-test_pk_empty_via_constructor_rejected_in_live_mode
-```
-
-### 测试模式示例
-
-```python
-def test_empty_api_key_rejected_in_live_mode(self) -> None:
-    """Test empty API key raises error in live mode."""
-    with patch.dict(os.environ, {"TRADING_MODE": "live", "LLM_API_KEY": ""}, clear=False):
-        with pytest.raises(PydanticValidationError) as exc_info:
-            LLMSettings()
-        assert "LLM_API_KEY is required when TRADING_MODE=live" in str(exc_info.value)
-```
-
----
-
-## 测试模式说明
-
-本次生成的测试遵循以下模式:
-
-- **Happy Path**: 测试正常功能流程
-- **Error Cases**: 测试 1-2 个关键错误场景
-- **使用项目现有测试框架**: pytest (Python) / Vitest (React)
-- **简洁可维护**: 避免过度抽象和复杂 fixture
-
----
-
-## Story 1.3 日志系统测试详情
-
-### Emoji 日志测试
-
-本次为 Story 1.3 补充了 **22 个新测试**，覆盖 emoji 格式化和文件输出功能。
-
-#### 日志级别 Emoji 配置 (5 tests)
-
-```python
-# 验证各级别 emoji 正确配置
-test_emojis_defined
-test_standard_levels_have_emojis
-test_info_emoji_is_checkmark  # ✅
-test_warning_emoji_is_warning_sign  # ⚠️
-test_error_emoji_is_cross  # ❌
-```
-
-#### 操作 Emoji 配置 (5 tests)
-
-```python
-# 验证操作特定 emoji
-test_operation_emojis_defined
-test_trade_emoji  # 💰
-test_analysis_emoji  # 🧠
-test_data_emoji  # 📊
-test_network_emoji  # 🌐
-```
-
-#### 控制台 Emoji 输出 (3 tests)
-
-```python
-# 验证控制台日志包含 emoji
-test_format_contains_emoji_placeholder
-test_format_structure  # {timestamp} | {level} | {thread} | {module} | {emoji} {message}
-test_different_levels_have_different_emojis  # DEBUG🔍, INFO✅, WARNING⚠️, ERROR❌, CRITICAL🔥
-```
-
-#### 文件输出 Emoji (3 tests)
-
-```python
-# 验证文件日志包含 emoji
-test_file_output_contains_emoji
-test_file_format_structure
-test_file_different_levels_have_different_emojis
-```
-
-#### FileEmojiFormatter (1 test)
-
-```python
-# 验证文件格式化器
-test_formatter_adds_emoji
-```
-
-#### 扩展脱敏测试 (5 tests)
-
-```python
-# 新增驼峰命名 API Key 脱敏测试
-test_sanitizes_api_key_camel_case  # apiKey
-test_sanitizes_api_key_title_case  # ApiKey
-test_normal_message_unchanged
-test_empty_message
-test_filter_returns_true
-```
-
-### 测试模式示例
-
-```python
-def test_file_output_contains_emoji(self) -> None:
-    """Test that file log output contains emoji."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        logger = get_logger("file_emoji_test", log_dir=tmpdir)
-        logger.info("Test file message")
-
-        log_file = Path(tmpdir) / "polymarket_trader.log"
-        assert log_file.exists(), "Log file should be created"
-
-        content = log_file.read_text(encoding="utf-8")
-        # File should contain INFO emoji (✅)
-        assert "✅" in content
-        assert "Test file message" in content
-```
-
-### 验收标准覆盖
-
-| AC | 描述 | 测试覆盖 |
-|----|------|----------|
-| #1 | colorlog 彩色控制台输出 | ✅ `TestGetLogger` |
-| #2 | RotatingFileHandler (10MB, 5备份) | ✅ `TestGetLogger.test_logger_has_handlers` |
-| #3 | 标准化日志格式 | ✅ `TestLogFormatWithEmoji`, `TestFileOutputWithEmoji` |
-| #4 | Emoji 日志支持 | ✅ `TestLogEmojis`, `TestOperationEmojis`, `TestLogFormatWithEmoji` |
-| #5 | 日志脱敏 | ✅ `TestSanitizingFilter` (8 tests) |
-
----
-
-## QA Automate 新增测试详情 (2026-02-15)
-
-### test_main.py - Application 类测试
-
-| 测试类 | 测试数 | 测试内容 |
-|--------|--------|----------|
-| `TestApplication` | 6 | Application 初始化、startup、shutdown、信号处理、流程集成 |
-| `TestMainFunction` | 3 | main() 入口点、BotError 处理、意外异常处理 |
-
-**测试结果**: ✅ 9 passed in 0.46s
-
-### 前端组件测试
-
-#### RecentActivity.test.tsx - 最近活动组件 (7 tests)
-
-- 组件标题渲染
-- 活动 item 列表渲染
-- 时间显示
-- 交易金额显示
-- 系统/预测活动 (无金额)
-
-#### PnLChart.test.tsx - 收益曲线图 (5 tests)
-
-- 图表标题渲染
-- 时间周期副标题
-- 图表容器高度
-- stat-card 容器
-- 响应式容器
-
-#### AppSidebar.test.tsx - 侧边栏导航 (7 tests)
-
-- 应用标题
-- 导航项目列表
-- 模式显示
-- 资金显示
-- 状态指示器
-- 主题切换按钮
-- 导航链接
-
-**前端测试状态**: ⚠️ 待验证 (Node.js 版本需升级到 v18+)
-
----
-
-## 已知问题
-
-### ~~Node.js 版本不兼容~~ ✅ 已解决
-
-- **解决方案**: 使用 `nvm use 23` 切换到 Node.js v23.5.0
-- **已更新 CLAUDE.md** 包含 Node.js 版本切换说明
-
----
-
-## 后续步骤
-
-1. ✅ ~~升级 Node.js 到 v18+~~ → 使用 `nvm use 23`
-2. ✅ ~~运行前端测试验证~~ → 35 tests passed
-3. 为未来实现模块 (`api/`, `core/`, `trading/`) 准备测试模板
-4. 集成 CI/CD 流程
-
----
-
-## Story 1.5 重试机制测试详情 (2026-02-15)
-
-### test_retry.py - 重试装饰器测试 (23 tests)
-
-| 测试类 | 测试数 | 测试内容 |
-|--------|--------|----------|
-| `TestRetryConfig` | 5 | RetryConfig 默认值、自定义值、线性/指数退避延迟计算、最大延迟限制 |
-| `TestRetrySync` | 6 | 同步函数重试 (成功不重试、异常重试、最大次数、异常类型过滤、多次重试后成功、多种异常) |
-| `TestRetryAsync` | 5 | 异步函数重试 (成功不重试、异常重试、最大次数、重试后成功、异常类型过滤) |
-| `TestRetryLogging` | 4 | 日志输出 (重试日志🔄、成功日志✅、失败日志❌、异步日志) |
-| `TestRetryPreservesFunctionMetadata` | 3 | 函数元数据保留 (函数名、文档字符串、异步函数名) |
-
-**测试结果**: ✅ 23 passed in 0.54s
-
-**覆盖率**: 83% (未覆盖: fallback logger 逻辑和 unreachable 分支)
-
-### 重试机制验收标准覆盖
-
-| AC | 描述 | 测试覆盖 |
-|----|------|----------|
-| #1 | 最大重试次数: 3 | ✅ `TestRetryConfig.test_default_values`, `TestRetrySync.test_max_attempts_reached` |
-| #2 | 基础延迟: 1s | ✅ `TestRetryConfig.test_default_values` |
-| #3 | 最大延迟: 30s | ✅ `TestRetryConfig.test_calculate_delay_respects_max` |
-| #4 | 指数退避 | ✅ `TestRetryConfig.test_calculate_delay_exponential` |
-| #5 | 可配置异常类型 | ✅ `TestRetrySync.test_only_configured_exceptions_trigger_retry`, `test_retry_with_multiple_exception_types` |
-| #6 | 支持异步函数 | ✅ `TestRetryAsync` (5 tests) |
-| #7 | 记录重试日志 | ✅ `TestRetryLogging` (4 tests) |
-
-### 测试模式示例
-
-```python
-def test_calculate_delay_exponential(self) -> None:
-    """Test exponential backoff delay calculation.
-
-    Expected delays based on formula: delay = base_delay * (2 ** attempt)
-    - attempt 0: 1 * 2^0 = 1s
-    - attempt 1: 1 * 2^1 = 2s
-    - attempt 2: 1 * 2^2 = 4s
-    """
-    config = RetryConfig(base_delay=1.0, exponential_backoff=True)
-    assert config.calculate_delay(0) == 1.0  # 1 * 2^0 = 1
-    assert config.calculate_delay(1) == 2.0  # 1 * 2^1 = 2
-    assert config.calculate_delay(2) == 4.0  # 1 * 2^2 = 4
-```
-
-### 源文件
-
-- `src/utils/retry.py` - 重试装饰器实现 (83 行代码)
-- `tests/test_retry.py` - 测试文件 (388 行代码)
-
----
-
-## Story 1.6 数据库模块测试详情 (2026-02-15)
-
-### test_storage/test_database.py - 数据库测试 (31 tests)
-
-| 测试类 | 测试数 | 测试内容 |
-|--------|--------|----------|
-| `TestDatabaseConfig` | 3 | DatabaseConfig 默认值、自定义 pool_size、from_settings() 路径创建 |
-| `TestDatabaseManager` | 6 | 连接成功、上下文管理器、表创建、目录创建、幂等性、日志消息 |
-| `TestDatabaseSchema` | 4 | markets 表列、system_state 表列、主键验证 |
-| `TestDatabaseErrorHandling` | 2 | 无效路径错误、连接错误传播 |
-| `TestConvenienceFunctions` | 3 | init_db 函数、get_db_manager 单例、get_connection 函数 |
-| `TestDatabaseError` | 5 | BotError 子类、消息保留、原始异常、operation 参数、全参数 |
-| `TestDatabaseManagerErrorHandling` | 2 | 连接错误日志、mkdir 失败处理 |
-| `TestDatabaseConfigEdgeCases` | 3 | 字符串路径、Path 对象、pool_size 边界 |
-| `TestDatabaseManagerConnection` | 3 | 外键启用、事务隔离、连接关闭 |
-
-**测试结果**: ✅ 31 passed in 0.32s
-
-### 数据库模块验收标准覆盖
-
-| AC | 描述 | 测试覆盖 |
-|----|------|----------|
-| #1 | SQLite + aiosqlite 异步连接 | ✅ `TestDatabaseManager.test_get_connection_success` |
-| #2 | 连接池管理 (异步锁) | ✅ `TestDatabaseManagerConnection` |
-| #3 | Schema 初始化 (markets, system_state) | ✅ `TestDatabaseSchema` |
-| #4 | 外键约束启用 | ✅ `TestDatabaseManagerConnection.test_connection_enables_foreign_keys` |
-| #5 | 目录自动创建 | ✅ `TestDatabaseManager.test_init_db_creates_directory` |
-| #6 | 错误处理 (DatabaseError) | ✅ `TestDatabaseErrorHandling`, `TestDatabaseError` |
-| #7 | 单例模式 | ✅ `TestConvenienceFunctions.test_get_db_manager_singleton` |
-
-### 测试模式示例
-
-```python
-@pytest.mark.asyncio
-async def test_connection_enables_foreign_keys(self, tmp_path: Path) -> None:
-    """Test that foreign keys are enabled by default."""
-    from src.storage.database import DatabaseConfig, DatabaseManager
-
-    config = DatabaseConfig(db_path=tmp_path / "test.db")
-    manager = DatabaseManager(config)
-
-    async with manager.get_connection() as conn:
-        cursor = await conn.execute("PRAGMA foreign_keys")
-        result = await cursor.fetchone()
-        assert result[0] == 1  # Foreign keys are ON
-```
-
-### 源文件
-
-- `src/storage/database.py` - 数据库管理实现 (220 行代码)
-- `tests/test_storage/test_database.py` - 测试文件 (400+ 行代码)
-
----
-
-*Generated by BMM QA Automate Workflow*
+**Generated by**: Quinn QA Automate Workflow
+**Framework**: pytest + pytest-asyncio + pytest-cov

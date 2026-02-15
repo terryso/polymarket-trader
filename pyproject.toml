@@ -54,4 +54,15 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --tb=short"
+# Add project root to Python path so `src` module can be imported
+pythonpath = ["."]
+# By default, skip integration tests. Use `pytest -m integration` to run only integration tests.
+# Use `pytest -m "unit or not integration"` to run unit tests only.
+addopts = "-v --tb=short -m 'not integration'"
+markers = [
+    "unit: Unit tests (fast, mocked, no external calls)",
+    "integration: Integration tests (slow, real API calls, requires network)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
