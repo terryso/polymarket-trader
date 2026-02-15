@@ -1,0 +1,28 @@
+# Polymarket
+py-clob-client>=0.1.0
+web3>=5.31.0
+
+# LLM (OpenAI compatible protocol - GLM)
+openai>=1.0.0
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Database
+aiosqlite>=0.19.0
+
+# HTTP & Config
+requests>=2.31.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Logging
+colorlog>=6.7.0
+
+# Scheduling
+apscheduler>=3.10.0
+
+# Utilities
+halo>=0.0.31

@@ -119,12 +119,14 @@ yarn-error.log*
 
 # ==================== Project Specific ====================
 
-# Logs
-logs/
+# Logs (keep directory, ignore contents)
+logs/*
+!logs/.gitkeep
 *.log
 
-# Database
-data/
+# Database (keep directory, ignore contents)
+data/*
+!data/.gitkeep
 *.db
 *.sqlite
 *.sqlite3
