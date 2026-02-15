@@ -2,7 +2,7 @@
 
 **生成日期**: 2026-02-15
 **项目**: polymarket-trader
-**更新**: Story 1.3 日志系统 Emoji 测试覆盖
+**更新**: QA Automate 新增 Application 和前端组件测试
 
 ---
 
@@ -15,18 +15,24 @@
 | `tests/test_config.py` | 65 | 配置管理测试 (Settings, LLMSettings, TradingSettings 等) + Live Mode 验证 |
 | `tests/test_exceptions.py` | 30 | 自定义异常类测试 (BotError, NetworkError, TradingError 等) |
 | `tests/test_logger.py` | 34 | 日志配置测试 (Emoji, 脱敏, 格式化, 文件输出) |
+| `tests/test_main.py` | **9** | **🆕 Application 类和 main 入口点测试** |
 
-**Python 测试总计**: 129 个测试用例
+**Python 测试总计**: 138 个测试用例 (+9 新增)
 
 ### React 前端测试
 
 | 文件 | 测试数 | 描述 |
 |------|--------|------|
 | `dashboard/src/components/dashboard/StatCard.test.tsx` | 8 | StatCard 组件渲染测试 |
+| `dashboard/src/components/dashboard/RecentActivity.test.tsx` | **7** | **🆕 最近活动列表组件测试** |
+| `dashboard/src/components/dashboard/PnLChart.test.tsx` | **5** | **🆕 收益曲线图组件测试** |
+| `dashboard/src/components/layout/AppSidebar.test.tsx` | **7** | **🆕 侧边栏导航组件测试** |
 | `dashboard/src/lib/utils.test.ts` | 7 | cn() 工具函数测试 |
 | `dashboard/src/test/example.test.ts` | 1 | 示例测试 (已存在) |
 
-**前端测试总计**: 16 个测试用例
+**前端测试总计**: 35 个测试用例 (+19 新增)
+
+**前端测试结果**: ✅ 35 passed in 1.83s (使用 Node.js v23.5.0)
 
 ---
 
@@ -308,6 +314,67 @@ def test_file_output_contains_emoji(self) -> None:
 | #3 | 标准化日志格式 | ✅ `TestLogFormatWithEmoji`, `TestFileOutputWithEmoji` |
 | #4 | Emoji 日志支持 | ✅ `TestLogEmojis`, `TestOperationEmojis`, `TestLogFormatWithEmoji` |
 | #5 | 日志脱敏 | ✅ `TestSanitizingFilter` (8 tests) |
+
+---
+
+## QA Automate 新增测试详情 (2026-02-15)
+
+### test_main.py - Application 类测试
+
+| 测试类 | 测试数 | 测试内容 |
+|--------|--------|----------|
+| `TestApplication` | 6 | Application 初始化、startup、shutdown、信号处理、流程集成 |
+| `TestMainFunction` | 3 | main() 入口点、BotError 处理、意外异常处理 |
+
+**测试结果**: ✅ 9 passed in 0.46s
+
+### 前端组件测试
+
+#### RecentActivity.test.tsx - 最近活动组件 (7 tests)
+
+- 组件标题渲染
+- 活动 item 列表渲染
+- 时间显示
+- 交易金额显示
+- 系统/预测活动 (无金额)
+
+#### PnLChart.test.tsx - 收益曲线图 (5 tests)
+
+- 图表标题渲染
+- 时间周期副标题
+- 图表容器高度
+- stat-card 容器
+- 响应式容器
+
+#### AppSidebar.test.tsx - 侧边栏导航 (7 tests)
+
+- 应用标题
+- 导航项目列表
+- 模式显示
+- 资金显示
+- 状态指示器
+- 主题切换按钮
+- 导航链接
+
+**前端测试状态**: ⚠️ 待验证 (Node.js 版本需升级到 v18+)
+
+---
+
+## 已知问题
+
+### ~~Node.js 版本不兼容~~ ✅ 已解决
+
+- **解决方案**: 使用 `nvm use 23` 切换到 Node.js v23.5.0
+- **已更新 CLAUDE.md** 包含 Node.js 版本切换说明
+
+---
+
+## 后续步骤
+
+1. ✅ ~~升级 Node.js 到 v18+~~ → 使用 `nvm use 23`
+2. ✅ ~~运行前端测试验证~~ → 35 tests passed
+3. 为未来实现模块 (`api/`, `core/`, `trading/`) 准备测试模板
+4. 集成 CI/CD 流程
 
 ---
 

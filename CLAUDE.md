@@ -29,6 +29,9 @@ pip install -r requirements.txt -r requirements-dev.txt
 ### React 前端
 
 ```bash
+# 切换到 Node.js 23 (前端需要 Node 18+)
+nvm use 23
+
 cd dashboard
 npm install
 ```
@@ -61,6 +64,9 @@ python -m pytest tests/test_config.py::TestSettings -v
 ### React 前端测试
 
 ```bash
+# 切换到 Node.js 23 (前端测试需要 Node 18+)
+nvm use 23
+
 cd dashboard
 
 # 运行所有测试（单次）
@@ -142,9 +148,10 @@ polymarket-trader/
 |------|------|
 | 激活 Python 虚拟环境 | `source .venv/bin/activate` |
 | 运行 Python 测试 | `python -m pytest tests/ -v` |
-| 安装前端依赖 | `cd dashboard && npm install` |
-| 运行前端测试 | `cd dashboard && npm test` |
-| 启动前端开发服务器 | `cd dashboard && npm run dev` |
+| 切换 Node.js 版本 | `nvm use 23` |
+| 安装前端依赖 | `nvm use 23 && cd dashboard && npm install` |
+| 运行前端测试 | `nvm use 23 && cd dashboard && npm test` |
+| 启动前端开发服务器 | `nvm use 23 && cd dashboard && npm run dev` |
 
 ---
 
@@ -153,3 +160,4 @@ polymarket-trader/
 - 虚拟环境 `.venv/` 已在 `.gitignore` 中，无需提交
 - 前端测试使用 Vitest，配置在 `dashboard/vitest.config.ts`
 - Python 测试使用 pytest，配置在 `pyproject.toml`
+- **前端需要 Node.js 18+**，使用 `nvm use 23` 切换版本后再运行前端命令
