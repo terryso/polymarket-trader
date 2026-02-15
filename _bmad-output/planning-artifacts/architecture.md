@@ -442,49 +442,81 @@ async def call_api(...):
 
 ### Frontend Architecture
 
-**技术栈:**
+**技术栈 (实际实现):**
 
 | 类别 | 选择 | 版本 |
 |------|------|------|
-| 框架 | React | 18.x |
-| 构建工具 | Vite | 5.x |
-| 语言 | TypeScript | 5.x |
-| 路由 | React Router | 6.x |
-| 数据获取 | TanStack Query | 5.x |
-| 样式 | Tailwind CSS | 3.x |
-| 组件库 | shadcn/ui | latest |
-| 图表 | Recharts | 2.x |
+| 框架 | React | 18.3.1 |
+| 构建工具 | Vite | 5.4.19 |
+| 语言 | TypeScript | 5.8.3 |
+| 路由 | React Router | 6.30.1 |
+| 数据获取 | TanStack Query | 5.83.0 |
+| 样式 | Tailwind CSS | 3.4.17 |
+| 组件库 | shadcn/ui | 50+ 组件 |
+| 图表 | Recharts | 2.15.4 |
+| 表单 | React Hook Form | 7.61.1 |
+| 日期 | date-fns | 3.6.0 |
 
-**前端项目结构:**
+**前端项目结构 (实际):**
 
 ```
 dashboard/
 ├── src/
-│   ├── components/     # 可复用组件
-│   │   ├── ui/         # shadcn/ui 组件
-│   │   └── charts/     # 图表组件
-│   ├── pages/          # 页面组件
-│   │   ├── Home.tsx
-│   │   ├── Positions.tsx
-│   │   ├── Trades.tsx
-│   │   └── Predictions.tsx
-│   ├── hooks/          # 自定义 hooks
-│   ├── api/            # API 调用
-│   ├── types/          # TypeScript 类型
-│   └── App.tsx
+│   ├── components/           # 可复用组件
+│   │   ├── ui/               # shadcn/ui 组件 (50+)
+│   │   │   ├── button.tsx
+│   │   │   ├── card.tsx
+│   │   │   ├── table.tsx
+│   │   │   ├── dialog.tsx
+│   │   │   └── ... (50+ 组件)
+│   │   ├── dashboard/        # Dashboard 组件
+│   │   │   ├── StatsCard.tsx
+│   │   │   ├── ProfitChart.tsx
+│   │   │   └── RecentActivity.tsx
+│   │   └── layout/           # 布局组件
+│   │       ├── DashboardLayout.tsx
+│   │       └── Sidebar.tsx
+│   ├── pages/                # 页面组件
+│   │   ├── Index.tsx         # 首页/概览
+│   │   ├── Positions.tsx     # 持仓列表
+│   │   ├── Trades.tsx        # 交易历史
+│   │   ├── Predictions.tsx   # 预测记录
+│   │   ├── Settings.tsx      # 系统设置
+│   │   └── NotFound.tsx      # 404 页面
+│   ├── data/                 # Mock 数据
+│   │   └── mockData.ts
+│   ├── hooks/                # 自定义 hooks
+│   ├── lib/                  # 工具库
+│   │   └── utils.ts
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── index.css
 ├── package.json
-└── vite.config.ts
+├── vite.config.ts
+├── tailwind.config.js
+└── tsconfig.json
 ```
 
-**Dashboard 页面:**
+**Dashboard 页面 (实际实现):**
 
-| 路由 | 页面 | 功能 |
-|------|------|------|
-| `/` | Home | 系统状态概览、收益统计 |
-| `/positions` | Positions | 当前持仓列表、PnL 显示 |
-| `/trades` | Trades | 交易历史记录 |
-| `/predictions` | Predictions | 预测记录、准确率统计 |
-| `/settings` | Settings | 配置查看（脱敏） |
+| 路由 | 页面 | 功能 | 状态 |
+|------|------|------|------|
+| `/` | Index | 系统状态概览、收益统计、快捷操作 | ✅ |
+| `/positions` | Positions | 当前持仓列表、PnL 显示、模式切换 | ✅ |
+| `/trades` | Trades | 交易历史记录、筛选、分页 | ✅ |
+| `/predictions` | Predictions | 预测记录、准确率统计、分析详情 | ✅ |
+| `/settings` | Settings | 配置查看（脱敏）、系统设置 | ✅ |
+| `*` | NotFound | 404 页面 | ✅ |
+
+**已集成的 shadcn/ui 组件:**
+
+| 类别 | 组件 |
+|------|------|
+| 布局 | Card, Separator, ScrollArea, Sheet, Tabs |
+| 表单 | Button, Input, Select, Switch, Checkbox, Form, Label |
+| 数据 | Table, Badge, Avatar, Progress |
+| 反馈 | Dialog, Toast, Alert, Tooltip, Popover |
+| 导航 | DropdownMenu, NavigationMenu, Pagination |
 
 ---
 
@@ -895,36 +927,43 @@ polymarket-trader/
 │       ├── crypto.py                   # 加密工具
 │       └── helpers.py                  # 辅助函数
 │
-├── dashboard/                          # React 前端
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   ├── index.html
+├── dashboard/                          # React 前端 (已实现)
+│   ├── package.json                    # 依赖配置
+│   ├── vite.config.ts                  # Vite 配置
+│   ├── tsconfig.json                   # TypeScript 配置
+│   ├── tailwind.config.js              # Tailwind 配置
+│   ├── postcss.config.js               # PostCSS 配置
+│   ├── index.html                      # HTML 入口
 │   └── src/
 │       ├── main.tsx                    # 入口文件
-│       ├── App.tsx                     # 根组件
-│       ├── index.css                   # 全局样式
+│       ├── App.tsx                     # 根组件 (路由配置)
+│       ├── index.css                   # 全局样式 + Tailwind
 │       │
 │       ├── components/                 # UI 组件
-│       │   ├── ui/                     # shadcn/ui 组件
-│       │   ├── charts/                 # 图表组件
-│       │   ├── MarketCard.tsx
-│       │   ├── TradeList.tsx
-│       │   └── StatsCard.tsx
+│       │   ├── ui/                     # shadcn/ui 组件 (50+)
+│       │   ├── dashboard/              # Dashboard 组件
+│       │   │   ├── StatsCard.tsx       # 统计卡片
+│       │   │   ├── ProfitChart.tsx     # 收益图表
+│       │   │   └── RecentActivity.tsx  # 最近活动
+│       │   └── layout/                 # 布局组件
+│       │       ├── DashboardLayout.tsx # 主布局
+│       │       └── Sidebar.tsx         # 侧边栏
 │       │
-│       ├── pages/                      # 页面组件
-│       │   ├── Home.tsx
-│       │   ├── Positions.tsx
-│       │   ├── Trades.tsx
-│       │   ├── Predictions.tsx
-│       │   └── Settings.tsx
+│       ├── pages/                      # 页面组件 (已实现)
+│       │   ├── Index.tsx               # 首页/概览
+│       │   ├── Positions.tsx           # 持仓列表
+│       │   ├── Trades.tsx              # 交易历史
+│       │   ├── Predictions.tsx         # 预测记录
+│       │   ├── Settings.tsx            # 系统设置
+│       │   └── NotFound.tsx            # 404 页面
+│       │
+│       ├── data/                       # 数据
+│       │   └── mockData.ts             # Mock 数据
 │       │
 │       ├── hooks/                      # 自定义 hooks
-│       ├── api/                        # API 调用
-│       ├── types/                      # TypeScript 类型
-│       └── lib/                        # 工具库
+│       ├── lib/                        # 工具库
+│       │   └── utils.ts                # cn() 等工具函数
+│       └── types/                      # TypeScript 类型
 │
 ├── tests/                              # 测试
 │   ├── conftest.py
@@ -1031,15 +1070,15 @@ polymarket-trader/
 
 **功能需求覆盖:**
 
-| 需求 | 状态 | 架构支持 |
-|------|------|----------|
-| F1: LLM 分析引擎 | ✅ | `src/analysis/llm_analyzer.py` |
-| F2: Paper Trading | ✅ | `src/trading/paper_trading.py` |
-| F3: 风险控制 | ✅ | `src/trading/risk_control.py` + `src/core/circuit_breaker.py` |
-| F4: 市场筛选 | ✅ | `src/analysis/market_filter.py` |
-| F5: 预测追踪 | ✅ | `src/storage/repositories/prediction_repo.py` |
-| F6: 学习日志 | ✅ | `src/trading/executor.py` + 日志系统 |
-| F7: Web Dashboard | ✅ | `src/dashboard/` + `dashboard/` |
+| 需求 | 状态 | 架构支持 | 实现位置 |
+|------|------|----------|----------|
+| F1: LLM 分析引擎 | 待开发 | ✅ | `src/analysis/llm_analyzer.py` |
+| F2: Paper Trading | 待开发 | ✅ | `src/trading/paper_trading.py` |
+| F3: 风险控制 | 待开发 | ✅ | `src/trading/risk_control.py` + `src/core/circuit_breaker.py` |
+| F4: 市场筛选 | 待开发 | ✅ | `src/analysis/market_filter.py` |
+| F5: 预测追踪 | 待开发 | ✅ | `src/storage/repositories/prediction_repo.py` |
+| F6: 学习日志 | 待开发 | ✅ | `src/trading/executor.py` + 日志系统 |
+| F7: Web Dashboard | ✅ 完成 | ✅ | `dashboard/src/` (6 页面已实现) |
 
 **非功能需求覆盖:**
 
@@ -1088,7 +1127,15 @@ polymarket-trader/
 
 ### Architecture Readiness Assessment
 
-**Overall Status:** ✅ READY FOR IMPLEMENTATION
+**Overall Status:** 🔄 IN PROGRESS (前端 UI 已完成)
+
+**Implementation Progress:**
+
+| 组件 | 状态 | 说明 |
+|------|------|------|
+| React 前端 | ✅ 完成 | 6 页面 + 50+ shadcn 组件 |
+| Python 后端 | 待开发 | M1.2 - M1.6 |
+| FastAPI Dashboard API | 待开发 | 后端 API |
 
 **Confidence Level:** HIGH
 
@@ -1097,12 +1144,22 @@ polymarket-trader/
 - 完整的风险控制设计
 - Paper Testing 优先策略
 - 参考项目验证的技术方案
+- 前端 UI 已实现，可并行开发后端
 
 **Areas for Future Enhancement:**
 - Phase 2: 通知系统
 - Phase 3: 回测系统
 - Phase 3: 多 LLM 交叉验证
 - Phase 3: 自适应参数
+
+---
+
+## Version History
+
+| 版本 | 日期 | 变更说明 |
+|------|------|----------|
+| 1.1 | 2026-02-15 | 更新前端架构为实际实现，添加 UI 组件详情 |
+| 1.0 | 2026-02-15 | 初始版本 |
 
 ### Implementation Handoff
 
