@@ -224,6 +224,10 @@ class Settings(BaseSettings):
         default="INFO",
         description="Logging level"
     )
+    data_dir: str = Field(
+        default="data",
+        description="Directory for data storage (database, etc.)"
+    )
 
     @field_validator("log_level")
     @classmethod

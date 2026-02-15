@@ -47,7 +47,7 @@ development_status:
   1-3-logging-system: done
   1-4-custom-exception-hierarchy: done
   1-5-retry-mechanism: done
-  1-6-database-initialization: backlog
+  1-6-database-initialization: done
   1-7-pydantic-data-models: backlog
   epic-1-retrospective: optional
 

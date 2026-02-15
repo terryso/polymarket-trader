@@ -14,6 +14,7 @@ __all__ = [
     "NetworkError",
     "TradingError",
     "ValidationError",
+    "DatabaseError",
     "RateLimitError",
     "RequestTimeoutError",
     "InsufficientFundsError",
@@ -157,6 +158,30 @@ class ValidationError(BotError):
         super().__init__(message, **context)
         self.field = field
         self.value = value
+
+
+class DatabaseError(BotError):
+    """Raised when there is a database operation error."""
+
+    def __init__(
+        self,
+        message: str = "Database error",
+        operation: str | None = None,
+        original_exception: Exception | None = None,
+        **context: Any,
+    ) -> None:
+        """Initialize database error.
+
+        Args:
+            message: Error message
+            operation: The database operation that failed
+            original_exception: The original exception
+            **context: Additional context information
+        """
+        if operation:
+            message = f"{message} (operation: {operation})"
+        super().__init__(message, original_exception, **context)
+        self.operation = operation
 
 
 class RateLimitError(NetworkError):

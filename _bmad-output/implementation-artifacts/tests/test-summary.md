@@ -2,7 +2,7 @@
 
 **生成日期**: 2026-02-15
 **项目**: polymarket-trader
-**更新**: QA Automate 新增 Application 和前端组件测试
+**更新**: QA Automate 验证 Story 1.6 数据库模块测试
 
 ---
 
@@ -15,9 +15,11 @@
 | `tests/test_config.py` | 65 | 配置管理测试 (Settings, LLMSettings, TradingSettings 等) + Live Mode 验证 |
 | `tests/test_exceptions.py` | 30 | 自定义异常类测试 (BotError, NetworkError, TradingError 等) |
 | `tests/test_logger.py` | 34 | 日志配置测试 (Emoji, 脱敏, 格式化, 文件输出) |
-| `tests/test_main.py` | **9** | **🆕 Application 类和 main 入口点测试** |
+| `tests/test_main.py` | 9 | Application 类和 main 入口点测试 |
+| `tests/test_retry.py` | 23 | Story 1.5 重试机制测试 (RetryConfig, 同步/异步重试, 日志) |
+| `tests/test_storage/test_database.py` | **31** | **🆕 Story 1.6 数据库模块测试 (DatabaseConfig, DatabaseManager, Schema, 连接管理)** |
 
-**Python 测试总计**: 138 个测试用例 (+9 新增)
+**Python 测试总计**: 208 个测试用例 (✅ 全部通过)
 
 ### React 前端测试
 
@@ -41,7 +43,7 @@
 ### Python 后端
 
 ```
-✅ 129 passed in 0.19s
+✅ 208 passed in 1.00s
 ```
 
 **测试框架**: pytest + pytest-asyncio
@@ -50,6 +52,9 @@
 - `src/config.py` - 配置加载、验证、Live Mode 安全检查 (65 tests)
 - `src/exceptions.py` - 异常类层级 (30 tests)
 - `src/utils/logger.py` - 日志配置、Emoji、敏感信息过滤、文件输出 (34 tests)
+- `src/main.py` - Application 类生命周期 (9 tests)
+- `src/utils/retry.py` - 重试装饰器、指数退避 (23 tests, 83% 覆盖率)
+- `src/storage/database.py` - 数据库连接、Schema 初始化、错误处理 (31 tests)
 
 ### React 前端
 
@@ -375,6 +380,112 @@ def test_file_output_contains_emoji(self) -> None:
 2. ✅ ~~运行前端测试验证~~ → 35 tests passed
 3. 为未来实现模块 (`api/`, `core/`, `trading/`) 准备测试模板
 4. 集成 CI/CD 流程
+
+---
+
+## Story 1.5 重试机制测试详情 (2026-02-15)
+
+### test_retry.py - 重试装饰器测试 (23 tests)
+
+| 测试类 | 测试数 | 测试内容 |
+|--------|--------|----------|
+| `TestRetryConfig` | 5 | RetryConfig 默认值、自定义值、线性/指数退避延迟计算、最大延迟限制 |
+| `TestRetrySync` | 6 | 同步函数重试 (成功不重试、异常重试、最大次数、异常类型过滤、多次重试后成功、多种异常) |
+| `TestRetryAsync` | 5 | 异步函数重试 (成功不重试、异常重试、最大次数、重试后成功、异常类型过滤) |
+| `TestRetryLogging` | 4 | 日志输出 (重试日志🔄、成功日志✅、失败日志❌、异步日志) |
+| `TestRetryPreservesFunctionMetadata` | 3 | 函数元数据保留 (函数名、文档字符串、异步函数名) |
+
+**测试结果**: ✅ 23 passed in 0.54s
+
+**覆盖率**: 83% (未覆盖: fallback logger 逻辑和 unreachable 分支)
+
+### 重试机制验收标准覆盖
+
+| AC | 描述 | 测试覆盖 |
+|----|------|----------|
+| #1 | 最大重试次数: 3 | ✅ `TestRetryConfig.test_default_values`, `TestRetrySync.test_max_attempts_reached` |
+| #2 | 基础延迟: 1s | ✅ `TestRetryConfig.test_default_values` |
+| #3 | 最大延迟: 30s | ✅ `TestRetryConfig.test_calculate_delay_respects_max` |
+| #4 | 指数退避 | ✅ `TestRetryConfig.test_calculate_delay_exponential` |
+| #5 | 可配置异常类型 | ✅ `TestRetrySync.test_only_configured_exceptions_trigger_retry`, `test_retry_with_multiple_exception_types` |
+| #6 | 支持异步函数 | ✅ `TestRetryAsync` (5 tests) |
+| #7 | 记录重试日志 | ✅ `TestRetryLogging` (4 tests) |
+
+### 测试模式示例
+
+```python
+def test_calculate_delay_exponential(self) -> None:
+    """Test exponential backoff delay calculation.
+
+    Expected delays based on formula: delay = base_delay * (2 ** attempt)
+    - attempt 0: 1 * 2^0 = 1s
+    - attempt 1: 1 * 2^1 = 2s
+    - attempt 2: 1 * 2^2 = 4s
+    """
+    config = RetryConfig(base_delay=1.0, exponential_backoff=True)
+    assert config.calculate_delay(0) == 1.0  # 1 * 2^0 = 1
+    assert config.calculate_delay(1) == 2.0  # 1 * 2^1 = 2
+    assert config.calculate_delay(2) == 4.0  # 1 * 2^2 = 4
+```
+
+### 源文件
+
+- `src/utils/retry.py` - 重试装饰器实现 (83 行代码)
+- `tests/test_retry.py` - 测试文件 (388 行代码)
+
+---
+
+## Story 1.6 数据库模块测试详情 (2026-02-15)
+
+### test_storage/test_database.py - 数据库测试 (31 tests)
+
+| 测试类 | 测试数 | 测试内容 |
+|--------|--------|----------|
+| `TestDatabaseConfig` | 3 | DatabaseConfig 默认值、自定义 pool_size、from_settings() 路径创建 |
+| `TestDatabaseManager` | 6 | 连接成功、上下文管理器、表创建、目录创建、幂等性、日志消息 |
+| `TestDatabaseSchema` | 4 | markets 表列、system_state 表列、主键验证 |
+| `TestDatabaseErrorHandling` | 2 | 无效路径错误、连接错误传播 |
+| `TestConvenienceFunctions` | 3 | init_db 函数、get_db_manager 单例、get_connection 函数 |
+| `TestDatabaseError` | 5 | BotError 子类、消息保留、原始异常、operation 参数、全参数 |
+| `TestDatabaseManagerErrorHandling` | 2 | 连接错误日志、mkdir 失败处理 |
+| `TestDatabaseConfigEdgeCases` | 3 | 字符串路径、Path 对象、pool_size 边界 |
+| `TestDatabaseManagerConnection` | 3 | 外键启用、事务隔离、连接关闭 |
+
+**测试结果**: ✅ 31 passed in 0.32s
+
+### 数据库模块验收标准覆盖
+
+| AC | 描述 | 测试覆盖 |
+|----|------|----------|
+| #1 | SQLite + aiosqlite 异步连接 | ✅ `TestDatabaseManager.test_get_connection_success` |
+| #2 | 连接池管理 (异步锁) | ✅ `TestDatabaseManagerConnection` |
+| #3 | Schema 初始化 (markets, system_state) | ✅ `TestDatabaseSchema` |
+| #4 | 外键约束启用 | ✅ `TestDatabaseManagerConnection.test_connection_enables_foreign_keys` |
+| #5 | 目录自动创建 | ✅ `TestDatabaseManager.test_init_db_creates_directory` |
+| #6 | 错误处理 (DatabaseError) | ✅ `TestDatabaseErrorHandling`, `TestDatabaseError` |
+| #7 | 单例模式 | ✅ `TestConvenienceFunctions.test_get_db_manager_singleton` |
+
+### 测试模式示例
+
+```python
+@pytest.mark.asyncio
+async def test_connection_enables_foreign_keys(self, tmp_path: Path) -> None:
+    """Test that foreign keys are enabled by default."""
+    from src.storage.database import DatabaseConfig, DatabaseManager
+
+    config = DatabaseConfig(db_path=tmp_path / "test.db")
+    manager = DatabaseManager(config)
+
+    async with manager.get_connection() as conn:
+        cursor = await conn.execute("PRAGMA foreign_keys")
+        result = await cursor.fetchone()
+        assert result[0] == 1  # Foreign keys are ON
+```
+
+### 源文件
+
+- `src/storage/database.py` - 数据库管理实现 (220 行代码)
+- `tests/test_storage/test_database.py` - 测试文件 (400+ 行代码)
 
 ---
 
