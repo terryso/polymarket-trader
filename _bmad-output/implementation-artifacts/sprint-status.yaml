@@ -43,7 +43,7 @@ development_status:
   # Epic 1: 项目基础设施与配置
   epic-1: in-progress
   1-1-project-structure-initialization: done
-  1-2-configuration-management-system: backlog
+  1-2-configuration-management-system: done
   1-3-logging-system: backlog
   1-4-custom-exception-hierarchy: backlog
   1-5-retry-mechanism: backlog
