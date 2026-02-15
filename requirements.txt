@@ -21,6 +21,9 @@ pydantic-settings>=2.0.0
 # Logging
 colorlog>=6.7.0
 
+# Python 3.9 compatibility for | type syntax
+eval-type-backport>=0.2.0
+
 # Scheduling
 apscheduler>=3.10.0
 

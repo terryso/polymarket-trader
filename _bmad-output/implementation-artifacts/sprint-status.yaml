@@ -48,7 +48,7 @@ development_status:
   1-4-custom-exception-hierarchy: done
   1-5-retry-mechanism: done
   1-6-database-initialization: done
-  1-7-pydantic-data-models: backlog
+  1-7-pydantic-data-models: done
   epic-1-retrospective: optional
 
   # Epic 2: 市场数据获取与筛选
