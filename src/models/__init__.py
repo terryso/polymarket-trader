@@ -12,6 +12,13 @@ Usage:
 
 from __future__ import annotations
 
+from src.models.api_response import (
+    ApiResponse,
+    ErrorDetail,
+    ErrorCode,
+    PaginatedResponse,
+    PaginationMeta,
+)
 from src.models.market import Market, MarketCategory
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.prediction import Prediction, PredictionResult, Recommendation
@@ -19,6 +26,12 @@ from src.models.statistics import DailyStats, Statistics
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 
 __all__ = [
+    # API Response
+    "ApiResponse",
+    "ErrorDetail",
+    "ErrorCode",
+    "PaginationMeta",
+    "PaginatedResponse",
     # Market
     "Market",
     "MarketCategory",

@@ -22,6 +22,7 @@ __all__ = [
     "DatabaseManager",
     "get_db_manager",
     "init_db",
+    "close_db",
     "get_connection",
 ]
 
@@ -339,6 +340,24 @@ async def init_db() -> None:
     """
     manager = get_db_manager()
     await manager.init_db()
+
+
+async def close_db() -> None:
+    """Close the database connection pool.
+
+    Convenience function that resets the global database manager,
+    releasing any held resources.
+
+    This should be called during application shutdown to ensure
+    proper cleanup of database resources.
+    """
+    global _db_manager
+    if _db_manager is not None:
+        # The DatabaseManager uses per-request connections that are
+        # automatically closed after each use, so we just need to
+        # clear the singleton reference.
+        _db_manager = None
+        logger.info("Database manager closed")
 
 
 @asynccontextmanager
