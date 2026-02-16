@@ -1,6 +1,6 @@
 # Story 6.2: 准确率统计
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -32,57 +32,57 @@ accuracy = correct_predictions / total_validated_predictions
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 定义准确率统计数据模型 (AC: 2, 3)
-  - [ ] 1.1 创建 `AccuracyStatistics` 数据类 (总体准确率)
-  - [ ] 1.2 创建 `CategoryAccuracy` 数据类 (按类别统计)
-  - [ ] 1.3 创建 `ConfidenceAccuracy` 数据类 (按置信度区间统计)
-  - [ ] 1.4 创建 `DateRangeAccuracy` 数据类 (按时间范围统计)
-  - [ ] 1.5 更新 `__all__` 导出
+- [x] Task 1: 定义准确率统计数据模型 (AC: 2, 3)
+  - [x] 1.1 创建 `AccuracyStatistics` 数据类 (总体准确率)
+  - [x] 1.2 创建 `CategoryAccuracy` 数据类 (按类别统计)
+  - [x] 1.3 创建 `ConfidenceAccuracy` 数据类 (按置信度区间统计)
+  - [x] 1.4 创建 `DateRangeAccuracy` 数据类 (按时间范围统计)
+  - [x] 1.5 更新 `__all__` 导出
 
-- [ ] Task 2: 实现总体准确率统计 (AC: 1)
-  - [ ] 2.1 实现 `get_overall_accuracy()` 方法
-  - [ ] 2.2 从 PredictionRepository 获取所有已验证预测
-  - [ ] 2.3 计算总体准确率
-  - [ ] 2.4 添加日志记录 (📊 emoji)
+- [x] Task 2: 实现总体准确率统计 (AC: 1)
+  - [x] 2.1 实现 `get_overall_accuracy()` 方法
+  - [x] 2.2 从 PredictionRepository 获取所有已验证预测
+  - [x] 2.3 计算总体准确率
+  - [x] 2.4 添加日志记录 (📊 emoji)
 
-- [ ] Task 3: 实现按类别统计 (AC: 1)
-  - [ ] 3.1 实现 `get_accuracy_by_category()` 方法
-  - [ ] 3.2 扩展 PredictionRepository 添加 `get_validated_with_market()`
-  - [ ] 3.3 按 market.category 分组统计
-  - [ ] 3.4 返回每个类别的准确率
+- [x] Task 3: 实现按类别统计 (AC: 1)
+  - [x] 3.1 实现 `get_accuracy_by_category()` 方法
+  - [x] 3.2 扩展 PredictionRepository 添加 `get_validated_with_market()`
+  - [x] 3.3 按 market.category 分组统计
+  - [x] 3.4 返回每个类别的准确率
 
-- [ ] Task 4: 实现按时间范围统计 (AC: 1)
-  - [ ] 4.1 实现 `get_accuracy_by_date_range()` 方法
-  - [ ] 4.2 扩展 PredictionRepository 添加 `get_validated_by_date_range()`
-  - [ ] 4.3 筛选 validated_at 在指定范围内的预测
-  - [ ] 4.4 计算时间范围内的准确率
+- [x] Task 4: 实现按时间范围统计 (AC: 1)
+  - [x] 4.1 实现 `get_accuracy_by_date_range()` 方法
+  - [x] 4.2 扩展 PredictionRepository 添加 `get_validated_by_date_range()`
+  - [x] 4.3 筛选 validated_at 在指定范围内的预测
+  - [x] 4.4 计算时间范围内的准确率
 
-- [ ] Task 5: 实现置信度与准确率相关性 (AC: 1)
-  - [ ] 5.1 实现 `get_confidence_accuracy_correlation()` 方法
-  - [ ] 5.2 按置信度区间分组 (0-0.6, 0.6-0.7, 0.7-0.8, 0.8-0.9, 0.9-1.0)
-  - [ ] 5.3 计算每个区间的准确率
-  - [ ] 5.4 计算相关系数 (可选)
+- [x] Task 5: 实现置信度与准确率相关性 (AC: 1)
+  - [x] 5.1 实现 `get_confidence_accuracy_correlation()` 方法
+  - [x] 5.2 按置信度区间分组 (0-0.6, 0.6-0.7, 0.7-0.8, 0.8-0.9, 0.9-1.0)
+  - [x] 5.3 计算每个区间的准确率
+  - [x] 5.4 计算相关系数 (可选)
 
-- [ ] Task 6: 扩展 PredictionRepository (AC: 2, 3)
-  - [ ] 6.1 添加 `get_all_validated()` 方法
-  - [ ] 6.2 添加 `get_validated_by_date_range(start, end)` 方法
-  - [ ] 6.3 添加 `get_validated_with_market()` 方法 (JOIN 查询)
-  - [ ] 6.4 添加单元测试
+- [x] Task 6: 扩展 PredictionRepository (AC: 2, 3)
+  - [x] 6.1 添加 `get_all_validated()` 方法
+  - [x] 6.2 添加 `get_validated_by_date_range(start, end)` 方法
+  - [x] 6.3 添加 `get_validated_with_market()` 方法 (JOIN 查询)
+  - [x] 6.4 添加单元测试
 
-- [ ] Task 7: 编写单元测试 (AC: All)
-  - [ ] 7.1 创建/扩展 `tests/test_analysis/test_prediction_tracker.py`
-  - [ ] 7.2 测试 `get_overall_accuracy()` 方法
-  - [ ] 7.3 测试 `get_accuracy_by_category()` 方法
-  - [ ] 7.4 测试 `get_accuracy_by_date_range()` 方法
-  - [ ] 7.5 测试 `get_confidence_accuracy_correlation()` 方法
-  - [ ] 7.6 测试边界情况 (无数据、空范围等)
-  - [ ] 7.7 Mock 所有外部依赖
+- [x] Task 7: 编写单元测试 (AC: All)
+  - [x] 7.1 创建/扩展 `tests/test_analysis/test_prediction_tracker.py`
+  - [x] 7.2 测试 `get_overall_accuracy()` 方法
+  - [x] 7.3 测试 `get_accuracy_by_category()` 方法
+  - [x] 7.4 测试 `get_accuracy_by_date_range()` 方法
+  - [x] 7.5 测试 `get_confidence_accuracy_correlation()` 方法
+  - [x] 7.6 测试边界情况 (无数据、空范围等)
+  - [x] 7.7 Mock 所有外部依赖
 
-- [ ] Task 8: 代码质量检查 (AC: All)
-  - [ ] 8.1 运行 `mypy src/analysis/prediction_tracker.py` 无错误
-  - [ ] 8.2 运行 `black --check` 通过
-  - [ ] 8.3 运行 `isort --check` 通过
-  - [ ] 8.4 运行完整测试套件确保通过
+- [x] Task 8: 代码质量检查 (AC: All)
+  - [x] 8.1 运行 `mypy src/analysis/prediction_tracker.py` 无错误
+  - [x] 8.2 运行 `black --check` 通过
+  - [x] 8.3 运行 `isort --check` 通过
+  - [x] 8.4 运行完整测试套件确保通过
 
 ## Dev Notes
 

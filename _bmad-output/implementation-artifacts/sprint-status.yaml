@@ -89,7 +89,7 @@ development_status:
   # Epic 6: 预测追踪与学习日志
   epic-6: in-progress
   6-1-prediction-result-validation-mechanism: done
-  6-2-accuracy-statistics: ready-for-dev
+  6-2-accuracy-statistics: done
   6-3-learning-log-generation: backlog
   6-4-prediction-history-query-api: backlog
   6-5-performance-analysis-and-insights: backlog
