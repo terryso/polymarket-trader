@@ -6,7 +6,7 @@ the Polymarket Trader application.
 
 import asyncio
 from typing import Any, AsyncGenerator, Generator
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -14,6 +14,33 @@ import pytest_asyncio
 
 # Configure pytest-asyncio
 pytest_plugins = ("pytest_asyncio",)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def disable_retry_delays() -> Generator[None, None, None]:
+    """Disable retry delays in tests to speed up execution.
+
+    This fixture automatically patches the retry decorator's sleep functions
+    to eliminate delays during testing, making tests that trigger retry
+    logic run instantly.
+    """
+    import time
+
+    import src.utils.retry as retry_module
+
+    # Store original functions
+    original_sleep = time.sleep
+    original_async_sleep = asyncio.sleep
+
+    # Replace with no-op versions
+    time.sleep = lambda *_: None
+    retry_module.asyncio.sleep = AsyncMock()
+
+    yield
+
+    # Restore original functions
+    time.sleep = original_sleep
+    retry_module.asyncio.sleep = original_async_sleep
 
 
 @pytest.fixture(scope="session")

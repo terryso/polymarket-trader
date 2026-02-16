@@ -56,7 +56,7 @@ development_status:
   2-1-polymarket-api-client: done
   2-2-market-data-fetch-and-store: done
   2-3-market-filter-rule-engine: done
-  2-4-market-data-repository: backlog
+  2-4-market-data-repository: done
   epic-2-retrospective: optional
 
   # Epic 3: LLM 智能分析引擎
