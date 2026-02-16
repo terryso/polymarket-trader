@@ -1,6 +1,6 @@
 # Story 7.6: 前端 API 集成
 
-Status: review
+Status: done
 
 ## Story
 

@@ -1,6 +1,6 @@
 # Story 7.5: 系统状态 API
 
-Status: review
+Status: done
 
 ## Story
 
