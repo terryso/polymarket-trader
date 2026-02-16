@@ -1,6 +1,6 @@
 # Story 3.5: Edge 计算 (价格差距分析)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

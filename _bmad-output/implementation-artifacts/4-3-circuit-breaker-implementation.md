@@ -1,6 +1,6 @@
 # Story 4.3: 熔断机制实现
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

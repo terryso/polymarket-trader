@@ -1,6 +1,6 @@
 # Story 4.2: 线程安全状态管理
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

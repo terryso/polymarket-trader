@@ -1,6 +1,6 @@
 # Story 4.1: 风险控制配置
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
