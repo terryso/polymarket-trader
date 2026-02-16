@@ -1,6 +1,6 @@
 # Story 6.3: 学习日志生成
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -34,64 +34,64 @@ So that **我可以回顾和改进策略**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 定义学习日志数据模型 (AC: 1, 2, 3)
-  - [ ] 1.1 创建 `TradeReport` 数据类 (单笔交易报告)
-  - [ ] 1.2 创建 `DailyReport` 数据类 (每日报告)
-  - [ ] 1.3 创建 `MarketInfo` 数据类 (市场信息摘要)
-  - [ ] 1.4 创建 `TradingSummary` 数据类 (交易汇总)
-  - [ ] 1.5 创建 `LearningInsight` 数据类 (学习洞察)
-  - [ ] 1.6 更新 `__all__` 导出
+- [x] Task 1: 定义学习日志数据模型 (AC: 1, 2, 3)
+  - [x] 1.1 创建 `TradeReport` 数据类 (单笔交易报告)
+  - [x] 1.2 创建 `DailyReport` 数据类 (每日报告)
+  - [x] 1.3 创建 `MarketInfo` 数据类 (市场信息摘要)
+  - [x] 1.4 创建 `TradingSummary` 数据类 (交易汇总)
+  - [x] 1.5 创建 `LearningInsight` 数据类 (学习洞察)
+  - [x] 1.6 更新 `__all__` 导出
 
-- [ ] Task 2: 实现 LearningLogGenerator 类 (AC: 1)
-  - [ ] 2.1 创建 `src/trading/learning_log.py` 文件
-  - [ ] 2.2 实现 `__init__` 方法 (依赖注入)
-  - [ ] 2.3 创建 `logs/reports/` 目录初始化逻辑
-  - [ ] 2.4 实现文件存储辅助方法
+- [x] Task 2: 实现 LearningLogGenerator 类 (AC: 1)
+  - [x] 2.1 创建 `src/trading/learning_log.py` 文件
+  - [x] 2.2 实现 `__init__` 方法 (依赖注入)
+  - [x] 2.3 创建 `logs/reports/` 目录初始化逻辑
+  - [x] 2.4 实现文件存储辅助方法
 
-- [ ] Task 3: 实现单笔交易报告生成 (AC: 1, 2)
-  - [ ] 3.1 实现 `generate_trade_report(trade, prediction, market)` 方法
-  - [ ] 3.2 提取市场信息 (标题、描述、截止日期)
-  - [ ] 3.3 计算价格差距 (市场价格 vs LLM 预测)
-  - [ ] 3.4 整理置信度、Edge、分析理由
-  - [ ] 3.5 记录交易决策 (买入方向、金额、价格)
-  - [ ] 3.6 获取当前持仓状态
-  - [ ] 3.7 生成 JSON 格式报告
-  - [ ] 3.8 存储到 `logs/reports/trade_{id}_{timestamp}.json`
+- [x] Task 3: 实现单笔交易报告生成 (AC: 1, 2)
+  - [x] 3.1 实现 `generate_trade_report(trade, prediction, market)` 方法
+  - [x] 3.2 提取市场信息 (标题、描述、截止日期)
+  - [x] 3.3 计算价格差距 (市场价格 vs LLM 预测)
+  - [x] 3.4 整理置信度、Edge、分析理由
+  - [x] 3.5 记录交易决策 (买入方向、金额、价格)
+  - [x] 3.6 获取当前持仓状态
+  - [x] 3.7 生成 JSON 格式报告
+  - [x] 3.8 存储到 `logs/reports/trade_{id}_{timestamp}.json`
 
-- [ ] Task 4: 实现每日报告生成 (AC: 1, 3)
-  - [ ] 4.1 实现 `generate_daily_report(date)` 方法
-  - [ ] 4.2 获取当日所有交易记录
-  - [ ] 4.3 计算 PnL 统计 (总盈亏、胜率)
-  - [ ] 4.4 统计交易数量、胜率
-  - [ ] 4.5 生成关键学习点 (基于交易结果)
-  - [ ] 4.6 生成 JSON 格式报告
-  - [ ] 4.7 存储到 `logs/reports/daily_{date}.json`
+- [x] Task 4: 实现每日报告生成 (AC: 1, 3)
+  - [x] 4.1 实现 `generate_daily_report(date)` 方法
+  - [x] 4.2 获取当日所有交易记录
+  - [x] 4.3 计算 PnL 统计 (总盈亏、胜率)
+  - [x] 4.4 统计交易数量、胜率
+  - [x] 4.5 生成关键学习点 (基于交易结果)
+  - [x] 4.6 生成 JSON 格式报告
+  - [x] 4.7 存储到 `logs/reports/daily_{date}.json`
 
-- [ ] Task 5: 实现报告存储机制 (AC: 4, 5)
-  - [ ] 5.1 实现 `_save_report(filename, content)` 私有方法
-  - [ ] 5.2 确保目录存在 (自动创建 `logs/reports/`)
-  - [ ] 5.3 实现 JSON 格式化 (pretty print)
-  - [ ] 5.4 实现文件命名规范
-  - [ ] 5.5 添加文件写入错误处理
+- [x] Task 5: 实现报告存储机制 (AC: 4, 5)
+  - [x] 5.1 实现 `_save_report(filename, content)` 私有方法
+  - [x] 5.2 确保目录存在 (自动创建 `logs/reports/`)
+  - [x] 5.3 实现 JSON 格式化 (pretty print)
+  - [x] 5.4 实现文件命名规范
+  - [x] 5.5 添加文件写入错误处理
 
-- [ ] Task 6: 集成到交易流程 (AC: 1)
-  - [ ] 6.1 在 `TradingExecutor` 中注入 `LearningLogGenerator`
-  - [ ] 6.2 在交易执行后调用 `generate_trade_report()`
-  - [ ] 6.3 添加日志记录 (📝 emoji)
+- [x] Task 6: 集成到交易流程 (AC: 1)
+  - [x] 6.1 在 `TradingExecutor` 中注入 `LearningLogGenerator`
+  - [x] 6.2 在交易执行后调用 `generate_trade_report()`
+  - [x] 6.3 添加日志记录 (📝 emoji)
 
-- [ ] Task 7: 编写单元测试 (AC: All)
-  - [ ] 7.1 创建 `tests/test_trading/test_learning_log.py`
-  - [ ] 7.2 测试 `generate_trade_report()` 方法
-  - [ ] 7.3 测试 `generate_daily_report()` 方法
-  - [ ] 7.4 测试报告存储 (文件写入)
-  - [ ] 7.5 测试边界情况 (无交易、空数据)
-  - [ ] 7.6 Mock 所有外部依赖
+- [x] Task 7: 编写单元测试 (AC: All)
+  - [x] 7.1 创建 `tests/test_trading/test_learning_log.py`
+  - [x] 7.2 测试 `generate_trade_report()` 方法
+  - [x] 7.3 测试 `generate_daily_report()` 方法
+  - [x] 7.4 测试报告存储 (文件写入)
+  - [x] 7.5 测试边界情况 (无交易、空数据)
+  - [x] 7.6 Mock 所有外部依赖
 
-- [ ] Task 8: 代码质量检查 (AC: All)
-  - [ ] 8.1 运行 `mypy src/trading/learning_log.py` 无错误
-  - [ ] 8.2 运行 `black --check` 通过
-  - [ ] 8.3 运行 `isort --check` 通过
-  - [ ] 8.4 运行完整测试套件确保通过
+- [x] Task 8: 代码质量检查 (AC: All)
+  - [x] 8.1 运行 `mypy src/trading/learning_log.py` 无错误
+  - [x] 8.2 运行 `black --check` 通过
+  - [x] 8.3 运行 `isort --check` 通过
+  - [x] 8.4 运行完整测试套件确保通过
 
 ## Dev Notes
 
