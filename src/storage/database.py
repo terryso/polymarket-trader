@@ -191,6 +191,24 @@ class DatabaseManager:
                     )
                     await conn.execute("ALTER TABLE predictions ADD COLUMN edge REAL")
 
+                # Create positions table (Story 4.5)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS positions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        outcome TEXT NOT NULL,
+                        shares REAL NOT NULL,
+                        avg_price REAL NOT NULL,
+                        initial_value REAL,
+                        current_value REAL,
+                        pnl REAL,
+                        status TEXT,
+                        opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        closed_at DATETIME,
+                        FOREIGN KEY (market_id) REFERENCES markets(id)
+                    )
+                """)
+
                 # Create indexes for predictions table
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_predictions_market_id
@@ -205,6 +223,17 @@ class DatabaseManager:
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_predictions_edge
                     ON predictions(edge)
+                """)
+
+                # Create indexes for positions table (Story 4.5)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_positions_market_id
+                    ON positions(market_id)
+                """)
+
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_positions_status
+                    ON positions(status)
                 """)
 
                 await conn.commit()

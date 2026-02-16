@@ -74,7 +74,7 @@ development_status:
   4-2-thread-safe-state-management: ready-for-dev
   4-3-circuit-breaker-implementation: review
   4-4-pre-trade-risk-check: ready-for-dev
-  4-5-position-management: backlog
+  4-5-position-management: ready-for-dev
   epic-4-retrospective: optional
 
   # Epic 5: Paper Trading 模拟交易
