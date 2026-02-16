@@ -33,15 +33,9 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-15
-project: polymarket-trader
-project_key: NOKEY
-tracking_system: file-system
-story_location: _bmad-output/implementation-artifacts
-
 development_status:
   # Epic 1: 项目基础设施与配置
-  epic-1: in-progress
+  epic-1: done
   1-1-project-structure-initialization: done
   1-2-configuration-management-system: done
   1-3-logging-system: done
@@ -52,7 +46,7 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: 市场数据获取与筛选
-  epic-2: in-progress
+  epic-2: done
   2-1-polymarket-api-client: done
   2-2-market-data-fetch-and-store: done
   2-3-market-filter-rule-engine: done
@@ -60,7 +54,7 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: LLM 智能分析引擎
-  epic-3: in-progress
+  epic-3: done
   3-1-llm-api-client: done
   3-2-llm-prompt-template: done
   3-3-llm-analysis-engine: done
@@ -69,7 +63,7 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: 风险控制与熔断系统
-  epic-4: in-progress
+  epic-4: done
   4-1-risk-control-configuration: done
   4-2-thread-safe-state-management: done
   4-3-circuit-breaker-implementation: done
@@ -78,7 +72,7 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Paper Trading 模拟交易
-  epic-5: in-progress
+  epic-5: done
   5-1-trade-record-data-model: done
   5-2-paper-trading-executor: done
   5-3-trading-decision-flow: done
@@ -97,9 +91,9 @@ development_status:
 
   # Epic 7: Dashboard 后端 API 集成
   epic-7: in-progress
-  7-1-fastapi-app-initialization: review
-  7-2-market-data-api: ready-for-dev
-  7-3-position-and-trade-api: backlog
+  7-1-fastapi-app-initialization: done
+  7-2-market-data-api: done
+  7-3-position-and-trade-api: done
   7-4-prediction-and-statistics-api: backlog
   7-5-system-status-api: backlog
   7-6-frontend-api-integration: backlog

@@ -1,6 +1,6 @@
 # Story 7.1: FastAPI 应用初始化
 
-Status: review
+Status: done
 
 ## Story
 
