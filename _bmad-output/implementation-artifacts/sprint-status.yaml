@@ -87,12 +87,12 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: 预测追踪与学习日志
-  epic-6: in-progress
+  epic-6: done
   6-1-prediction-result-validation-mechanism: done
   6-2-accuracy-statistics: done
   6-3-learning-log-generation: done
   6-4-prediction-history-query-api: done
-  6-5-performance-analysis-and-insights: ready-for-dev
+  6-5-performance-analysis-and-insights: done
   epic-6-retrospective: optional
 
   # Epic 7: Dashboard 后端 API 集成

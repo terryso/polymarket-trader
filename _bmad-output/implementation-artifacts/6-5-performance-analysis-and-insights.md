@@ -1,6 +1,6 @@
 # Story 6.5: 表现分析与洞察
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -29,66 +29,66 @@ So that **我能够持续优化策略**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 定义数据模型 (AC: All)
-  - [ ] 1.1 创建 `PerformanceMetrics` 数据类 (total_trades, win_rate, avg_pnl, etc.)
-  - [ ] 1.2 创建 `CategoryPerformance` 数据类 (category, trades, win_rate, pnl)
-  - [ ] 1.3 创建 `ConfidenceAnalysis` 数据类 (confidence_range, accuracy, sample_size)
-  - [ ] 1.4 创建 `EdgeAnalysis` 数据类 (edge_range, success_rate, avg_return)
-  - [ ] 1.5 创建 `PatternInsight` 数据类 (pattern_type, description, examples)
-  - [ ] 1.6 创建 `PerformanceInsightReport` 数据类 (metrics, patterns, recommendations)
-  - [ ] 1.7 更新 `__all__` 导出
+- [x] Task 1: 定义数据模型 (AC: All)
+  - [x] 1.1 创建 `PerformanceMetrics` 数据类 (total_trades, win_rate, avg_pnl, etc.)
+  - [x] 1.2 创建 `CategoryPerformance` 数据类 (category, trades, win_rate, pnl)
+  - [x] 1.3 创建 `ConfidenceAnalysis` 数据类 (confidence_range, accuracy, sample_size)
+  - [x] 1.4 创建 `EdgeAnalysis` 数据类 (edge_range, success_rate, avg_return)
+  - [x] 1.5 创建 `PatternInsight` 数据类 (pattern_type, description, examples)
+  - [x] 1.6 创建 `PerformanceInsightReport` 数据类 (metrics, patterns, recommendations)
+  - [x] 1.7 更新 `__all__` 导出
 
-- [ ] Task 2: 实现 PerformanceAnalyzer 类基础结构 (AC: 1)
-  - [ ] 2.1 创建 `src/analysis/performance_analyzer.py` 文件
-  - [ ] 2.2 定义 `PerformanceAnalyzer` 类
-  - [ ] 2.3 注入依赖 (PredictionRepository, TradeRepository, PositionRepository)
-  - [ ] 2.4 添加日志配置 (使用 🧠 emoji)
+- [x] Task 2: 实现 PerformanceAnalyzer 类基础结构 (AC: 1)
+  - [x] 2.1 创建 `src/analysis/performance_analyzer.py` 文件
+  - [x] 2.2 定义 `PerformanceAnalyzer` 类
+  - [x] 2.3 注入依赖 (PredictionRepository, TradeRepository, PositionRepository)
+  - [x] 2.4 添加日志配置 (使用 🧠 emoji)
 
-- [ ] Task 3: 实现综合表现分析 (AC: 1)
-  - [ ] 3.1 实现 `analyze_performance()` 方法
-  - [ ] 3.2 计算总体指标 (总交易数、胜率、平均 PnL)
-  - [ ] 3.3 按类别分组分析 (最佳/最差类别)
-  - [ ] 3.4 计算高置信度预测准确率 (confidence >= 0.8)
-  - [ ] 3.5 计算低置信度预测表现 (confidence < 0.75)
-  - [ ] 3.6 返回 `PerformanceMetrics` 对象
+- [x] Task 3: 实现综合表现分析 (AC: 1)
+  - [x] 3.1 实现 `analyze_performance()` 方法
+  - [x] 3.2 计算总体指标 (总交易数、胜率、平均 PnL)
+  - [x] 3.3 按类别分组分析 (最佳/最差类别)
+  - [x] 3.4 计算高置信度预测准确率 (confidence >= 0.8)
+  - [x] 3.5 计算低置信度预测表现 (confidence < 0.75)
+  - [x] 3.6 返回 `PerformanceMetrics` 对象
 
-- [ ] Task 4: 实现模式识别 (AC: 1)
-  - [ ] 4.1 实现 `identify_patterns()` 方法
-  - [ ] 4.2 识别成功模式 (高置信度 + 高 edge 的表现)
-  - [ ] 4.3 识别失败模式 (低置信度或低 edge 的表现)
-  - [ ] 4.4 分析 Edge 大小与成功率关系
-  - [ ] 4.5 分析持仓时间与收益关系
-  - [ ] 4.6 返回 `PatternInsight` 列表
+- [x] Task 4: 实现模式识别 (AC: 1)
+  - [x] 4.1 实现 `identify_patterns()` 方法
+  - [x] 4.2 识别成功模式 (高置信度 + 高 edge 的表现)
+  - [x] 4.3 识别失败模式 (低置信度或低 edge 的表现)
+  - [x] 4.4 分析 Edge 大小与成功率关系
+  - [x] 4.5 分析持仓时间与收益关系
+  - [x] 4.6 返回 `PatternInsight` 列表
 
-- [ ] Task 5: 实现改进建议生成 (AC: 1)
-  - [ ] 5.1 实现 `generate_recommendations()` 方法
-  - [ ] 5.2 基于模式分析生成策略建议
-  - [ ] 5.3 识别需要改进的领域
-  - [ ] 5.4 提供具体可执行的建议
-  - [ ] 5.5 返回建议字符串列表
+- [x] Task 5: 实现改进建议生成 (AC: 1)
+  - [x] 5.1 实现 `generate_recommendations()` 方法
+  - [x] 5.2 基于模式分析生成策略建议
+  - [x] 5.3 识别需要改进的领域
+  - [x] 5.4 提供具体可执行的建议
+  - [x] 5.5 返回建议字符串列表
 
-- [ ] Task 6: 实现洞察报告生成 (AC: 2, 3)
-  - [ ] 6.1 实现 `generate_insight_report()` 方法
-  - [ ] 6.2 组合 PerformanceMetrics、PatternInsight、recommendations
-  - [ ] 6.3 生成 JSON 格式报告
-  - [ ] 6.4 存储到 `logs/reports/insights_{date}.json`
-  - [ ] 6.5 确保报告目录存在
-  - [ ] 6.6 记录分析完成日志 (🧠 表现分析完成)
+- [x] Task 6: 实现洞察报告生成 (AC: 2, 3)
+  - [x] 6.1 实现 `generate_insight_report()` 方法
+  - [x] 6.2 组合 PerformanceMetrics、PatternInsight、recommendations
+  - [x] 6.3 生成 JSON 格式报告
+  - [x] 6.4 存储到 `logs/reports/insights_{date}.json`
+  - [x] 6.5 确保报告目录存在
+  - [x] 6.6 记录分析完成日志 (🧠 表现分析完成)
 
-- [ ] Task 7: 编写单元测试 (AC: All)
-  - [ ] 7.1 创建 `tests/test_analysis/test_performance_analyzer.py`
-  - [ ] 7.2 测试 `analyze_performance()` 方法
-  - [ ] 7.3 测试 `identify_patterns()` 方法
-  - [ ] 7.4 测试 `generate_recommendations()` 方法
-  - [ ] 7.5 测试 `generate_insight_report()` 方法
-  - [ ] 7.6 测试边界情况 (无数据、单条数据)
-  - [ ] 7.7 Mock 所有外部依赖
+- [x] Task 7: 编写单元测试 (AC: All)
+  - [x] 7.1 创建 `tests/test_analysis/test_performance_analyzer.py`
+  - [x] 7.2 测试 `analyze_performance()` 方法
+  - [x] 7.3 测试 `identify_patterns()` 方法
+  - [x] 7.4 测试 `generate_recommendations()` 方法
+  - [x] 7.5 测试 `generate_insight_report()` 方法
+  - [x] 7.6 测试边界情况 (无数据、单条数据)
+  - [x] 7.7 Mock 所有外部依赖
 
-- [ ] Task 8: 代码质量检查 (AC: All)
-  - [ ] 8.1 运行 `mypy src/analysis/performance_analyzer.py` 无错误
-  - [ ] 8.2 运行 `black --check` 通过
-  - [ ] 8.3 运行 `isort --check` 通过
-  - [ ] 8.4 运行完整测试套件确保通过
+- [x] Task 8: 代码质量检查 (AC: All)
+  - [x] 8.1 运行 `mypy src/analysis/performance_analyzer.py` 无错误
+  - [x] 8.2 运行 `black --check` 通过
+  - [x] 8.3 运行 `isort --check` 通过
+  - [x] 8.4 运行完整测试套件确保通过
 
 ## Dev Notes
 
