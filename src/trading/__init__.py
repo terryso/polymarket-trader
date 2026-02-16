@@ -4,13 +4,15 @@ This package provides trading-related functionality including:
 - RiskController: Pre-trade risk checks (Story 4.4)
 - PositionManager: Position lifecycle management (Story 4.5)
 - PaperTradingExecutor: Paper trading executor (Story 5.2)
-- Trading executor (Story 5.x)
+- TradingExecutor: Trading decision flow orchestrator (Story 5.3)
 
 Example:
     >>> from src.trading import RiskController, PositionManager, PaperTradingExecutor
+    >>> from src.trading import TradingExecutor, TradingDecision
     >>> from src.trading.risk_control import RiskCheckResult
 """
 
+from src.trading.executor import TradingDecision, TradingExecutor
 from src.trading.paper_trading import PaperTradeResult, PaperTradingExecutor
 from src.trading.position_manager import PositionManager
 from src.trading.risk_control import RiskCheckFailure, RiskCheckResult, RiskController
@@ -22,4 +24,6 @@ __all__ = [
     "PositionManager",
     "PaperTradingExecutor",
     "PaperTradeResult",
+    "TradingExecutor",
+    "TradingDecision",
 ]
