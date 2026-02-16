@@ -211,6 +211,88 @@ class TestDatabaseSchema:
 
             assert pk_columns == ["key"]
 
+    @pytest.mark.asyncio
+    async def test_predictions_table_exists(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test predictions table is created."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='predictions'"
+            )
+            result = await cursor.fetchone()
+            assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_predictions_table_columns(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test predictions table has all required columns."""
+        expected_columns = {
+            "id",
+            "market_id",
+            "predicted_probability",
+            "confidence",
+            "reasoning",
+            "key_assumptions",
+            "model_used",
+            "recommendation",
+            "actual_outcome",
+            "is_correct",
+            "validated_at",
+            "created_at",
+        }
+
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute("PRAGMA table_info(predictions)")
+            rows = await cursor.fetchall()
+            actual_columns = {row[1] for row in rows}
+
+            assert expected_columns == actual_columns
+
+    @pytest.mark.asyncio
+    async def test_predictions_table_primary_key(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test predictions table has correct primary key."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute("PRAGMA table_info(predictions)")
+            rows = await cursor.fetchall()
+            pk_columns = [row[1] for row in rows if row[5] == 1]
+
+            assert pk_columns == ["id"]
+
+    @pytest.mark.asyncio
+    async def test_predictions_table_indexes(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test predictions table has correct indexes."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='predictions'"
+            )
+            rows = await cursor.fetchall()
+            index_names = {row[0] for row in rows}
+
+            assert "idx_predictions_market_id" in index_names
+            assert "idx_predictions_created_at" in index_names
+
+    @pytest.mark.asyncio
+    async def test_predictions_foreign_key_to_markets(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test predictions table has foreign key to markets table."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='predictions'"
+            )
+            result = await cursor.fetchone()
+            sql = result[0]
+
+            assert "FOREIGN KEY" in sql
+            assert "market_id" in sql
+            assert "REFERENCES markets" in sql
+
 
 class TestDatabaseErrorHandling:
     """Test database error handling."""

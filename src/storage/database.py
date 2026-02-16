@@ -159,6 +159,36 @@ class DatabaseManager:
                     )
                 """)
 
+                # Create predictions table
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS predictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        predicted_probability REAL,
+                        confidence REAL,
+                        reasoning TEXT,
+                        key_assumptions TEXT,
+                        model_used TEXT,
+                        recommendation TEXT,
+                        actual_outcome TEXT,
+                        is_correct BOOLEAN,
+                        validated_at DATETIME,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (market_id) REFERENCES markets(id)
+                    )
+                """)
+
+                # Create indexes for predictions table
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_predictions_market_id
+                    ON predictions(market_id)
+                """)
+
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_predictions_created_at
+                    ON predictions(created_at)
+                """)
+
                 await conn.commit()
 
             logger.info(f"✅ Database initialized at {self._db_path}")

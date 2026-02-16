@@ -64,7 +64,7 @@ development_status:
   3-1-llm-api-client: done
   3-2-llm-prompt-template: done
   3-3-llm-analysis-engine: done
-  3-4-prediction-result-storage: backlog
+  3-4-prediction-result-storage: done
   3-5-edge-calculation: backlog
   epic-3-retrospective: optional
 

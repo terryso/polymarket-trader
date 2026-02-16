@@ -128,7 +128,7 @@ class Prediction(BaseModel):
         validate_assignment=True,
     )
 
-    id: int = Field(..., description="Prediction unique identifier")
+    id: int | None = Field(default=None, description="Prediction unique identifier")
     market_id: str = Field(..., description="Market reference")
     predicted_probability: float = Field(
         ..., ge=0, le=1, description="Predicted probability (0-1)"
