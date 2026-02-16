@@ -98,8 +98,8 @@ development_status:
   # Epic 7: Dashboard 后端 API 集成
   epic-7: in-progress
   7-1-fastapi-app-initialization: review
-  7-2-market-data-api: ready-for-dev
-  7-3-position-and-trade-api: backlog
+  7-2-market-data-api: done
+  7-3-position-and-trade-api: done
   7-4-prediction-and-statistics-api: backlog
   7-5-system-status-api: backlog
   7-6-frontend-api-integration: backlog
