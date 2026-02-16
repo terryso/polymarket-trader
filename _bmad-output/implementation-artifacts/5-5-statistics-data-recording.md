@@ -1,6 +1,6 @@
 # Story 5.5: 统计数据记录
 
-Status: review
+Status: done
 
 ## Story
 
