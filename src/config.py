@@ -114,10 +114,34 @@ class TradingSettings(BaseSettings):
 
 
 class RiskControlSettings(BaseSettings):
-    """Risk control parameters configuration."""
+    """Risk control parameters configuration.
+
+    风险控制参数配置，包括资金管理、熔断机制、置信度门槛和持仓限制。
+
+    Attributes:
+        max_single_ratio: 单笔交易最大资金比例 (0-1)
+        min_bet: 最小交易金额 (USD)
+        consecutive_losses_limit: 连续亏损次数触发熔断
+        reduce_ratio_after_losses: 连续亏损后降级比例 (0-1)
+        daily_loss_limit: 日亏损停止门槛 (0-1)
+        capital_threshold: 低资金门槛 (USD)
+        reduce_ratio_low_capital: 低资金时降级比例 (0-1)
+        min_confidence: 最小 LLM 置信度门槛 (0-1)
+        min_edge: 最小 Edge 门槛 (0-1)
+        max_position_per_market: 单市场最大持仓比例 (0-1)
+        max_open_markets: 最大同时持仓数量
+
+    Example:
+        >>> from src.config import settings
+        >>> settings.risk.min_confidence
+        0.75
+        >>> settings.risk.max_position_per_market
+        0.40
+    """
 
     model_config = SettingsConfigDict(env_prefix="")
 
+    # 资金管理
     max_single_ratio: float = Field(
         default=0.20,
         alias="MAX_SINGLE_RATIO",
@@ -125,6 +149,49 @@ class RiskControlSettings(BaseSettings):
         le=1,
         description="Maximum single trade ratio of capital (0-1)",
     )
+    min_bet: float = Field(
+        default=5.0,
+        alias="MIN_BET",
+        gt=0,
+        description="Minimum bet amount in USD",
+    )
+
+    # 熔断机制
+    consecutive_losses_limit: int = Field(
+        default=3,
+        alias="CONSECUTIVE_LOSSES_LIMIT",
+        gt=0,
+        description="Consecutive losses before reducing position",
+    )
+    reduce_ratio_after_losses: float = Field(
+        default=0.10,
+        alias="REDUCE_RATIO_AFTER_LOSSES",
+        ge=0,
+        le=1,
+        description="Position ratio after consecutive losses (0-1)",
+    )
+    daily_loss_limit: float = Field(
+        default=0.30,
+        alias="DAILY_LOSS_LIMIT",
+        ge=0,
+        le=1,
+        description="Daily loss limit to stop trading (0-1)",
+    )
+    capital_threshold: float = Field(
+        default=100.0,
+        alias="CAPITAL_THRESHOLD",
+        gt=0,
+        description="Capital threshold for reduced mode",
+    )
+    reduce_ratio_low_capital: float = Field(
+        default=0.10,
+        alias="REDUCE_RATIO_LOW_CAPITAL",
+        ge=0,
+        le=1,
+        description="Position ratio when capital below threshold (0-1)",
+    )
+
+    # 置信度门槛
     min_confidence: float = Field(
         default=0.75,
         alias="MIN_CONFIDENCE",
@@ -139,31 +206,38 @@ class RiskControlSettings(BaseSettings):
         le=1,
         description="Minimum edge (price gap) to trade (0-1)",
     )
+
+    # 持仓限制
+    max_position_per_market: float = Field(
+        default=0.40,
+        alias="MAX_POSITION_PER_MARKET",
+        ge=0,
+        le=1,
+        description="Maximum position ratio per market (0-1)",
+    )
+    max_open_markets: int = Field(
+        default=3,
+        alias="MAX_OPEN_MARKETS",
+        gt=0,
+        description="Maximum number of open positions",
+    )
+    # Backward compatibility alias
     max_concurrent_trades: int = Field(
         default=3,
         alias="MAX_CONCURRENT_TRADES",
         gt=0,
-        description="Maximum number of concurrent positions",
+        description="Maximum number of concurrent positions (deprecated: use max_open_markets)",
     )
-    daily_loss_limit: float = Field(
-        default=0.30,
-        alias="DAILY_LOSS_LIMIT",
-        ge=0,
-        le=1,
-        description="Daily loss limit to stop trading (0-1)",
-    )
-    consecutive_losses_limit: int = Field(
-        default=3,
-        alias="CONSECUTIVE_LOSSES_LIMIT",
-        gt=0,
-        description="Consecutive losses before reducing position",
-    )
-    capital_threshold: float = Field(
-        default=100.0,
-        alias="CAPITAL_THRESHOLD",
-        gt=0,
-        description="Capital threshold for reduced mode",
-    )
+
+    @field_validator("max_open_markets")
+    @classmethod
+    def validate_max_open_markets(cls, v: int) -> int:
+        """Validate max_open_markets is reasonable."""
+        if v > 20:
+            raise ValueError(
+                "MAX_OPEN_MARKETS should not exceed 20 for risk management"
+            )
+        return v
 
 
 class MarketFilterSettings(BaseSettings):

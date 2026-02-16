@@ -62,15 +62,15 @@ development_status:
   # Epic 3: LLM 智能分析引擎
   epic-3: in-progress
   3-1-llm-api-client: done
-  3-2-llm-prompt-template: ready-for-dev
-  3-3-llm-analysis-engine: ready-for-dev
+  3-2-llm-prompt-template: done
+  3-3-llm-analysis-engine: done
   3-4-prediction-result-storage: backlog
   3-5-edge-calculation: backlog
   epic-3-retrospective: optional
 
   # Epic 4: 风险控制与熔断系统
-  epic-4: backlog
-  4-1-risk-control-configuration: backlog
+  epic-4: in-progress
+  4-1-risk-control-configuration: done
   4-2-thread-safe-state-management: backlog
   4-3-circuit-breaker-implementation: backlog
   4-4-pre-trade-risk-check: backlog
