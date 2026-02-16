@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { mockTrades } from "@/data/mockData";
+import { useTrades } from "@/hooks/useTrades";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -10,6 +12,8 @@ import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious, PaginationEllipsis,
 } from "@/components/ui/pagination";
+import { AlertCircle } from "lucide-react";
+import type { TradeMode } from "@/api/types";
 
 type ModeFilter = "all" | "paper" | "live";
 type TypeFilter = "all" | "buy" | "sell";
@@ -20,12 +24,20 @@ const Trades = () => {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [page, setPage] = useState(1);
 
-  const filtered = useMemo(() => mockTrades.filter((t) => {
-    if (modeFilter !== "all" && t.mode !== modeFilter) return false;
-    if (typeFilter === "buy" && !t.type.startsWith("BUY")) return false;
-    if (typeFilter === "sell" && !t.type.startsWith("SELL")) return false;
-    return true;
-  }), [modeFilter, typeFilter]);
+  // Fetch trades with mode filter
+  const { data, isLoading, error } = useTrades({
+    mode: modeFilter === "all" ? undefined : (modeFilter.toUpperCase() as TradeMode),
+  });
+
+  // Filter by type in memory (backend doesn't support this filter)
+  const filtered = useMemo(() => {
+    const trades = data?.items ?? [];
+    return trades.filter((t) => {
+      if (typeFilter === "buy" && !t.trade_type.startsWith("BUY")) return false;
+      if (typeFilter === "sell" && !t.trade_type.startsWith("SELL")) return false;
+      return true;
+    });
+  }, [data?.items, typeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -56,6 +68,60 @@ const Trades = () => {
     return pages;
   }, [currentPage, totalPages]);
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <Skeleton className="h-7 w-32" />
+            <Skeleton className="h-5 w-24 mt-1" />
+          </div>
+          <Skeleton className="h-12 w-72" />
+          <Skeleton className="h-64" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">交易历史</h2>
+            <p className="text-sm text-muted-foreground mt-1">交易记录</p>
+          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              无法加载数据: {error.message}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Format timestamp
+  const formatTimestamp = (ts: string | null): string => {
+    if (!ts) return "-";
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }).replace(/\//g, "-");
+    } catch {
+      return ts;
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -78,42 +144,54 @@ const Trades = () => {
         </div>
 
         <div className="stat-card overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">时间</TableHead>
-                  <TableHead className="text-muted-foreground">市场</TableHead>
-                  <TableHead className="text-muted-foreground">类型</TableHead>
-                  <TableHead className="text-muted-foreground hidden sm:table-cell">模式</TableHead>
-                  <TableHead className="text-muted-foreground text-right">金额</TableHead>
-                  <TableHead className="text-muted-foreground text-right hidden md:table-cell">价格</TableHead>
-                  <TableHead className="text-muted-foreground text-right hidden md:table-cell">份额</TableHead>
-                  <TableHead className="text-muted-foreground text-center hidden sm:table-cell">状态</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paged.map((t) => (
-                  <TableRow key={t.id} className="border-border hover:bg-accent/50">
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">{t.timestamp}</TableCell>
-                    <TableCell className="font-medium text-foreground max-w-[120px] truncate">{t.market}</TableCell>
-                    <TableCell>
-                      <span className={t.type.startsWith("BUY") ? "badge-profit" : "badge-loss"}>
-                        {t.type.replace("_", " ")}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <span className={t.mode === "paper" ? "badge-paper" : "badge-live"}>{t.mode}</span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">${t.amount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono hidden md:table-cell">${t.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono hidden md:table-cell">{t.shares.toFixed(2)}</TableCell>
-                    <TableCell className="text-center hidden sm:table-cell">✅</TableCell>
+          {paged.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground">时间</TableHead>
+                    <TableHead className="text-muted-foreground">市场</TableHead>
+                    <TableHead className="text-muted-foreground">类型</TableHead>
+                    <TableHead className="text-muted-foreground hidden sm:table-cell">模式</TableHead>
+                    <TableHead className="text-muted-foreground text-right">金额</TableHead>
+                    <TableHead className="text-muted-foreground text-right hidden md:table-cell">价格</TableHead>
+                    <TableHead className="text-muted-foreground text-right hidden md:table-cell">份额</TableHead>
+                    <TableHead className="text-muted-foreground text-center hidden sm:table-cell">状态</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {paged.map((t) => (
+                    <TableRow key={t.id} className="border-border hover:bg-accent/50">
+                      <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                        {formatTimestamp(t.created_at)}
+                      </TableCell>
+                      <TableCell className="font-medium text-foreground max-w-[120px] truncate">{t.market_id}</TableCell>
+                      <TableCell>
+                        <span className={t.trade_type.startsWith("BUY") ? "badge-profit" : "badge-loss"}>
+                          {t.trade_type.replace("_", " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <span className={t.mode === "PAPER" ? "badge-paper" : "badge-live"}>{t.mode}</span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">${t.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono hidden md:table-cell">${t.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono hidden md:table-cell">
+                        {t.shares ? t.shares.toFixed(2) : "-"}
+                      </TableCell>
+                      <TableCell className="text-center hidden sm:table-cell">
+                        {t.status === "filled" ? "✅" : t.status === "failed" ? "❌" : "⏳"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              暂无交易记录
+            </div>
+          )}
         </div>
 
         {totalPages > 1 && (

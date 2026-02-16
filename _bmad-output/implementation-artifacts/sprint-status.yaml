@@ -96,7 +96,7 @@ development_status:
   7-3-position-and-trade-api: done
   7-4-prediction-and-statistics-api: done
   7-5-system-status-api: review
-  7-6-frontend-api-integration: backlog
+  7-6-frontend-api-integration: review
   epic-7-retrospective: optional
 
   # Epic 8: 系统调度与自动化运行
