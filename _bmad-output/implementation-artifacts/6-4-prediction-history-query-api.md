@@ -1,6 +1,6 @@
 # Story 6.4: 预测历史查询 API
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -24,55 +24,55 @@ So that **Dashboard 可以展示预测数据**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 定义分页和排序数据模型 (AC: 2, 3)
-  - [ ] 1.1 创建 `PaginationParams` 数据类 (page, per_page)
-  - [ ] 1.2 创建 `SortParams` 数据类 (sort_by, sort_order)
-  - [ ] 1.3 创建 `PredictionQueryResult` 数据类 (predictions, total, page, per_page)
-  - [ ] 1.4 更新 `__all__` 导出
+- [x] Task 1: 定义分页和排序数据模型 (AC: 2, 3)
+  - [x] 1.1 创建 `PaginationParams` 数据类 (page, per_page)
+  - [x] 1.2 创建 `SortParams` 数据类 (sort_by, sort_order)
+  - [x] 1.3 创建 `PredictionQueryResult` 数据类 (predictions, total, page, per_page)
+  - [x] 1.4 更新 `__all__` 导出
 
-- [ ] Task 2: 实现基础分页查询 (AC: 2)
-  - [ ] 2.1 添加 `_apply_pagination()` 辅助方法
-  - [ ] 2.2 添加 `_apply_sorting()` 辅助方法
-  - [ ] 2.3 实现分页元数据返回 (total, has_next, has_prev)
+- [x] Task 2: 实现基础分页查询 (AC: 2)
+  - [x] 2.1 添加 `_apply_pagination()` 辅助方法
+  - [x] 2.2 添加 `_apply_sorting()` 辅助方法
+  - [x] 2.3 实现分页元数据返回 (total, has_next, has_prev)
 
-- [ ] Task 3: 实现按结果状态查询 (AC: 1)
-  - [ ] 3.1 实现 `get_predictions_with_outcome(status)` 方法
-  - [ ] 3.2 status 支持: "correct", "incorrect", "pending", "all"
-  - [ ] 3.3 添加日志记录 (📊 emoji)
-  - [ ] 3.4 支持分页和排序
+- [x] Task 3: 实现按结果状态查询 (AC: 1)
+  - [x] 3.1 实现 `get_predictions_with_outcome(status)` 方法
+  - [x] 3.2 status 支持: "correct", "incorrect", "pending", "all"
+  - [x] 3.3 添加日志记录 (📊 emoji)
+  - [x] 3.4 支持分页和排序
 
-- [ ] Task 4: 实现便捷查询方法 (AC: 1)
-  - [ ] 4.1 实现 `get_correct_predictions()` 方法
-  - [ ] 4.2 实现 `get_incorrect_predictions()` 方法
-  - [ ] 4.3 两者都支持分页和排序
+- [x] Task 4: 实现便捷查询方法 (AC: 1)
+  - [x] 4.1 实现 `get_correct_predictions()` 方法
+  - [x] 4.2 实现 `get_incorrect_predictions()` 方法
+  - [x] 4.3 两者都支持分页和排序
 
-- [ ] Task 5: 实现按置信度范围查询 (AC: 1)
-  - [ ] 5.1 实现 `get_predictions_by_confidence_range(min, max)` 方法
-  - [ ] 5.2 验证 min <= max 且在 0-1 范围内
-  - [ ] 5.3 支持分页和排序
-  - [ ] 5.4 返回包含关联市场信息
+- [x] Task 5: 实现按置信度范围查询 (AC: 1)
+  - [x] 5.1 实现 `get_predictions_by_confidence_range(min, max)` 方法
+  - [x] 5.2 验证 min <= max 且在 0-1 范围内
+  - [x] 5.3 支持分页和排序
+  - [x] 5.4 返回包含关联市场信息
 
-- [ ] Task 6: 实现带市场信息的查询 (AC: 4)
-  - [ ] 6.1 扩展查询方法返回 `(Prediction, Market)` 元组
-  - [ ] 6.2 复用 `_row_to_market()` 方法
-  - [ ] 6.3 使用 JOIN 查询提高效率
+- [x] Task 6: 实现带市场信息的查询 (AC: 4)
+  - [x] 6.1 扩展查询方法返回 `(Prediction, Market)` 元组
+  - [x] 6.2 复用 `_row_to_market()` 方法
+  - [x] 6.3 使用 JOIN 查询提高效率
 
-- [ ] Task 7: 编写单元测试 (AC: All)
-  - [ ] 7.1 扩展 `tests/test_storage/test_prediction_repo.py`
-  - [ ] 7.2 测试 `get_predictions_with_outcome()` 各状态
-  - [ ] 7.3 测试 `get_correct_predictions()` 方法
-  - [ ] 7.4 测试 `get_incorrect_predictions()` 方法
-  - [ ] 7.5 测试 `get_predictions_by_confidence_range()` 方法
-  - [ ] 7.6 测试分页功能
-  - [ ] 7.7 测试排序功能
-  - [ ] 7.8 测试边界情况 (空结果、无效参数)
-  - [ ] 7.9 Mock 所有外部依赖
+- [x] Task 7: 编写单元测试 (AC: All)
+  - [x] 7.1 扩展 `tests/test_storage/test_prediction_repo.py`
+  - [x] 7.2 测试 `get_predictions_with_outcome()` 各状态
+  - [x] 7.3 测试 `get_correct_predictions()` 方法
+  - [x] 7.4 测试 `get_incorrect_predictions()` 方法
+  - [x] 7.5 测试 `get_predictions_by_confidence_range()` 方法
+  - [x] 7.6 测试分页功能
+  - [x] 7.7 测试排序功能
+  - [x] 7.8 测试边界情况 (空结果、无效参数)
+  - [x] 7.9 Mock 所有外部依赖
 
-- [ ] Task 8: 代码质量检查 (AC: All)
-  - [ ] 8.1 运行 `mypy src/storage/repositories/prediction_repo.py` 无错误
-  - [ ] 8.2 运行 `black --check` 通过
-  - [ ] 8.3 运行 `isort --check` 通过
-  - [ ] 8.4 运行完整测试套件确保通过
+- [x] Task 8: 代码质量检查 (AC: All)
+  - [x] 8.1 运行 `mypy src/storage/repositories/prediction_repo.py` 无错误
+  - [x] 8.2 运行 `black --check` 通过
+  - [x] 8.3 运行 `isort --check` 通过
+  - [x] 8.4 运行完整测试套件确保通过
 
 ## Dev Notes
 
