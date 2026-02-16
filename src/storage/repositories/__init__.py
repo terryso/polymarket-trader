@@ -9,6 +9,7 @@ Usage:
         PredictionRepository,
         PositionRepository,
         TradeRepository,
+        StatisticsRepository,
     )
 
     market_repo = MarketRepository()
@@ -22,6 +23,9 @@ Usage:
 
     trade_repo = TradeRepository()
     await trade_repo.save(trade)
+
+    stats_repo = StatisticsRepository()
+    await stats_repo.save(stats)
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from __future__ import annotations
 from src.storage.repositories.market_repo import MarketRepository
 from src.storage.repositories.position_repo import PositionRepository
 from src.storage.repositories.prediction_repo import PredictionRepository
+from src.storage.repositories.statistics_repo import StatisticsRepository
 from src.storage.repositories.trade_repo import TradeRepository
 
 __all__ = [
@@ -36,4 +41,5 @@ __all__ = [
     "PredictionRepository",
     "PositionRepository",
     "TradeRepository",
+    "StatisticsRepository",
 ]

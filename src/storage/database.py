@@ -272,6 +272,34 @@ class DatabaseManager:
                     ON trades(created_at)
                 """)
 
+                # Create statistics table (Story 5.5)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS statistics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date DATE NOT NULL,
+                        mode TEXT NOT NULL,
+                        starting_capital REAL,
+                        ending_capital REAL,
+                        total_pnl REAL,
+                        total_trades INTEGER,
+                        winning_trades INTEGER,
+                        losing_trades INTEGER,
+                        win_rate REAL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # Create indexes for statistics table (Story 5.5)
+                await conn.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_statistics_date_mode
+                    ON statistics(date, mode)
+                """)
+
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_statistics_created_at
+                    ON statistics(created_at)
+                """)
+
                 await conn.commit()
 
             logger.info(f"✅ Database initialized at {self._db_path}")
