@@ -95,7 +95,7 @@ development_status:
   7-2-market-data-api: done
   7-3-position-and-trade-api: done
   7-4-prediction-and-statistics-api: done
-  7-5-system-status-api: backlog
+  7-5-system-status-api: review
   7-6-frontend-api-integration: backlog
   epic-7-retrospective: optional
 

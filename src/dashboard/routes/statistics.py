@@ -3,12 +3,14 @@
 This module provides REST API endpoints for statistics operations.
 
 Story 7.4: 预测与统计 API
+Story 7.5: 系统状态 API
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+import time
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -24,7 +26,9 @@ from src.models.statistics_response import (
     TradesByDayPoint,
     WinRateHistoryPoint,
 )
+from src.models.system_status import SanitizedSettings, SystemStatus
 from src.models.trade import TradeMode, TradeStatus
+from src.storage.database import get_connection
 from src.storage.repositories.position_repo import PositionRepository
 from src.storage.repositories.statistics_repo import StatisticsRepository
 from src.storage.repositories.trade_repo import TradeRepository
@@ -32,6 +36,9 @@ from src.storage.repositories.trade_repo import TradeRepository
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Module-level variable for tracking application start time
+_app_start_time: float = time.time()
 
 
 def get_statistics_repository() -> StatisticsRepository:
@@ -285,6 +292,152 @@ async def get_performance(
     )
 
     return ApiResponse(success=True, data=performance, error=None)
+
+
+# ============================================================================
+# System Status Endpoints (Story 7.5)
+# ============================================================================
+
+
+async def get_last_market_fetch() -> datetime | None:
+    """Get last market fetch timestamp from database.
+
+    Returns:
+        datetime | None: Last market fetch timestamp or None
+    """
+    try:
+        async with get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT value, updated_at FROM system_state WHERE key = ?",
+                ("last_market_fetch",),
+            )
+            row = await cursor.fetchone()
+            if row and row[1]:
+                return datetime.fromisoformat(row[1])
+    except Exception as e:
+        logger.warning(f"Failed to get last market fetch: {e}")
+    return None
+
+
+@router.get("/status", response_model=ApiResponse[SystemStatus])
+async def get_system_status(
+    state: ThreadSafeState = Depends(get_state),
+) -> ApiResponse[SystemStatus]:
+    """Get system running status.
+
+    Returns real-time system status for monitoring including
+    trading state, capital, and performance metrics.
+
+    Args:
+        state: ThreadSafeState dependency
+
+    Returns:
+        System status data
+    """
+    logger.info("📊 Getting system status")
+
+    # Get current state
+    state_snapshot = await state.get_state()
+
+    # Get last market fetch time
+    last_market_fetch = await get_last_market_fetch()
+
+    # Calculate uptime
+    uptime_hours = (time.time() - _app_start_time) / 3600
+
+    status = SystemStatus(
+        trading_enabled=state_snapshot.trading_enabled,
+        mode=settings.trading_mode.upper(),
+        current_capital=state_snapshot.current_capital,
+        daily_pnl=state_snapshot.daily_pnl,
+        open_positions=state_snapshot.open_positions_count,
+        consecutive_losses=state_snapshot.consecutive_losses,
+        reduced_mode=state_snapshot.reduced_mode,
+        last_market_fetch=last_market_fetch,
+        uptime_hours=round(uptime_hours, 2),
+    )
+
+    return ApiResponse(success=True, data=status, error=None)
+
+
+def mask_api_key(key: str) -> str:
+    """Mask API key, showing only first 4 characters.
+
+    Args:
+        key: API key to mask
+
+    Returns:
+        Masked API key (e.g., "sk-x****xxxx")
+
+    Example:
+        >>> mask_api_key("sk-1234567890abcdef")
+        'sk-1****'
+    """
+    if not key:
+        return "[NOT_SET]"
+    if len(key) <= 4:
+        return key[:4] + "****"
+    return key[:4] + "****"
+
+
+def mask_private_key() -> str:
+    """Return fully masked private key indicator.
+
+    Returns:
+        Always returns "[REDACTED]"
+    """
+    return "[REDACTED]"
+
+
+def mask_wallet_address(address: str) -> str:
+    """Mask wallet address, showing first 6 and last 4 characters.
+
+    Args:
+        address: Wallet address to mask
+
+    Returns:
+        Masked address (e.g., "0x1234...5678")
+
+    Example:
+        >>> mask_wallet_address("0x1234567890abcdef1234")
+        '0x1234...1234'
+    """
+    if not address:
+        return "[NOT_SET]"
+    if len(address) <= 10:
+        return address[:6] + "..." if len(address) >= 6 else address + "..."
+    return f"{address[:6]}...{address[-4:]}"
+
+
+@router.get("/settings", response_model=ApiResponse[SanitizedSettings])
+async def get_settings_sanitized() -> ApiResponse[SanitizedSettings]:
+    """Get sanitized system settings.
+
+    Returns configuration values with sensitive data masked
+    for secure display in the dashboard.
+
+    Returns:
+        Sanitized settings data
+    """
+    logger.info("📊 Getting sanitized settings")
+
+    sanitized = SanitizedSettings(
+        trading_mode=settings.trading_mode.upper(),
+        initial_capital=settings.initial_capital,
+        trade_unit=settings.trading.trade_unit,
+        max_single_ratio=settings.risk.max_single_ratio,
+        min_confidence=settings.risk.min_confidence,
+        min_edge=settings.risk.min_edge,
+        daily_loss_limit=settings.risk.daily_loss_limit,
+        max_open_markets=settings.risk.max_open_markets,
+        llm_model=settings.llm.model,
+        llm_api_base=settings.llm.api_base,
+        llm_api_key=mask_api_key(settings.llm.api_key),
+        polymarket_pk=mask_private_key(),
+        proxy_wallet=mask_wallet_address(settings.polymarket.proxy_wallet),
+    )
+
+    return ApiResponse(success=True, data=sanitized, error=None)
 
 
 __all__ = ["router"]
