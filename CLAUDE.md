@@ -122,6 +122,17 @@ cd dashboard
 npm run lint
 ```
 
+## 测试标准
+- 任何代码更改后运行完整测试套件：`pytest --cov --cov-report=term-missing`
+- 所有新功能都需要在 `tests/` 目录中有相应的测试文件
+- 使用 pytest fixtures 和 mocking 处理外部依赖
+- 新模块的目标是 90%+ 的代码覆盖率
+
+## 代码审查标准
+- 所有代码更改都应通过：`pytest`、`mypy src/` 和 `ruff check .`
+- 立即自动修复 HIGH 和 MEDIUM 严重程度的问题
+- 在代码注释中记录任何接受的 LOW 严重程度问题
+
 ---
 
 ## 项目结构
