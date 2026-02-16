@@ -1,7 +1,7 @@
-"""Analysis modules: market filter, LLM analyzer, prompts.
+"""Analysis modules: market filter, LLM analyzer, prompts, prediction tracker.
 
-This module provides market analysis functionality including filtering
-and LLM-based prediction analysis.
+This module provides market analysis functionality including filtering,
+LLM-based prediction analysis, and prediction validation tracking.
 
 Example:
     >>> from src.analysis import MarketFilter, FilterResult, FilterStatistics
@@ -18,6 +18,10 @@ Example:
     ...     parse_llm_analysis_response,
     ...     LLMAnalysisResult,
     ... )
+
+    >>> from src.analysis import PredictionTracker, ValidationResult, AccuracyResult
+    >>> tracker = PredictionTracker(market_repo, prediction_repo)
+    >>> results = await tracker.check_resolved_markets()
 """
 
 from __future__ import annotations
@@ -28,9 +32,14 @@ from src.analysis.market_filter import (
     FilterStatistics,
     MarketFilter,
 )
+from src.analysis.prediction_tracker import (
+    AccuracyResult,
+    PredictionTracker,
+    ValidationResult,
+)
 from src.analysis.prompts import (
-    LLMAnalysisResult,
     MARKET_ANALYST_SYSTEM_PROMPT,
+    LLMAnalysisResult,
     Recommendation,
     build_market_analysis_prompt,
     parse_llm_analysis_response,
@@ -52,4 +61,8 @@ __all__ = [
     "build_market_analysis_prompt",
     "parse_llm_analysis_response",
     "validate_analysis_result",
+    # Prediction tracker
+    "PredictionTracker",
+    "ValidationResult",
+    "AccuracyResult",
 ]

@@ -1008,3 +1008,113 @@ class TestMarketRepository:
             result = await repo.get_last_fetch_time()
 
             assert result is None
+
+    # ==================== get_resolved_markets tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_resolved_markets_success(
+        self, repo: MarketRepository
+    ) -> None:
+        """Test retrieving resolved markets."""
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.market_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.get_resolved_markets()
+
+            assert result == []
+            # Verify query filters for RESOLVED status
+            call_args = mock_conn.execute.call_args
+            assert "resolution_status = 'RESOLVED'" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_get_resolved_markets_returns_resolved_only(
+        self, repo: MarketRepository
+    ) -> None:
+        """Test that get_resolved_markets only returns resolved markets."""
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "id": "resolved-market",
+            "title": "Resolved Market",
+            "description": None,
+            "category": None,
+            "yes_price": 0.5,
+            "no_price": 0.5,
+            "liquidity": 1000.0,
+            "deadline": None,
+            "resolution_status": "RESOLVED",
+            "resolution_outcome": "YES",
+            "created_at": None,
+            "updated_at": None,
+        }[key]
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[mock_row])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.market_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.get_resolved_markets()
+
+            assert len(result) == 1
+            assert result[0].resolution_status == "RESOLVED"
+            assert result[0].resolution_outcome == "YES"
+
+    @pytest.mark.asyncio
+    async def test_get_resolved_markets_database_error(
+        self, repo: MarketRepository
+    ) -> None:
+        """Test that database errors in get_resolved_markets are properly wrapped."""
+        import aiosqlite
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(
+            side_effect=aiosqlite.Error("Database error")
+        )
+
+        with patch(
+            "src.storage.repositories.market_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            with pytest.raises(DatabaseError) as exc_info:
+                await repo.get_resolved_markets()
+
+            assert exc_info.value.operation == "get_resolved_markets"
+
+    @pytest.mark.asyncio
+    async def test_get_resolved_markets_ordered_by_updated_at(
+        self, repo: MarketRepository
+    ) -> None:
+        """Test that resolved markets are ordered by updated_at DESC."""
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.market_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            await repo.get_resolved_markets()
+
+            call_args = mock_conn.execute.call_args
+            assert "ORDER BY updated_at DESC" in call_args[0][0]

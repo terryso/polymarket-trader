@@ -219,6 +219,78 @@ class PredictionRepository:
             )
             raise
 
+    async def get_unvalidated_predictions(self) -> list[Prediction]:
+        """Get all unvalidated predictions (validated_at is NULL).
+
+        Returns predictions that have not been validated yet,
+        regardless of market resolution status.
+
+        Returns:
+            List of unvalidated Prediction models
+
+        Example:
+            >>> unvalidated = await repo.get_unvalidated_predictions()
+            >>> len(unvalidated)
+            5
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute("""
+                    SELECT * FROM predictions
+                    WHERE validated_at IS NULL
+                    ORDER BY created_at DESC
+                    """)
+                rows = await cursor.fetchall()
+
+            predictions = [self._row_to_prediction(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(predictions)} "
+                f"unvalidated predictions"
+            )
+            return predictions
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to get unvalidated predictions: {e}"
+            )
+            raise
+
+    async def get_validated_predictions(self) -> list[Prediction]:
+        """Get all validated predictions (validated_at is NOT NULL).
+
+        Returns predictions that have been validated against
+        resolved market outcomes.
+
+        Returns:
+            List of validated Prediction models
+
+        Example:
+            >>> validated = await repo.get_validated_predictions()
+            >>> len(validated)
+            20
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute("""
+                    SELECT * FROM predictions
+                    WHERE validated_at IS NOT NULL
+                    ORDER BY validated_at DESC
+                    """)
+                rows = await cursor.fetchall()
+
+            predictions = [self._row_to_prediction(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(predictions)} "
+                f"validated predictions"
+            )
+            return predictions
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to get validated predictions: {e}"
+            )
+            raise
+
     async def get_latest_prediction(self, market_id: str) -> Prediction | None:
         """Get the most recent prediction for a specific market.
 

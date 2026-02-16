@@ -144,14 +144,16 @@ class MarketRepository:
                         saved_count += 1
                     except aiosqlite.Error as e:
                         logger.warning(
-                            f"{OPERATION_EMOJIS['data']} Skipped market {market.id}: {e}"
+                            f"{OPERATION_EMOJIS['data']} Skipped market "
+                            f"{market.id}: {e}"
                         )
                         continue
 
                 await conn.commit()
 
             logger.info(
-                f"{OPERATION_EMOJIS['data']} ✅ Saved {saved_count}/{len(markets)} markets"
+                f"{OPERATION_EMOJIS['data']} ✅ Saved {saved_count}/"
+                f"{len(markets)} markets"
             )
             return saved_count
         except aiosqlite.Error as e:
@@ -480,7 +482,8 @@ class MarketRepository:
                     return False
 
                 logger.info(
-                    f"{OPERATION_EMOJIS['data']} Updated resolution for market: {market_id}"
+                    f"{OPERATION_EMOJIS['data']} Updated resolution for "
+                    f"market: {market_id}"
                 )
                 return True
         except aiosqlite.Error as e:
@@ -490,5 +493,41 @@ class MarketRepository:
             raise DatabaseError(
                 message=f"Failed to update market resolution: {market_id}",
                 operation="update_market_resolution",
+                original_exception=e,
+            ) from e
+
+    async def get_resolved_markets(self) -> list[Market]:
+        """Get all resolved markets.
+
+        Returns markets where resolution_status = 'RESOLVED',
+        ordered by updated_at descending.
+
+        Returns:
+            List of resolved Market models
+
+        Raises:
+            DatabaseError: If query fails
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute("""
+                    SELECT * FROM markets
+                    WHERE resolution_status = 'RESOLVED'
+                    ORDER BY updated_at DESC
+                    """)
+                rows = await cursor.fetchall()
+                markets = [self._row_to_market(row) for row in rows]
+                logger.info(
+                    f"{OPERATION_EMOJIS['data']} Found {len(markets)} resolved markets"
+                )
+                return markets
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to get resolved markets: {e}"
+            )
+            raise DatabaseError(
+                message="Failed to get resolved markets",
+                operation="get_resolved_markets",
                 original_exception=e,
             ) from e

@@ -990,3 +990,175 @@ class TestPredictionRepository:
         mock_row.__getitem__.side_effect = getitem
 
         return mock_row
+
+    # ==================== get_unvalidated_predictions tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_unvalidated_predictions_found(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test retrieving unvalidated predictions."""
+        mock_row = self._create_mock_row(
+            prediction_id=1,
+            market_id="unvalidated-market",
+            predicted_probability=0.75,
+            confidence=0.85,
+            validated_at=None,  # Not validated
+        )
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[mock_row])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            predictions = await repo.get_unvalidated_predictions()
+
+            assert len(predictions) == 1
+            # Verify query filters for NULL validated_at
+            call_args = mock_conn.execute.call_args
+            assert "validated_at IS NULL" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_get_unvalidated_predictions_empty(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test retrieving unvalidated predictions when all are validated."""
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            predictions = await repo.get_unvalidated_predictions()
+
+            assert predictions == []
+
+    @pytest.mark.asyncio
+    async def test_get_unvalidated_predictions_database_error(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that database errors are raised properly."""
+        import aiosqlite
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            with pytest.raises(aiosqlite.Error):
+                await repo.get_unvalidated_predictions()
+
+    # ==================== get_validated_predictions tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_validated_predictions_found(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test retrieving validated predictions."""
+        mock_row = self._create_mock_row(
+            prediction_id=1,
+            market_id="validated-market",
+            predicted_probability=0.75,
+            confidence=0.85,
+            validated_at="2026-02-15T10:30:00",
+            actual_outcome="YES",
+            is_correct=1,
+        )
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[mock_row])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            predictions = await repo.get_validated_predictions()
+
+            assert len(predictions) == 1
+            # Verify query filters for NOT NULL validated_at
+            call_args = mock_conn.execute.call_args
+            assert "validated_at IS NOT NULL" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_get_validated_predictions_empty(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test retrieving validated predictions when none are validated."""
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            predictions = await repo.get_validated_predictions()
+
+            assert predictions == []
+
+    @pytest.mark.asyncio
+    async def test_get_validated_predictions_database_error(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that database errors are raised properly."""
+        import aiosqlite
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            with pytest.raises(aiosqlite.Error):
+                await repo.get_validated_predictions()
+
+    @pytest.mark.asyncio
+    async def test_get_validated_predictions_ordered_by_validated_at(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that validated predictions are ordered by validated_at DESC."""
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            await repo.get_validated_predictions()
+
+            call_args = mock_conn.execute.call_args
+            assert "ORDER BY validated_at DESC" in call_args[0][0]
