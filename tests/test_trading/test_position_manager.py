@@ -1,6 +1,7 @@
 """Tests for PositionManager.
 
 Story 4.5: 持仓管理
+Story 5.4: 模拟持仓 PnL 计算
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from src.core.state import StateSnapshot, ThreadSafeState
 from src.exceptions import TradingError, ValidationError
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.storage.repositories.position_repo import PositionRepository
-from src.trading.position_manager import PositionManager
+from src.trading.position_manager import PnLResult, PositionManager, TotalPnLResult
 
 
 class TestPositionManager:
@@ -31,7 +32,9 @@ class TestPositionManager:
         return PositionRepository()
 
     @pytest.fixture
-    def manager(self, repo: PositionRepository, state: ThreadSafeState) -> PositionManager:
+    def manager(
+        self, repo: PositionRepository, state: ThreadSafeState
+    ) -> PositionManager:
         """创建测试用持仓管理器."""
         return PositionManager(repo, state)
 
@@ -60,9 +63,7 @@ class TestPositionManager:
     ) -> None:
         """测试开仓."""
         with patch.object(manager._repo, "get_by_market", return_value=None):
-            with patch.object(
-                manager._repo, "save", return_value=sample_position
-            ):
+            with patch.object(manager._repo, "save", return_value=sample_position):
                 position = await manager.open_position(
                     market_id="test-market-1",
                     outcome=PositionOutcome.YES,
@@ -83,9 +84,7 @@ class TestPositionManager:
                 assert position.closed_at is None
 
     @pytest.mark.asyncio
-    async def test_open_position_no_outcome(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_open_position_no_outcome(self, manager: PositionManager) -> None:
         """测试开仓 NO 方向."""
         no_position = Position(
             id=2,
@@ -166,9 +165,7 @@ class TestPositionManager:
         self, manager: PositionManager, sample_position: Position
     ) -> None:
         """测试开仓 - 重复开仓同一市场."""
-        with patch.object(
-            manager._repo, "get_by_market", return_value=sample_position
-        ):
+        with patch.object(manager._repo, "get_by_market", return_value=sample_position):
             with pytest.raises(TradingError, match="Open position already exists"):
                 await manager.open_position(
                     market_id="test-market-1",
@@ -215,9 +212,7 @@ class TestPositionManager:
                 assert updated.pnl == 10.0  # 55 - 45
 
     @pytest.mark.asyncio
-    async def test_update_position_value_loss(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_update_position_value_loss(self, manager: PositionManager) -> None:
         """测试更新持仓价值 - 亏损."""
         position = Position(
             id=1,
@@ -249,7 +244,9 @@ class TestPositionManager:
     ) -> None:
         """测试更新持仓价值 - 无效价格."""
         with patch.object(manager._repo, "get_by_id", return_value=sample_position):
-            with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+            with pytest.raises(
+                ValidationError, match="Current price must be between 0 and 1"
+            ):
                 await manager.update_position_value(1, 1.5)
 
     @pytest.mark.asyncio
@@ -309,9 +306,7 @@ class TestPositionManager:
                 assert closed.closed_at is not None
 
     @pytest.mark.asyncio
-    async def test_close_position_loss(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_close_position_loss(self, manager: PositionManager) -> None:
         """测试平仓 - 亏损."""
         position = Position(
             id=1,
@@ -387,13 +382,13 @@ class TestPositionManager:
     ) -> None:
         """测试平仓 - 无效价格."""
         with patch.object(manager._repo, "get_by_id", return_value=sample_position):
-            with pytest.raises(ValidationError, match="Final price must be between 0 and 1"):
+            with pytest.raises(
+                ValidationError, match="Final price must be between 0 and 1"
+            ):
                 await manager.close_position(1, 1.5)
 
     @pytest.mark.asyncio
-    async def test_close_position_not_found(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_close_position_not_found(self, manager: PositionManager) -> None:
         """测试平仓 - 持仓不存在."""
         with patch.object(manager._repo, "get_by_id", return_value=None):
             with pytest.raises(ValidationError, match="Position 99999 not found"):
@@ -425,9 +420,7 @@ class TestPositionManager:
     # ==================== get_open_positions tests ====================
 
     @pytest.mark.asyncio
-    async def test_get_open_positions(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_get_open_positions(self, manager: PositionManager) -> None:
         """测试获取开放持仓列表."""
         mock_positions = [
             Position(
@@ -458,7 +451,9 @@ class TestPositionManager:
             ),
         ]
 
-        with patch.object(manager._repo, "get_open_positions", return_value=mock_positions):
+        with patch.object(
+            manager._repo, "get_open_positions", return_value=mock_positions
+        ):
             positions = await manager.get_open_positions()
 
             assert len(positions) == 2
@@ -466,9 +461,7 @@ class TestPositionManager:
                 assert pos.status == PositionStatus.OPEN
 
     @pytest.mark.asyncio
-    async def test_get_open_positions_empty(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_get_open_positions_empty(self, manager: PositionManager) -> None:
         """测试获取空列表."""
         with patch.object(manager._repo, "get_open_positions", return_value=[]):
             positions = await manager.get_open_positions()
@@ -477,9 +470,7 @@ class TestPositionManager:
     # ==================== get_total_exposure tests ====================
 
     @pytest.mark.asyncio
-    async def test_get_total_exposure(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_get_total_exposure(self, manager: PositionManager) -> None:
         """测试计算总风险敞口."""
         mock_positions = [
             Position(
@@ -510,15 +501,15 @@ class TestPositionManager:
             ),
         ]
 
-        with patch.object(manager._repo, "get_open_positions", return_value=mock_positions):
+        with patch.object(
+            manager._repo, "get_open_positions", return_value=mock_positions
+        ):
             exposure = await manager.get_total_exposure()
             # 55 + 20 = 75
             assert exposure == 75.0
 
     @pytest.mark.asyncio
-    async def test_get_total_exposure_empty(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_get_total_exposure_empty(self, manager: PositionManager) -> None:
         """测试空持仓的总风险敞口."""
         with patch.object(manager._repo, "get_open_positions", return_value=[]):
             exposure = await manager.get_total_exposure()
@@ -624,3 +615,580 @@ class TestPositionManager:
         state2 = await manager._state.get_state()
         assert state2.open_positions_count == initial_count + 2
         assert state2.current_capital == initial_capital + 20.0
+
+    # ==================== PnL calculation tests (Story 5.4) ====================
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_buy_yes_profit(self, manager: PositionManager) -> None:
+        """测试 BUY_YES 持仓盈利场景."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=45.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        result = manager.calculate_pnl(position, current_price=0.55)
+
+        assert isinstance(result, PnLResult)
+        assert result.pnl == pytest.approx(10.0)  # 100 * (0.55 - 0.45)
+        assert result.pnl_pct == pytest.approx(10.0 / 45.0)
+        assert result.current_value == pytest.approx(55.0)
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_buy_yes_loss(self, manager: PositionManager) -> None:
+        """测试 BUY_YES 持仓亏损场景."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=45.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        result = manager.calculate_pnl(position, current_price=0.35)
+
+        assert isinstance(result, PnLResult)
+        assert result.pnl == pytest.approx(-10.0)  # 100 * (0.35 - 0.45)
+        assert result.pnl_pct == pytest.approx(-10.0 / 45.0)
+        assert result.current_value == pytest.approx(35.0)
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_buy_no_profit(self, manager: PositionManager) -> None:
+        """测试 BUY_NO 持仓盈利场景 (NO 价格上涨)."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.NO,
+            shares=100.0,
+            avg_price=0.55,
+            initial_value=55.0,
+            current_value=55.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        # NO 价格从 0.55 上涨到 0.65 = 盈利
+        result = manager.calculate_pnl(position, current_price=0.65)
+
+        assert isinstance(result, PnLResult)
+        assert result.pnl == pytest.approx(10.0)  # 100 * (0.65 - 0.55)
+        assert result.pnl_pct == pytest.approx(10.0 / 55.0, rel=0.01)
+        assert result.current_value == pytest.approx(65.0)
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_buy_no_loss(self, manager: PositionManager) -> None:
+        """测试 BUY_NO 持仓亏损场景 (NO 价格下跌)."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.NO,
+            shares=100.0,
+            avg_price=0.55,
+            initial_value=55.0,
+            current_value=55.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        # NO 价格从 0.55 下跌到 0.45 = 亏损
+        result = manager.calculate_pnl(position, current_price=0.45)
+
+        assert isinstance(result, PnLResult)
+        assert result.pnl == pytest.approx(-10.0)  # 100 * (0.45 - 0.55)
+        assert result.pnl_pct == pytest.approx(-10.0 / 55.0, rel=0.01)
+        assert result.current_value == pytest.approx(45.0)
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_zero_initial_value(
+        self, manager: PositionManager
+    ) -> None:
+        """测试 initial_value 为 None 的边界情况."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=None,  # None case
+            current_value=None,
+            pnl=None,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        result = manager.calculate_pnl(position, current_price=0.55)
+
+        assert isinstance(result, PnLResult)
+        assert result.pnl == pytest.approx(10.0)
+        assert result.pnl_pct == 0.0  # Safe default when initial_value is None
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_invalid_price(
+        self, manager: PositionManager
+    ) -> None:
+        """测试 calculate_pnl - 无效价格."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=45.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        # Price <= 0
+        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+            manager.calculate_pnl(position, current_price=0.0)
+
+        # Price >= 1
+        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+            manager.calculate_pnl(position, current_price=1.0)
+
+        # Negative price
+        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+            manager.calculate_pnl(position, current_price=-0.5)
+
+        # Price > 1
+        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+            manager.calculate_pnl(position, current_price=1.5)
+
+    @pytest.mark.asyncio
+    async def test_calculate_pnl_zero_initial_value_zero(
+        self, manager: PositionManager
+    ) -> None:
+        """测试 initial_value 为 0 的边界情况."""
+        position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=0.0,  # Zero case
+            current_value=0.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        result = manager.calculate_pnl(position, current_price=0.55)
+
+        assert isinstance(result, PnLResult)
+        assert result.pnl == pytest.approx(10.0)
+        assert result.pnl_pct == 0.0  # Safe default when initial_value is 0
+
+    @pytest.mark.asyncio
+    async def test_calculate_total_pnl(self, manager: PositionManager) -> None:
+        """测试总 PnL 计算."""
+        mock_positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.45,
+                initial_value=45.0,
+                current_value=55.0,
+                pnl=10.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+            Position(
+                id=2,
+                market_id="m2",
+                outcome=PositionOutcome.NO,
+                shares=50.0,
+                avg_price=0.60,
+                initial_value=30.0,
+                current_value=25.0,
+                pnl=-5.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(
+            manager._repo, "get_open_positions", return_value=mock_positions
+        ):
+            result = await manager.calculate_total_pnl()
+
+            assert isinstance(result, TotalPnLResult)
+            assert result.total_pnl == pytest.approx(5.0)  # 10 - 5
+            assert result.positions_count == 2
+            assert result.winning_count == 1
+            assert result.losing_count == 1
+
+    @pytest.mark.asyncio
+    async def test_calculate_total_pnl_empty(self, manager: PositionManager) -> None:
+        """测试空持仓的总 PnL 计算."""
+        with patch.object(manager._repo, "get_open_positions", return_value=[]):
+            result = await manager.calculate_total_pnl()
+
+            assert isinstance(result, TotalPnLResult)
+            assert result.total_pnl == 0.0
+            assert result.positions_count == 0
+            assert result.winning_count == 0
+            assert result.losing_count == 0
+
+    @pytest.mark.asyncio
+    async def test_calculate_total_pnl_all_winning(
+        self, manager: PositionManager
+    ) -> None:
+        """测试全部盈利的总 PnL 计算."""
+        mock_positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.40,
+                initial_value=40.0,
+                current_value=50.0,
+                pnl=10.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+            Position(
+                id=2,
+                market_id="m2",
+                outcome=PositionOutcome.NO,
+                shares=50.0,
+                avg_price=0.50,
+                initial_value=25.0,
+                current_value=35.0,
+                pnl=10.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(
+            manager._repo, "get_open_positions", return_value=mock_positions
+        ):
+            result = await manager.calculate_total_pnl()
+
+            assert isinstance(result, TotalPnLResult)
+            assert result.total_pnl == pytest.approx(20.0)
+            assert result.positions_count == 2
+            assert result.winning_count == 2
+            assert result.losing_count == 0
+
+    @pytest.mark.asyncio
+    async def test_calculate_total_pnl_all_losing(
+        self, manager: PositionManager
+    ) -> None:
+        """测试全部亏损的总 PnL 计算."""
+        mock_positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.60,
+                initial_value=60.0,
+                current_value=50.0,
+                pnl=-10.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+            Position(
+                id=2,
+                market_id="m2",
+                outcome=PositionOutcome.NO,
+                shares=50.0,
+                avg_price=0.40,
+                initial_value=20.0,
+                current_value=15.0,
+                pnl=-5.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(
+            manager._repo, "get_open_positions", return_value=mock_positions
+        ):
+            result = await manager.calculate_total_pnl()
+
+            assert isinstance(result, TotalPnLResult)
+            assert result.total_pnl == pytest.approx(-15.0)
+            assert result.positions_count == 2
+            assert result.winning_count == 0
+            assert result.losing_count == 2
+
+    @pytest.mark.asyncio
+    async def test_calculate_total_pnl_with_none_pnl(
+        self, manager: PositionManager
+    ) -> None:
+        """测试持仓 pnl 为 None 的总 PnL 计算."""
+        mock_positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.45,
+                initial_value=45.0,
+                current_value=45.0,
+                pnl=None,  # None pnl
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(
+            manager._repo, "get_open_positions", return_value=mock_positions
+        ):
+            result = await manager.calculate_total_pnl()
+
+            assert isinstance(result, TotalPnLResult)
+            assert result.total_pnl == 0.0  # None is treated as 0
+            assert result.positions_count == 1
+            assert result.winning_count == 0
+            assert result.losing_count == 0  # pnl == 0 is not losing
+
+    @pytest.mark.asyncio
+    async def test_update_all_positions_value(self, manager: PositionManager) -> None:
+        """测试批量更新持仓价值."""
+        positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.45,
+                initial_value=45.0,
+                current_value=45.0,
+                pnl=0.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+            Position(
+                id=2,
+                market_id="m2",
+                outcome=PositionOutcome.NO,
+                shares=50.0,
+                avg_price=0.60,
+                initial_value=30.0,
+                current_value=30.0,
+                pnl=0.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(manager._repo, "get_open_positions", return_value=positions):
+            # Mock get_by_id to return the position
+            async def mock_get_by_id(pos_id: int) -> Position | None:
+                for p in positions:
+                    if p.id == pos_id:
+                        return p
+                return None
+
+            with patch.object(manager._repo, "get_by_id", side_effect=mock_get_by_id):
+                # Mock update to return the updated position
+                def mock_update(pos: Position) -> Position:
+                    return pos
+
+                with patch.object(manager._repo, "update", side_effect=mock_update):
+                    market_prices = {"m1": 0.55, "m2": 0.50}
+
+                    updated = await manager.update_all_positions_value(market_prices)
+
+                    assert len(updated) == 2
+                    # Position 1: 100 shares @ new price 0.55 = 55 current_value, pnl = 10
+                    assert updated[0].current_value == pytest.approx(55.0)
+                    assert updated[0].pnl == pytest.approx(10.0)
+                    # Position 2: 50 shares @ new price 0.50 = 25 current_value, pnl = -5
+                    assert updated[1].current_value == pytest.approx(25.0)
+                    assert updated[1].pnl == pytest.approx(-5.0)
+
+    @pytest.mark.asyncio
+    async def test_update_all_positions_value_missing_price(
+        self, manager: PositionManager
+    ) -> None:
+        """测试批量更新持仓价值 - 缺少市场价格."""
+        positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.45,
+                initial_value=45.0,
+                current_value=45.0,
+                pnl=0.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+            Position(
+                id=2,
+                market_id="m2",
+                outcome=PositionOutcome.NO,
+                shares=50.0,
+                avg_price=0.60,
+                initial_value=30.0,
+                current_value=30.0,
+                pnl=0.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(manager._repo, "get_open_positions", return_value=positions):
+
+            async def mock_get_by_id(pos_id: int) -> Position | None:
+                for p in positions:
+                    if p.id == pos_id:
+                        return p
+                return None
+
+            with patch.object(manager._repo, "get_by_id", side_effect=mock_get_by_id):
+
+                def mock_update(pos: Position) -> Position:
+                    return pos
+
+                with patch.object(manager._repo, "update", side_effect=mock_update):
+                    # Only provide price for m1, not m2
+                    market_prices = {"m1": 0.55}
+
+                    updated = await manager.update_all_positions_value(market_prices)
+
+                    # Only 1 position should be updated (m1)
+                    assert len(updated) == 1
+                    assert updated[0].market_id == "m1"
+
+    @pytest.mark.asyncio
+    async def test_update_all_positions_value_empty(
+        self, manager: PositionManager
+    ) -> None:
+        """测试批量更新持仓价值 - 空持仓."""
+        with patch.object(manager._repo, "get_open_positions", return_value=[]):
+            market_prices = {"m1": 0.55}
+
+            updated = await manager.update_all_positions_value(market_prices)
+
+            assert len(updated) == 0
+
+    @pytest.mark.asyncio
+    async def test_update_all_positions_value_with_error(
+        self, manager: PositionManager
+    ) -> None:
+        """测试批量更新持仓价值 - 一个持仓更新失败."""
+        positions = [
+            Position(
+                id=1,
+                market_id="m1",
+                outcome=PositionOutcome.YES,
+                shares=100.0,
+                avg_price=0.45,
+                initial_value=45.0,
+                current_value=45.0,
+                pnl=0.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+            Position(
+                id=2,
+                market_id="m2",
+                outcome=PositionOutcome.NO,
+                shares=50.0,
+                avg_price=0.60,
+                initial_value=30.0,
+                current_value=30.0,
+                pnl=0.0,
+                status=PositionStatus.OPEN,
+                opened_at=datetime.now(timezone.utc),
+                closed_at=None,
+            ),
+        ]
+
+        with patch.object(manager._repo, "get_open_positions", return_value=positions):
+            call_count = [0]
+
+            async def mock_get_by_id(pos_id: int) -> Position | None:
+                for p in positions:
+                    if p.id == pos_id:
+                        return p
+                return None
+
+            with patch.object(manager._repo, "get_by_id", side_effect=mock_get_by_id):
+
+                def mock_update(pos: Position) -> Position:
+                    call_count[0] += 1
+                    if pos.id == 2:
+                        raise TradingError("Database error")
+                    return pos
+
+                with patch.object(manager._repo, "update", side_effect=mock_update):
+                    market_prices = {"m1": 0.55, "m2": 0.50}
+
+                    updated = await manager.update_all_positions_value(market_prices)
+
+                    # Only m1 should succeed
+                    assert len(updated) == 1
+                    assert updated[0].market_id == "m1"
+
+    # ==================== PnLResult and TotalPnLResult dataclass tests ====================
+
+    def test_pnl_result_dataclass(self) -> None:
+        """测试 PnLResult 数据类."""
+        result = PnLResult(
+            pnl=10.0,
+            pnl_pct=0.2222,
+            current_value=55.0,
+        )
+
+        assert result.pnl == 10.0
+        assert result.pnl_pct == pytest.approx(0.2222)
+        assert result.current_value == 55.0
+
+    def test_total_pnl_result_dataclass(self) -> None:
+        """测试 TotalPnLResult 数据类."""
+        result = TotalPnLResult(
+            total_pnl=5.0,
+            positions_count=2,
+            winning_count=1,
+            losing_count=1,
+        )
+
+        assert result.total_pnl == 5.0
+        assert result.positions_count == 2
+        assert result.winning_count == 1
+        assert result.losing_count == 1

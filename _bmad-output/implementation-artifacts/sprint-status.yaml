@@ -81,8 +81,8 @@ development_status:
   epic-5: in-progress
   5-1-trade-record-data-model: done
   5-2-paper-trading-executor: done
-  5-3-trading-decision-flow: backlog
-  5-4-simulated-position-pnl-calculation: backlog
+  5-3-trading-decision-flow: done
+  5-4-simulated-position-pnl-calculation: ready-for-dev
   5-5-statistics-data-recording: backlog
   epic-5-retrospective: optional
 

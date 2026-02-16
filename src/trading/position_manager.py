@@ -2,8 +2,10 @@
 
 This module provides the PositionManager class that handles all
 position lifecycle operations including opening, updating, and closing.
+Also provides PnL calculation functionality for simulated positions.
 
 Story 4.5: 持仓管理
+Story 5.4: 模拟持仓 PnL 计算
 
 Example:
     >>> from src.trading.position_manager import PositionManager
@@ -21,12 +23,17 @@ Example:
     ...     shares=100.0,
     ...     price=0.45
     ... )
+    >>>
+    >>> # Calculate PnL
+    >>> result = manager.calculate_pnl(position, current_price=0.55)
+    >>> print(f"PnL: ${result.pnl:.2f} ({result.pnl_pct:.2%})")
 """
 
 from __future__ import annotations
 
-__all__ = ["PositionManager"]
+__all__ = ["PositionManager", "PnLResult", "TotalPnLResult"]
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -40,6 +47,38 @@ if TYPE_CHECKING:
 
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class PnLResult:
+    """Result of PnL calculation for a single position.
+
+    Attributes:
+        pnl: Absolute profit/loss in USD
+        pnl_pct: Profit/loss percentage (0-1 range, negative for loss)
+        current_value: Current market value in USD
+    """
+
+    pnl: float
+    pnl_pct: float
+    current_value: float
+
+
+@dataclass
+class TotalPnLResult:
+    """Result of total PnL calculation across all positions.
+
+    Attributes:
+        total_pnl: Total profit/loss across all positions in USD
+        positions_count: Number of positions included in calculation
+        winning_count: Number of profitable positions (pnl > 0)
+        losing_count: Number of losing positions (pnl < 0)
+    """
+
+    total_pnl: float
+    positions_count: int
+    winning_count: int
+    losing_count: int
 
 
 class PositionManager:
@@ -313,3 +352,143 @@ class PositionManager:
         """
         position = await self._repo.get_by_market(market_id, PositionStatus.OPEN)
         return position
+
+    def calculate_pnl(self, position: Position, current_price: float) -> PnLResult:
+        """Calculate PnL for a single position.
+
+        PnL calculation formula:
+        - For both YES and NO outcomes: pnl = shares * (current_price - avg_price)
+        - This works because we hold shares directly in the outcome type
+
+        Args:
+            position: Position to calculate PnL for
+            current_price: Current market price for the outcome (0-1)
+
+        Returns:
+            PnLResult with pnl, pnl_pct, and current_value
+
+        Raises:
+            ValidationError: If current_price is not between 0 and 1
+
+        Example:
+            >>> # BUY_YES position with profit
+            >>> result = manager.calculate_pnl(position, current_price=0.55)
+            >>> print(f"PnL: ${result.pnl:.2f} ({result.pnl_pct:.2%})")
+        """
+        # Validate current_price
+        if not 0 < current_price < 1:
+            raise ValidationError(
+                f"Current price must be between 0 and 1, got {current_price}"
+            )
+
+        # Calculate current value
+        current_value = position.shares * current_price
+
+        # Calculate PnL based on outcome
+        # For both YES and NO, we use the same formula since we're
+        # buying the outcome directly (YES shares or NO shares)
+        pnl = position.shares * (current_price - position.avg_price)
+
+        # Calculate PnL percentage
+        initial_value = position.initial_value or 0
+        if initial_value > 0:
+            pnl_pct = pnl / initial_value
+        else:
+            pnl_pct = 0.0
+
+        self._logger.debug(
+            f"📊 PnL calculated for position {position.id}: "
+            f"pnl=${pnl:.2f}, pnl_pct={pnl_pct:.2%}, "
+            f"current_value=${current_value:.2f}"
+        )
+
+        return PnLResult(
+            pnl=pnl,
+            pnl_pct=pnl_pct,
+            current_value=current_value,
+        )
+
+    async def calculate_total_pnl(self) -> TotalPnLResult:
+        """Calculate total PnL across all open positions.
+
+        Note: This method uses the pnl stored in each position,
+        which should be updated via update_all_positions_value first.
+
+        Returns:
+            TotalPnLResult with aggregated PnL statistics
+
+        Example:
+            >>> result = await manager.calculate_total_pnl()
+            >>> print(f"Total PnL: ${result.total_pnl:.2f}")
+            >>> print(f"Winning: {result.winning_count}, Losing: {result.losing_count}")
+        """
+        positions = await self.get_open_positions()
+
+        total_pnl = 0.0
+        winning_count = 0
+        losing_count = 0
+
+        for position in positions:
+            pnl = position.pnl or 0
+            total_pnl += pnl
+
+            if pnl > 0:
+                winning_count += 1
+            elif pnl < 0:
+                losing_count += 1
+
+        self._logger.info(
+            f"📊 Total PnL: ${total_pnl:.2f} "
+            f"({winning_count} winning, {losing_count} losing, "
+            f"{len(positions)} total)"
+        )
+
+        return TotalPnLResult(
+            total_pnl=total_pnl,
+            positions_count=len(positions),
+            winning_count=winning_count,
+            losing_count=losing_count,
+        )
+
+    async def update_all_positions_value(
+        self, market_prices: dict[str, float]
+    ) -> list[Position]:
+        """Update current value and PnL for all open positions.
+
+        Args:
+            market_prices: Dictionary mapping market_id to current price
+                          for the outcome held (YES price for YES positions,
+                          NO price for NO positions)
+
+        Returns:
+            List of updated positions
+
+        Example:
+            >>> prices = {"market-1": 0.55, "market-2": 0.40}
+            >>> updated = await manager.update_all_positions_value(prices)
+            >>> print(f"Updated {len(updated)} positions")
+        """
+        positions = await self.get_open_positions()
+        updated_positions: list[Position] = []
+
+        for position in positions:
+            current_price = market_prices.get(position.market_id)
+
+            if current_price is None:
+                self._logger.warning(
+                    f"⚠️ No price available for market {position.market_id}, "
+                    f"skipping position {position.id}"
+                )
+                continue
+
+            try:
+                updated = await self.update_position_value(position.id, current_price)
+                updated_positions.append(updated)
+            except (ValidationError, TradingError) as e:
+                self._logger.error(f"❌ Failed to update position {position.id}: {e}")
+
+        self._logger.info(
+            f"📊 Updated {len(updated_positions)}/{len(positions)} positions"
+        )
+
+        return updated_positions
