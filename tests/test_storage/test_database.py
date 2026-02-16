@@ -295,6 +295,90 @@ class TestDatabaseSchema:
             assert "market_id" in sql
             assert "REFERENCES markets" in sql
 
+    # ==================== trades table tests (Story 5.1) ====================
+
+    @pytest.mark.asyncio
+    async def test_trades_table_exists(self, initialized_db: "DatabaseManager") -> None:
+        """Test trades table is created (Story 5.1)."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='trades'"
+            )
+            result = await cursor.fetchone()
+            assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_trades_table_columns(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test trades table has all required columns (Story 5.1)."""
+        expected_columns = {
+            "id",
+            "market_id",
+            "trade_type",
+            "mode",
+            "amount",
+            "price",
+            "shares",
+            "status",
+            "llm_prediction_id",
+            "position_id",
+            "created_at",
+        }
+
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute("PRAGMA table_info(trades)")
+            rows = await cursor.fetchall()
+            actual_columns = {row[1] for row in rows}
+
+            assert expected_columns == actual_columns
+
+    @pytest.mark.asyncio
+    async def test_trades_table_primary_key(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test trades table has correct primary key (Story 5.1)."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute("PRAGMA table_info(trades)")
+            rows = await cursor.fetchall()
+            pk_columns = [row[1] for row in rows if row[5] == 1]
+
+            assert pk_columns == ["id"]
+
+    @pytest.mark.asyncio
+    async def test_trades_table_indexes(
+        self, initialized_db: "DatabaseManager"
+    ) -> None:
+        """Test trades table has correct indexes (Story 5.1)."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='trades'"
+            )
+            rows = await cursor.fetchall()
+            index_names = {row[0] for row in rows}
+
+            assert "idx_trades_market_id" in index_names
+            assert "idx_trades_mode" in index_names
+            assert "idx_trades_created_at" in index_names
+
+    @pytest.mark.asyncio
+    async def test_trades_foreign_keys(self, initialized_db: "DatabaseManager") -> None:
+        """Test trades table has foreign keys to markets, predictions, positions (Story 5.1)."""
+        async with initialized_db.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='trades'"
+            )
+            result = await cursor.fetchone()
+            sql = result[0]
+
+            assert "FOREIGN KEY" in sql
+            assert "market_id" in sql
+            assert "REFERENCES markets" in sql
+            assert "llm_prediction_id" in sql
+            assert "REFERENCES predictions" in sql
+            assert "position_id" in sql
+            assert "REFERENCES positions" in sql
+
 
 class TestDatabaseMigration:
     """Test database migration for edge column."""

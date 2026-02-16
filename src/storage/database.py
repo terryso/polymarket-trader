@@ -236,6 +236,42 @@ class DatabaseManager:
                     ON positions(status)
                 """)
 
+                # Create trades table (Story 5.1)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS trades (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        market_id TEXT NOT NULL,
+                        trade_type TEXT NOT NULL,
+                        mode TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        price REAL NOT NULL,
+                        shares REAL,
+                        status TEXT,
+                        llm_prediction_id INTEGER,
+                        position_id INTEGER,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (market_id) REFERENCES markets(id),
+                        FOREIGN KEY (llm_prediction_id) REFERENCES predictions(id),
+                        FOREIGN KEY (position_id) REFERENCES positions(id)
+                    )
+                """)
+
+                # Create indexes for trades table (Story 5.1)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_trades_market_id
+                    ON trades(market_id)
+                """)
+
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_trades_mode
+                    ON trades(mode)
+                """)
+
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_trades_created_at
+                    ON trades(created_at)
+                """)
+
                 await conn.commit()
 
             logger.info(f"✅ Database initialized at {self._db_path}")

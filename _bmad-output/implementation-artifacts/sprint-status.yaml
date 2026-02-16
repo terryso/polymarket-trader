@@ -78,8 +78,8 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Paper Trading 模拟交易
-  epic-5: backlog
-  5-1-trade-record-data-model: backlog
+  epic-5: in-progress
+  5-1-trade-record-data-model: review
   5-2-paper-trading-executor: backlog
   5-3-trading-decision-flow: backlog
   5-4-simulated-position-pnl-calculation: backlog
