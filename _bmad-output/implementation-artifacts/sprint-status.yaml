@@ -73,7 +73,7 @@ development_status:
   4-1-risk-control-configuration: done
   4-2-thread-safe-state-management: ready-for-dev
   4-3-circuit-breaker-implementation: review
-  4-4-pre-trade-risk-check: backlog
+  4-4-pre-trade-risk-check: ready-for-dev
   4-5-position-management: backlog
   epic-4-retrospective: optional
 
