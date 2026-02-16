@@ -22,6 +22,10 @@ Example:
     >>> from src.analysis import PredictionTracker, ValidationResult, AccuracyResult
     >>> tracker = PredictionTracker(market_repo, prediction_repo)
     >>> results = await tracker.check_resolved_markets()
+
+    >>> from src.analysis import PerformanceAnalyzer
+    >>> analyzer = PerformanceAnalyzer(prediction_repo, trade_repo, position_repo)
+    >>> report = await analyzer.generate_insight_report()
 """
 
 from __future__ import annotations
@@ -31,6 +35,19 @@ from src.analysis.market_filter import (
     FilterResult,
     FilterStatistics,
     MarketFilter,
+)
+from src.analysis.performance_analyzer import (
+    CategoryPerformance,
+    ConfidenceAnalysis,
+    EdgeAnalysis,
+    ImprovementSuggestion,
+    PatternInsight,
+    PatternType,
+    PerformanceAnalyzer,
+    PerformanceInsightReport,
+    PerformanceLevel,
+    PerformanceMetrics,
+    SuggestionPriority,
 )
 from src.analysis.prediction_tracker import (
     AccuracyResult,
@@ -65,4 +82,16 @@ __all__ = [
     "PredictionTracker",
     "ValidationResult",
     "AccuracyResult",
+    # Performance analyzer (Story 6.5)
+    "PerformanceAnalyzer",
+    "PerformanceLevel",
+    "PatternType",
+    "SuggestionPriority",
+    "PerformanceMetrics",
+    "CategoryPerformance",
+    "ConfidenceAnalysis",
+    "EdgeAnalysis",
+    "PatternInsight",
+    "ImprovementSuggestion",
+    "PerformanceInsightReport",
 ]

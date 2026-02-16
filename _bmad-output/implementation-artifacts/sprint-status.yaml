@@ -92,7 +92,7 @@ development_status:
   6-2-accuracy-statistics: done
   6-3-learning-log-generation: done
   6-4-prediction-history-query-api: done
-  6-5-performance-analysis-and-insights: backlog
+  6-5-performance-analysis-and-insights: ready-for-dev
   epic-6-retrospective: optional
 
   # Epic 7: Dashboard 后端 API 集成
