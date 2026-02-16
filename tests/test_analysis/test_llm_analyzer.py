@@ -580,3 +580,172 @@ class TestAnalyzeMarkets:
             assert len(results) == 3
             # With max_concurrent=1, should never exceed 1
             assert max_concurrent <= 1
+
+
+class TestEdgeCalculationInAnalyzeMarket:
+    """Test edge calculation in analyze_market method."""
+
+    @pytest.fixture
+    def analyzer(self) -> LLMAnalyzer:
+        """Create analyzer instance."""
+        return LLMAnalyzer()
+
+    @pytest.fixture
+    def sample_market(self) -> Market:
+        """Create sample market for testing."""
+        return Market(
+            id="test-market-123",
+            title="Will X happen by 2026?",
+            description="A test prediction market",
+            yes_price=0.65,
+            no_price=0.35,
+            liquidity=50000.0,
+            deadline=datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc),
+        )
+
+    @pytest.mark.asyncio
+    async def test_analyze_market_sets_edge_buy_yes(
+        self, analyzer: LLMAnalyzer, sample_market: Market
+    ) -> None:
+        """Test that analyze_market sets edge for BUY_YES recommendation."""
+        # LLM predicts 0.80, market price 0.65, edge = 0.15
+        mock_response = """```json
+        {
+            "predicted_probability": 0.80,
+            "confidence": 0.85,
+            "reasoning": "Strong analysis",
+            "key_assumptions": [],
+            "recommendation": "BUY_YES"
+        }
+        ```"""
+
+        with patch("src.analysis.llm_analyzer.LLMClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.chat_with_system.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            result = await analyzer.analyze_market(sample_market)
+
+            assert result.edge is not None
+            assert abs(result.edge - 0.15) < 0.001  # 0.80 - 0.65 = 0.15
+
+    @pytest.mark.asyncio
+    async def test_analyze_market_sets_edge_buy_no(
+        self, analyzer: LLMAnalyzer, sample_market: Market
+    ) -> None:
+        """Test that analyze_market sets edge for BUY_NO recommendation."""
+        # LLM predicts 0.30 (BUY_NO), market price 0.65
+        # BUY_NO edge = (1 - 0.30) - (1 - 0.65) = 0.70 - 0.35 = 0.35
+        mock_response = """```json
+        {
+            "predicted_probability": 0.30,
+            "confidence": 0.85,
+            "reasoning": "Analysis suggests NO",
+            "key_assumptions": [],
+            "recommendation": "BUY_NO"
+        }
+        ```"""
+
+        with patch("src.analysis.llm_analyzer.LLMClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.chat_with_system.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            result = await analyzer.analyze_market(sample_market)
+
+            assert result.edge is not None
+            assert abs(result.edge - 0.35) < 0.001
+
+    @pytest.mark.asyncio
+    async def test_analyze_market_sets_edge_zero_for_no_trade(
+        self, analyzer: LLMAnalyzer, sample_market: Market
+    ) -> None:
+        """Test that analyze_market sets edge to 0 for NO_TRADE."""
+        mock_response = """```json
+        {
+            "predicted_probability": 0.65,
+            "confidence": 0.70,
+            "reasoning": "No clear edge",
+            "key_assumptions": [],
+            "recommendation": "NO_TRADE"
+        }
+        ```"""
+
+        with patch("src.analysis.llm_analyzer.LLMClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.chat_with_system.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            result = await analyzer.analyze_market(sample_market)
+
+            assert result.edge is not None
+            assert result.edge == 0.0
+
+    @pytest.mark.asyncio
+    async def test_analyze_market_edge_none_without_market_price(
+        self, analyzer: LLMAnalyzer
+    ) -> None:
+        """Test that edge is None when market has no price."""
+        market_no_price = Market(
+            id="market-no-price",
+            title="Market without price",
+            yes_price=None,  # No price
+        )
+
+        mock_response = """```json
+        {
+            "predicted_probability": 0.75,
+            "confidence": 0.85,
+            "reasoning": "This is a detailed analysis of the market.",
+            "key_assumptions": [],
+            "recommendation": "BUY_YES"
+        }
+        ```"""
+
+        with patch("src.analysis.llm_analyzer.LLMClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.chat_with_system.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            result = await analyzer.analyze_market(market_no_price)
+
+            # Edge should be None when there's no market price
+            assert result.edge is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_market_edge_is_absolute_value(
+        self, analyzer: LLMAnalyzer, sample_market: Market
+    ) -> None:
+        """Test that edge is stored as absolute value."""
+        # LLM predicts 0.50, market price 0.65
+        # Edge = 0.50 - 0.65 = -0.15, but stored as abs(0.15)
+        mock_response = """```json
+        {
+            "predicted_probability": 0.50,
+            "confidence": 0.85,
+            "reasoning": "Prediction below market",
+            "key_assumptions": [],
+            "recommendation": "BUY_YES"
+        }
+        ```"""
+
+        with patch("src.analysis.llm_analyzer.LLMClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.chat_with_system.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            result = await analyzer.analyze_market(sample_market)
+
+            assert result.edge is not None
+            assert result.edge >= 0  # Edge should be non-negative (absolute value)
+            assert abs(result.edge - 0.15) < 0.001  # |0.50 - 0.65| = 0.15

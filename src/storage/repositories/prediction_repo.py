@@ -106,8 +106,9 @@ class PredictionRepository:
                     """
                     INSERT INTO predictions (
                         market_id, predicted_probability, confidence,
-                        reasoning, key_assumptions, model_used, recommendation
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        reasoning, key_assumptions, model_used, recommendation,
+                        edge
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         prediction.market_id,
@@ -117,6 +118,7 @@ class PredictionRepository:
                         assumptions_json,
                         prediction.model_used,
                         recommendation_str,
+                        prediction.edge,
                     ),
                 )
                 await conn.commit()
@@ -347,6 +349,11 @@ class PredictionRepository:
             except ValueError:
                 recommendation = None
 
+        # Parse edge
+        edge: float | None = None
+        if "edge" in row.keys() and row["edge"] is not None:
+            edge = row["edge"]
+
         # Parse created_at
         created_at: datetime | None = None
         if row["created_at"]:
@@ -382,6 +389,7 @@ class PredictionRepository:
             key_assumptions=key_assumptions,
             model_used=row["model_used"],
             recommendation=recommendation,
+            edge=edge,
             actual_outcome=actual_outcome,
             is_correct=is_correct,
             validated_at=validated_at,

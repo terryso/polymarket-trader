@@ -311,3 +311,187 @@ class TestPrediction:
         # Valid assignment should work
         prediction.predicted_probability = 0.8
         assert prediction.predicted_probability == 0.8
+
+
+class TestPredictionEdgeField:
+    """Tests for edge field in Prediction and PredictionResult models."""
+
+    # === PredictionResult edge field tests ===
+
+    def test_prediction_result_edge_default_none(self) -> None:
+        """Test edge field defaults to None in PredictionResult."""
+        result = PredictionResult(
+            predicted_probability=0.75,
+            confidence=0.85,
+            reasoning="Test reasoning",
+            recommendation=Recommendation.BUY_YES,
+        )
+        assert result.edge is None
+
+    def test_prediction_result_edge_can_be_set(self) -> None:
+        """Test edge field can be set in PredictionResult."""
+        result = PredictionResult(
+            predicted_probability=0.75,
+            confidence=0.85,
+            reasoning="Test reasoning",
+            recommendation=Recommendation.BUY_YES,
+            edge=0.15,
+        )
+        assert result.edge == 0.15
+
+    def test_prediction_result_edge_validation_valid(self) -> None:
+        """Test edge field accepts valid values (0-1)."""
+        # Edge = 0
+        result = PredictionResult(
+            predicted_probability=0.5,
+            confidence=0.5,
+            reasoning="Test",
+            recommendation=Recommendation.NO_TRADE,
+            edge=0.0,
+        )
+        assert result.edge == 0.0
+
+        # Edge = 1
+        result = PredictionResult(
+            predicted_probability=0.5,
+            confidence=0.5,
+            reasoning="Test",
+            recommendation=Recommendation.BUY_YES,
+            edge=1.0,
+        )
+        assert result.edge == 1.0
+
+        # Edge = 0.5
+        result = PredictionResult(
+            predicted_probability=0.5,
+            confidence=0.5,
+            reasoning="Test",
+            recommendation=Recommendation.BUY_YES,
+            edge=0.5,
+        )
+        assert result.edge == 0.5
+
+    def test_prediction_result_edge_validation_invalid_high(self) -> None:
+        """Test edge field rejects values > 1."""
+        with pytest.raises(ValueError):
+            PredictionResult(
+                predicted_probability=0.5,
+                confidence=0.5,
+                reasoning="Test",
+                recommendation=Recommendation.BUY_YES,
+                edge=1.5,
+            )
+
+    def test_prediction_result_edge_validation_invalid_negative(self) -> None:
+        """Test edge field rejects negative values."""
+        with pytest.raises(ValueError):
+            PredictionResult(
+                predicted_probability=0.5,
+                confidence=0.5,
+                reasoning="Test",
+                recommendation=Recommendation.BUY_YES,
+                edge=-0.1,
+            )
+
+    def test_prediction_result_edge_validate_assignment(self) -> None:
+        """Test edge field validates on assignment."""
+        result = PredictionResult(
+            predicted_probability=0.5,
+            confidence=0.5,
+            reasoning="Test",
+            recommendation=Recommendation.BUY_YES,
+        )
+
+        # Invalid assignment should raise
+        with pytest.raises(ValueError):
+            result.edge = -0.1
+
+        with pytest.raises(ValueError):
+            result.edge = 1.5
+
+        # Valid assignment should work
+        result.edge = 0.15
+        assert result.edge == 0.15
+
+    # === Prediction edge field tests ===
+
+    def test_prediction_edge_default_none(self) -> None:
+        """Test edge field defaults to None in Prediction."""
+        prediction = Prediction(
+            market_id="test-market",
+            predicted_probability=0.75,
+            confidence=0.85,
+        )
+        assert prediction.edge is None
+
+    def test_prediction_edge_can_be_set(self) -> None:
+        """Test edge field can be set in Prediction."""
+        prediction = Prediction(
+            id=1,
+            market_id="test-market",
+            predicted_probability=0.75,
+            confidence=0.85,
+            edge=0.20,
+        )
+        assert prediction.edge == 0.20
+
+    def test_prediction_edge_validation_valid(self) -> None:
+        """Test edge field accepts valid values (0-1) in Prediction."""
+        prediction = Prediction(
+            market_id="test",
+            predicted_probability=0.5,
+            confidence=0.5,
+            edge=0.0,
+        )
+        assert prediction.edge == 0.0
+
+        prediction = Prediction(
+            market_id="test",
+            predicted_probability=0.5,
+            confidence=0.5,
+            edge=1.0,
+        )
+        assert prediction.edge == 1.0
+
+    def test_prediction_edge_validation_invalid_high(self) -> None:
+        """Test edge field rejects values > 1 in Prediction."""
+        with pytest.raises(ValueError):
+            Prediction(
+                market_id="test",
+                predicted_probability=0.5,
+                confidence=0.5,
+                edge=1.5,
+            )
+
+    def test_prediction_edge_validation_invalid_negative(self) -> None:
+        """Test edge field rejects negative values in Prediction."""
+        with pytest.raises(ValueError):
+            Prediction(
+                market_id="test",
+                predicted_probability=0.5,
+                confidence=0.5,
+                edge=-0.1,
+            )
+
+    def test_prediction_edge_in_json_export(self) -> None:
+        """Test edge field is included in JSON export."""
+        prediction = Prediction(
+            id=1,
+            market_id="test-123",
+            predicted_probability=0.72,
+            confidence=0.85,
+            edge=0.15,
+        )
+        json_str = prediction.model_dump_json()
+        assert '"edge":0.15' in json_str
+
+    def test_prediction_edge_none_in_json_export(self) -> None:
+        """Test edge field with None value in JSON export."""
+        prediction = Prediction(
+            id=1,
+            market_id="test-123",
+            predicted_probability=0.72,
+            confidence=0.85,
+        )
+        data = prediction.model_dump()
+        assert data["edge"] is None

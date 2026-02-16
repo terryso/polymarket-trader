@@ -162,6 +162,16 @@ class LLMAnalyzer:
                 recommendation=(recommendation_mapping[llm_result.recommendation]),
             )
 
+            # 计算 Edge (如果有市场价格)
+            if market.yes_price is not None:
+                raw_edge = self.calculate_edge(result, market.yes_price)
+                result.edge = abs(raw_edge)  # 使用绝对值
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['analysis']} Edge calculated for "
+                    f"market {market.id}: edge={result.edge:.4f}, "
+                    f"min_edge={self._min_edge}"
+                )
+
             # 验证是否可交易
             is_tradeable = self._is_tradeable(result, market.yes_price)
 
@@ -222,9 +232,13 @@ class LLMAnalyzer:
         if result.recommendation == PredRecommendation.NO_TRADE:
             return False
 
-        # 检查 Edge (如果有市场价格)
-        if market_yes_price is not None:
-            edge = self.calculate_edge(result, market_yes_price)
+        # 检查 Edge (使用预计算的 edge 值)
+        if result.edge is not None:
+            if result.edge < self._min_edge:
+                return False
+        elif market_yes_price is not None:
+            # 兼容旧逻辑: 如果 edge 未预计算，则计算
+            edge = abs(self.calculate_edge(result, market_yes_price))
             if edge < self._min_edge:
                 return False
 
@@ -233,24 +247,57 @@ class LLMAnalyzer:
     def calculate_edge(
         self, result: PredictionResult, market_yes_price: float
     ) -> float:
-        """计��� Edge (预测概率与市场价格的差距).
+        """计算 Edge (预测概率与市场价格的差距).
+
+        Edge 表示 LLM 预测概率与市场价格之间的差距。
+        正值表示预测概率高于市场价格，负值表示低于。
+
+        计算公式:
+            - BUY_YES: edge = predicted_probability - market_yes_price
+            - BUY_NO: edge = (1 - predicted_probability) - (1 - market_yes_price)
+                      = market_yes_price - predicted_probability
+            - NO_TRADE: edge = 0
 
         Args:
             result: LLM 分析结果
             market_yes_price: 市场当前 YES 价格 (0-1)
 
         Returns:
-            Edge 值 (正数表示预测概率高于市场价格)
+            Edge 值 (有符号值，正数表示预测概率高于市场价格)
 
         Example:
+            >>> # BUY_YES 场景
             >>> result = PredictionResult(
-            ...     predicted_probability=0.8,
+            ...     predicted_probability=0.80,
+            ...     confidence=0.85,
+            ...     reasoning="Strong buy signal",
             ...     recommendation=Recommendation.BUY_YES,
-            ...     ...
             ... )
             >>> edge = analyzer.calculate_edge(result, 0.65)
             >>> edge
-            0.15
+            0.15  # 0.80 - 0.65
+
+            >>> # BUY_NO 场景
+            >>> result = PredictionResult(
+            ...     predicted_probability=0.30,
+            ...     confidence=0.85,
+            ...     reasoning="Strong sell signal",
+            ...     recommendation=Recommendation.BUY_NO,
+            ... )
+            >>> edge = analyzer.calculate_edge(result, 0.65)
+            >>> edge
+            0.35  # (1 - 0.30) - (1 - 0.65) = 0.70 - 0.35
+
+            >>> # NO_TRADE 场景
+            >>> result = PredictionResult(
+            ...     predicted_probability=0.50,
+            ...     confidence=0.60,
+            ...     reasoning="No clear edge",
+            ...     recommendation=Recommendation.NO_TRADE,
+            ... )
+            >>> edge = analyzer.calculate_edge(result, 0.50)
+            >>> edge
+            0.0
         """
         from src.models.prediction import Recommendation as PredRecommendation
 

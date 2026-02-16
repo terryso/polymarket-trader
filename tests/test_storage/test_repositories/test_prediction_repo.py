@@ -786,6 +786,164 @@ class TestPredictionRepository:
 
             assert prediction_id == 1
 
+    # ==================== Edge field tests ====================
+
+    @pytest.mark.asyncio
+    async def test_save_prediction_with_edge(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that edge field is saved to database."""
+        prediction = Prediction(
+            market_id="test-market-edge",
+            predicted_probability=0.80,
+            confidence=0.85,
+            edge=0.15,
+        )
+
+        mock_cursor = MagicMock()
+        mock_cursor.lastrowid = 1
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+        mock_conn.commit = AsyncMock()
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            await repo.save_prediction(prediction, upsert=False)
+
+            # Verify edge is in INSERT statement
+            insert_call = mock_conn.execute.call_args
+            sql = insert_call[0][0]
+            params = insert_call[0][1]
+
+            assert "edge" in sql
+            assert params[7] == 0.15  # edge is the 8th parameter
+
+    @pytest.mark.asyncio
+    async def test_save_prediction_with_none_edge(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that None edge value is handled correctly."""
+        prediction = Prediction(
+            market_id="test-market-no-edge",
+            predicted_probability=0.75,
+            confidence=0.85,
+            # edge is None by default
+        )
+
+        mock_cursor = MagicMock()
+        mock_cursor.lastrowid = 1
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+        mock_conn.commit = AsyncMock()
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            await repo.save_prediction(prediction, upsert=False)
+
+            # Verify edge (None) is in INSERT statement
+            insert_call = mock_conn.execute.call_args
+            params = insert_call[0][1]
+
+            assert params[7] is None  # edge is the 8th parameter
+
+    @pytest.mark.asyncio
+    async def test_row_to_prediction_with_edge(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that edge field is parsed from database row."""
+        mock_row = self._create_mock_row(
+            prediction_id=1,
+            market_id="test-market",
+            predicted_probability=0.80,
+            confidence=0.85,
+            edge=0.15,
+        )
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_row)
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            prediction = await repo.get_latest_prediction("test-market")
+
+            assert prediction is not None
+            assert prediction.edge == 0.15
+
+    @pytest.mark.asyncio
+    async def test_row_to_prediction_with_null_edge(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that NULL edge is parsed as None."""
+        mock_row = self._create_mock_row(
+            prediction_id=1,
+            market_id="test-market",
+            predicted_probability=0.75,
+            confidence=0.85,
+            edge=None,
+        )
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_row)
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            prediction = await repo.get_latest_prediction("test-market")
+
+            assert prediction is not None
+            assert prediction.edge is None
+
+    @pytest.mark.asyncio
+    async def test_row_to_prediction_edge_zero(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that edge=0 is parsed correctly (not confused with None)."""
+        mock_row = self._create_mock_row(
+            prediction_id=1,
+            market_id="test-market",
+            predicted_probability=0.65,
+            confidence=0.85,
+            edge=0.0,
+        )
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_row)
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            prediction = await repo.get_latest_prediction("test-market")
+
+            assert prediction is not None
+            assert prediction.edge == 0.0
+
     # ==================== Helper methods ====================
 
     def _create_mock_row(
@@ -798,6 +956,7 @@ class TestPredictionRepository:
         key_assumptions: str | None = None,
         model_used: str | None = None,
         recommendation: str | None = None,
+        edge: float | None = None,
         actual_outcome: str | None = None,
         is_correct: int | None = None,
         validated_at: str | None = None,
@@ -814,6 +973,7 @@ class TestPredictionRepository:
             "key_assumptions": key_assumptions,
             "model_used": model_used,
             "recommendation": recommendation,
+            "edge": edge,
             "actual_outcome": actual_outcome,
             "is_correct": is_correct,
             "validated_at": validated_at,

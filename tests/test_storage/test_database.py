@@ -237,6 +237,7 @@ class TestDatabaseSchema:
             "key_assumptions",
             "model_used",
             "recommendation",
+            "edge",  # New edge column
             "actual_outcome",
             "is_correct",
             "validated_at",
@@ -276,6 +277,7 @@ class TestDatabaseSchema:
 
             assert "idx_predictions_market_id" in index_names
             assert "idx_predictions_created_at" in index_names
+            assert "idx_predictions_edge" in index_names  # New edge index
 
     @pytest.mark.asyncio
     async def test_predictions_foreign_key_to_markets(
@@ -292,6 +294,93 @@ class TestDatabaseSchema:
             assert "FOREIGN KEY" in sql
             assert "market_id" in sql
             assert "REFERENCES markets" in sql
+
+
+class TestDatabaseMigration:
+    """Test database migration for edge column."""
+
+    @pytest.mark.asyncio
+    async def test_migration_adds_edge_column(self, tmp_path: Path) -> None:
+        """Test that migration adds edge column if it doesn't exist."""
+        import aiosqlite
+
+        from src.storage.database import DatabaseConfig, DatabaseManager
+
+        config = DatabaseConfig(db_path=tmp_path / "test.db")
+        manager = DatabaseManager(config)
+
+        # Create initial database without edge column (simulate old schema)
+        async with aiosqlite.connect(str(config.db_path)) as conn:
+            await conn.execute("""
+                CREATE TABLE predictions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    market_id TEXT NOT NULL,
+                    predicted_probability REAL,
+                    confidence REAL,
+                    reasoning TEXT,
+                    key_assumptions TEXT,
+                    model_used TEXT,
+                    recommendation TEXT,
+                    actual_outcome TEXT,
+                    is_correct BOOLEAN,
+                    validated_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (market_id) REFERENCES markets(id)
+                )
+            """)
+            await conn.commit()
+
+        # Run init_db which should add the edge column via migration
+        await manager.init_db()
+
+        # Verify edge column was added
+        async with manager.get_connection() as conn:
+            cursor = await conn.execute("PRAGMA table_info(predictions)")
+            rows = await cursor.fetchall()
+            column_names = {row[1] for row in rows}
+
+            assert "edge" in column_names
+
+    @pytest.mark.asyncio
+    async def test_migration_creates_edge_index(self, tmp_path: Path) -> None:
+        """Test that migration creates edge index."""
+        from src.storage.database import DatabaseConfig, DatabaseManager
+
+        config = DatabaseConfig(db_path=tmp_path / "test.db")
+        manager = DatabaseManager(config)
+
+        # Initialize database
+        await manager.init_db()
+
+        # Verify edge index exists
+        async with manager.get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='predictions'"
+            )
+            rows = await cursor.fetchall()
+            index_names = {row[0] for row in rows}
+
+            assert "idx_predictions_edge" in index_names
+
+    @pytest.mark.asyncio
+    async def test_migration_is_idempotent(self, tmp_path: Path) -> None:
+        """Test that migration can run multiple times without error."""
+        from src.storage.database import DatabaseConfig, DatabaseManager
+
+        config = DatabaseConfig(db_path=tmp_path / "test.db")
+        manager = DatabaseManager(config)
+
+        # Run init_db multiple times
+        await manager.init_db()
+        await manager.init_db()  # Should not raise
+
+        # Verify edge column still exists and is unique
+        async with manager.get_connection() as conn:
+            cursor = await conn.execute("PRAGMA table_info(predictions)")
+            rows = await cursor.fetchall()
+            edge_columns = [row for row in rows if row[1] == "edge"]
+
+            assert len(edge_columns) == 1  # Only one edge column
 
 
 class TestDatabaseErrorHandling:

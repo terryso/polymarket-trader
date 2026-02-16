@@ -64,6 +64,7 @@ class PredictionResult(BaseModel):
         reasoning: Explanation for the prediction
         key_assumptions: List of key assumptions made
         recommendation: Trading recommendation
+        edge: Edge (price gap) between prediction and market price (0-1)
 
     Example:
         >>> result = PredictionResult(
@@ -72,6 +73,7 @@ class PredictionResult(BaseModel):
         ...     reasoning="Based on current market trends...",
         ...     key_assumptions=["Economic stability continues", "No major news events"],
         ...     recommendation=Recommendation.BUY_YES,
+        ...     edge=0.15,
         ... )
     """
 
@@ -89,6 +91,12 @@ class PredictionResult(BaseModel):
         default_factory=list, description="Key assumptions"
     )
     recommendation: Recommendation = Field(..., description="Trading recommendation")
+    edge: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Edge (price gap) between prediction and market",
+    )
 
 
 class Prediction(BaseModel):
@@ -106,6 +114,7 @@ class Prediction(BaseModel):
         key_assumptions: List of key assumptions made
         model_used: LLM model used for prediction
         recommendation: Trading recommendation
+        edge: Edge (price gap) between prediction and market price (0-1)
         actual_outcome: Actual market outcome (for validation)
         is_correct: Whether prediction was correct
         validated_at: When prediction was validated
@@ -120,6 +129,7 @@ class Prediction(BaseModel):
         ...     reasoning="Strong technical indicators...",
         ...     recommendation=Recommendation.BUY_YES,
         ...     model_used="glm-4",
+        ...     edge=0.15,
         ... )
     """
 
@@ -141,6 +151,12 @@ class Prediction(BaseModel):
     model_used: str | None = Field(default=None, description="LLM model used")
     recommendation: Recommendation | None = Field(
         default=None, description="Trading recommendation"
+    )
+    edge: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Edge (price gap) between prediction and market",
     )
     actual_outcome: str | None = Field(default=None, description="Actual outcome")
     is_correct: bool | None = Field(default=None, description="Prediction correctness")

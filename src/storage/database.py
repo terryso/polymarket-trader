@@ -170,6 +170,7 @@ class DatabaseManager:
                         key_assumptions TEXT,
                         model_used TEXT,
                         recommendation TEXT,
+                        edge REAL,
                         actual_outcome TEXT,
                         is_correct BOOLEAN,
                         validated_at DATETIME,
@@ -177,6 +178,18 @@ class DatabaseManager:
                         FOREIGN KEY (market_id) REFERENCES markets(id)
                     )
                 """)
+
+                # Migration: Add edge column if it doesn't exist (for existing databases)
+                # This must run BEFORE creating the edge index
+                cursor = await conn.execute("PRAGMA table_info(predictions)")
+                columns = await cursor.fetchall()
+                column_names = {col[1] for col in columns}
+
+                if "edge" not in column_names:
+                    logger.info(
+                        "📊 Migrating database: adding edge column to predictions table"
+                    )
+                    await conn.execute("ALTER TABLE predictions ADD COLUMN edge REAL")
 
                 # Create indexes for predictions table
                 await conn.execute("""
@@ -187,6 +200,11 @@ class DatabaseManager:
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_predictions_created_at
                     ON predictions(created_at)
+                """)
+
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_predictions_edge
+                    ON predictions(edge)
                 """)
 
                 await conn.commit()
