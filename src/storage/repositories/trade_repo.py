@@ -336,6 +336,53 @@ class TradeRepository:
                 original_exception=e,
             ) from e
 
+    # ==================== Story 6.3: 学习日志生成 ====================
+
+    async def get_trades_by_date(self, report_date: date) -> list[Trade]:
+        """Get all trades for a specific date.
+
+        Story 6.3: 学习日志生成
+
+        Args:
+            report_date: The date to get trades for
+
+        Returns:
+            List of trades executed on the given date, ordered by created_at descending
+
+        Raises:
+            DatabaseError: If database operation fails
+
+        Example:
+            >>> from datetime import date
+            >>> trades = await repo.get_trades_by_date(date.today())
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    """
+                    SELECT * FROM trades
+                    WHERE date(created_at) = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (report_date.isoformat(),),
+                )
+                rows = await cursor.fetchall()
+
+            trades = [self._row_to_trade(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(trades)} trades "
+                f"for date {report_date}"
+            )
+            return trades
+        except aiosqlite.Error as e:
+            logger.error(f"Failed to get trades for date {report_date}: {e}")
+            raise DatabaseError(
+                message=f"Failed to get trades for date: {report_date}",
+                operation="get_trades_by_date",
+                original_exception=e,
+            ) from e
+
     def _row_to_trade(self, row: aiosqlite.Row) -> Trade:
         """Convert a database row to a Trade model.
 

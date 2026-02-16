@@ -8,7 +8,7 @@ trade records in the database using mocked database connections.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -635,3 +635,81 @@ class TestTradeRepository:
                 await repo.get_recent()
 
             assert "Failed to get recent trades" in str(exc_info.value)
+
+    # ==================== Story 6.3: get_trades_by_date tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_trades_by_date(self, repo: TradeRepository) -> None:
+        """Test getting trades for a specific date (Story 6.3)."""
+        mock_rows = [
+            self._create_mock_row(
+                id=1,
+                market_id="market-1",
+                created_at="2026-02-16T10:30:00",
+            ),
+            self._create_mock_row(
+                id=2,
+                market_id="market-2",
+                created_at="2026-02-16T14:00:00",
+            ),
+        ]
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=mock_rows)
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.trade_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            trades = await repo.get_trades_by_date(date(2026, 2, 16))
+
+            assert len(trades) == 2
+            # Verify the query used the correct date
+            call_args = mock_conn.execute.call_args
+            assert "date(created_at) = ?" in call_args[0][0]
+            assert call_args[0][1] == ("2026-02-16",)
+
+    @pytest.mark.asyncio
+    async def test_get_trades_by_date_empty(self, repo: TradeRepository) -> None:
+        """Test getting trades for a date with no trades (Story 6.3)."""
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.trade_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            trades = await repo.get_trades_by_date(date(2026, 2, 16))
+
+            assert trades == []
+
+    @pytest.mark.asyncio
+    async def test_get_trades_by_date_database_error(self, repo: TradeRepository) -> None:
+        """Test that database errors are properly wrapped for get_trades_by_date (Story 6.3)."""
+        import aiosqlite
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("database error"))
+
+        with patch(
+            "src.storage.repositories.trade_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.exceptions import DatabaseError
+
+            with pytest.raises(DatabaseError) as exc_info:
+                await repo.get_trades_by_date(date(2026, 2, 16))
+
+            assert "Failed to get trades for date" in str(exc_info.value)
