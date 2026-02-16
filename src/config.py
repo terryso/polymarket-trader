@@ -18,22 +18,11 @@ class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LLM_")
 
     api_base: str = Field(
-        default="https://open.bigmodel.cn/api/paas/v4",
-        description="LLM API base URL"
+        default="https://open.bigmodel.cn/api/paas/v4", description="LLM API base URL"
     )
-    api_key: str = Field(
-        default="",
-        description="LLM API key"
-    )
-    model: str = Field(
-        default="glm-4",
-        description="LLM model name"
-    )
-    timeout: int = Field(
-        default=30,
-        gt=0,
-        description="API timeout in seconds"
-    )
+    api_key: str = Field(default="", description="LLM API key")
+    model: str = Field(default="glm-4", description="LLM model name")
+    timeout: int = Field(default=30, gt=0, description="API timeout in seconds")
 
     @field_validator("api_key")
     @classmethod
@@ -51,19 +40,12 @@ class PolymarketSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="")
 
-    pk: str = Field(
-        default="",
-        description="Polymarket private key"
-    )
+    pk: str = Field(default="", description="Polymarket private key")
     proxy_wallet: str = Field(
-        default="",
-        alias="YOUR_PROXY_WALLET",
-        description="Proxy wallet address"
+        default="", alias="YOUR_PROXY_WALLET", description="Proxy wallet address"
     )
     trader_address: str = Field(
-        default="",
-        alias="BOT_TRADER_ADDRESS",
-        description="Bot trader address"
+        default="", alias="BOT_TRADER_ADDRESS", description="Bot trader address"
     )
 
     @field_validator("pk")
@@ -100,37 +82,34 @@ class TradingSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="")
 
     trade_unit: float = Field(
-        default=10.0,
-        alias="TRADE_UNIT",
-        gt=0,
-        description="Base trade unit in USD"
+        default=10.0, alias="TRADE_UNIT", gt=0, description="Base trade unit in USD"
     )
     slippage_tolerance: float = Field(
         default=0.02,
         alias="SLIPPAGE_TOLERANCE",
         ge=0,
         le=1,
-        description="Slippage tolerance (0-1)"
+        description="Slippage tolerance (0-1)",
     )
     pct_profit: float = Field(
         default=0.03,
         alias="PCT_PROFIT",
         ge=0,
         le=1,
-        description="Profit taking threshold (0-1)"
+        description="Profit taking threshold (0-1)",
     )
     pct_loss: float = Field(
         default=-0.025,
         alias="PCT_LOSS",
         ge=-1,
         le=0,
-        description="Stop loss threshold (negative value, -1 to 0)"
+        description="Stop loss threshold (negative value, -1 to 0)",
     )
     initial_capital: float = Field(
         default=200.0,
         alias="INITIAL_CAPITAL",
         gt=0,
-        description="Initial capital in USD"
+        description="Initial capital in USD",
     )
 
 
@@ -144,46 +123,46 @@ class RiskControlSettings(BaseSettings):
         alias="MAX_SINGLE_RATIO",
         ge=0,
         le=1,
-        description="Maximum single trade ratio of capital (0-1)"
+        description="Maximum single trade ratio of capital (0-1)",
     )
     min_confidence: float = Field(
         default=0.75,
         alias="MIN_CONFIDENCE",
         ge=0,
         le=1,
-        description="Minimum LLM confidence to trade (0-1)"
+        description="Minimum LLM confidence to trade (0-1)",
     )
     min_edge: float = Field(
         default=0.10,
         alias="MIN_EDGE",
         ge=0,
         le=1,
-        description="Minimum edge (price gap) to trade (0-1)"
+        description="Minimum edge (price gap) to trade (0-1)",
     )
     max_concurrent_trades: int = Field(
         default=3,
         alias="MAX_CONCURRENT_TRADES",
         gt=0,
-        description="Maximum number of concurrent positions"
+        description="Maximum number of concurrent positions",
     )
     daily_loss_limit: float = Field(
         default=0.30,
         alias="DAILY_LOSS_LIMIT",
         ge=0,
         le=1,
-        description="Daily loss limit to stop trading (0-1)"
+        description="Daily loss limit to stop trading (0-1)",
     )
     consecutive_losses_limit: int = Field(
         default=3,
         alias="CONSECUTIVE_LOSSES_LIMIT",
         gt=0,
-        description="Consecutive losses before reducing position"
+        description="Consecutive losses before reducing position",
     )
     capital_threshold: float = Field(
         default=100.0,
         alias="CAPITAL_THRESHOLD",
         gt=0,
-        description="Capital threshold for reduced mode"
+        description="Capital threshold for reduced mode",
     )
 
 
@@ -196,13 +175,23 @@ class MarketFilterSettings(BaseSettings):
         default=10000.0,
         alias="MIN_LIQUIDITY",
         gt=0,
-        description="Minimum market liquidity in USD"
+        description="Minimum market liquidity in USD",
     )
     min_deadline_days: int = Field(
         default=7,
         alias="MIN_DEADLINE_DAYS",
         gt=0,
-        description="Minimum days until market deadline"
+        description="Minimum days until market deadline",
+    )
+    excluded_keywords: list[str] = Field(
+        default=["price", "USD", "tomorrow"],
+        alias="EXCLUDED_KEYWORDS",
+        description="Keywords to exclude from market titles (word boundary match)",
+    )
+    controversial_keywords: list[str] = Field(
+        default=[],
+        alias="CONTROVERSIAL_KEYWORDS",
+        description="Controversial keywords to exclude from market descriptions",
     )
 
 
@@ -217,16 +206,11 @@ class Settings(BaseSettings):
 
     # Application settings
     trading_mode: Literal["paper", "live"] = Field(
-        default="paper",
-        description="Trading mode: paper or live"
+        default="paper", description="Trading mode: paper or live"
     )
-    log_level: str = Field(
-        default="INFO",
-        description="Logging level"
-    )
+    log_level: str = Field(default="INFO", description="Logging level")
     data_dir: str = Field(
-        default="data",
-        description="Directory for data storage (database, etc.)"
+        default="data", description="Directory for data storage (database, etc.)"
     )
 
     @field_validator("log_level")
@@ -236,9 +220,7 @@ class Settings(BaseSettings):
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         v_upper = v.upper()
         if v_upper not in valid_levels:
-            raise ValueError(
-                f"LOG_LEVEL must be one of {valid_levels}, got '{v}'"
-            )
+            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}, got '{v}'")
         return v_upper
 
     # Nested settings
