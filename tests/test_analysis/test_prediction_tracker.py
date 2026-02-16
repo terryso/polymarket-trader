@@ -1,22 +1,26 @@
 """Tests for PredictionTracker.
 
 Story 6.1: 预测结果验证机制
+Story 6.2: 准确率统计
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.analysis.prediction_tracker import (
     AccuracyResult,
+    AccuracyStatistics,
+    CategoryAccuracy,
+    ConfidenceAccuracy,
+    DateRangeAccuracy,
     PredictionTracker,
     ValidationResult,
 )
-from src.models.market import Market
+from src.models.market import Market, MarketCategory
 from src.models.prediction import Prediction, Recommendation
 
 
@@ -743,3 +747,476 @@ class TestPredictionTracker:
         direction = tracker._get_prediction_direction(prediction)
 
         assert direction == "YES"  # Recommendation wins
+
+
+# ==================== Story 6.2: 准确率统计测试 ====================
+
+
+class TestAccuracyStatisticsDataclass:
+    """Tests for AccuracyStatistics dataclass."""
+
+    def test_accuracy_statistics_creation(self) -> None:
+        """Test AccuracyStatistics creation with all fields."""
+        stats = AccuracyStatistics(
+            total=10,
+            correct=7,
+            incorrect=3,
+            accuracy=0.7,
+        )
+
+        assert stats.total == 10
+        assert stats.correct == 7
+        assert stats.incorrect == 3
+        assert stats.accuracy == 0.7
+
+    def test_accuracy_statistics_no_predictions(self) -> None:
+        """Test AccuracyStatistics with no predictions."""
+        stats = AccuracyStatistics(
+            total=0,
+            correct=0,
+            incorrect=0,
+            accuracy=None,
+        )
+
+        assert stats.total == 0
+        assert stats.accuracy is None
+
+
+class TestCategoryAccuracyDataclass:
+    """Tests for CategoryAccuracy dataclass."""
+
+    def test_category_accuracy_creation(self) -> None:
+        """Test CategoryAccuracy creation."""
+        cat_accuracy = CategoryAccuracy(
+            category="politics",
+            total=5,
+            correct=3,
+            accuracy=0.6,
+        )
+
+        assert cat_accuracy.category == "politics"
+        assert cat_accuracy.total == 5
+        assert cat_accuracy.correct == 3
+        assert cat_accuracy.accuracy == 0.6
+
+
+class TestConfidenceAccuracyDataclass:
+    """Tests for ConfidenceAccuracy dataclass."""
+
+    def test_confidence_accuracy_creation(self) -> None:
+        """Test ConfidenceAccuracy creation."""
+        conf_accuracy = ConfidenceAccuracy(
+            confidence_range="0.8-0.9",
+            total=10,
+            correct=8,
+            accuracy=0.8,
+        )
+
+        assert conf_accuracy.confidence_range == "0.8-0.9"
+        assert conf_accuracy.total == 10
+        assert conf_accuracy.correct == 8
+        assert conf_accuracy.accuracy == 0.8
+
+
+class TestDateRangeAccuracyDataclass:
+    """Tests for DateRangeAccuracy dataclass."""
+
+    def test_date_range_accuracy_creation(self) -> None:
+        """Test DateRangeAccuracy creation."""
+        start = datetime(2026, 1, 1)
+        end = datetime(2026, 1, 31)
+
+        date_accuracy = DateRangeAccuracy(
+            start_date=start,
+            end_date=end,
+            total=5,
+            correct=4,
+            accuracy=0.8,
+        )
+
+        assert date_accuracy.start_date == start
+        assert date_accuracy.end_date == end
+        assert date_accuracy.total == 5
+        assert date_accuracy.correct == 4
+        assert date_accuracy.accuracy == 0.8
+
+
+class TestPredictionTrackerAccuracy:
+    """Tests for PredictionTracker accuracy statistics methods."""
+
+    @pytest.fixture
+    def mock_market_repo(self) -> AsyncMock:
+        """Create a mock MarketRepository."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_prediction_repo(self) -> AsyncMock:
+        """Create a mock PredictionRepository."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def tracker(
+        self, mock_market_repo: AsyncMock, mock_prediction_repo: AsyncMock
+    ) -> PredictionTracker:
+        """Create a PredictionTracker instance for testing."""
+        return PredictionTracker(mock_market_repo, mock_prediction_repo)
+
+    # ==================== get_overall_accuracy tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_overall_accuracy(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting overall accuracy."""
+        mock_prediction_repo.get_all_validated = AsyncMock(
+            return_value=[
+                Prediction(
+                    id=1,
+                    market_id="m1",
+                    predicted_probability=0.7,
+                    confidence=0.8,
+                    is_correct=True,
+                ),
+                Prediction(
+                    id=2,
+                    market_id="m2",
+                    predicted_probability=0.6,
+                    confidence=0.7,
+                    is_correct=False,
+                ),
+                Prediction(
+                    id=3,
+                    market_id="m3",
+                    predicted_probability=0.8,
+                    confidence=0.9,
+                    is_correct=True,
+                ),
+            ]
+        )
+
+        result = await tracker.get_overall_accuracy()
+
+        assert result.total == 3
+        assert result.correct == 2
+        assert result.incorrect == 1
+        assert result.accuracy == 2 / 3
+
+    @pytest.mark.asyncio
+    async def test_get_overall_accuracy_empty(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting overall accuracy with no validated predictions."""
+        mock_prediction_repo.get_all_validated = AsyncMock(return_value=[])
+
+        result = await tracker.get_overall_accuracy()
+
+        assert result.total == 0
+        assert result.correct == 0
+        assert result.incorrect == 0
+        assert result.accuracy is None
+
+    @pytest.mark.asyncio
+    async def test_get_overall_accuracy_all_correct(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting overall accuracy when all predictions are correct."""
+        mock_prediction_repo.get_all_validated = AsyncMock(
+            return_value=[
+                Prediction(
+                    id=i,
+                    market_id=f"m{i}",
+                    predicted_probability=0.7,
+                    confidence=0.8,
+                    is_correct=True,
+                )
+                for i in range(5)
+            ]
+        )
+
+        result = await tracker.get_overall_accuracy()
+
+        assert result.total == 5
+        assert result.correct == 5
+        assert result.incorrect == 0
+        assert result.accuracy == 1.0
+
+    # ==================== get_accuracy_by_category tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_accuracy_by_category(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting accuracy by category."""
+        mock_prediction_repo.get_validated_with_market = AsyncMock(
+            return_value=[
+                (
+                    Prediction(
+                        id=1,
+                        market_id="m1",
+                        predicted_probability=0.7,
+                        confidence=0.8,
+                        is_correct=True,
+                    ),
+                    Market(
+                        id="m1",
+                        title="Test 1",
+                        category=MarketCategory.POLITICS,
+                    ),
+                ),
+                (
+                    Prediction(
+                        id=2,
+                        market_id="m2",
+                        predicted_probability=0.6,
+                        confidence=0.7,
+                        is_correct=False,
+                    ),
+                    Market(
+                        id="m2",
+                        title="Test 2",
+                        category=MarketCategory.POLITICS,
+                    ),
+                ),
+                (
+                    Prediction(
+                        id=3,
+                        market_id="m3",
+                        predicted_probability=0.8,
+                        confidence=0.9,
+                        is_correct=True,
+                    ),
+                    Market(
+                        id="m3",
+                        title="Test 3",
+                        category=MarketCategory.CRYPTO,
+                    ),
+                ),
+            ]
+        )
+
+        results = await tracker.get_accuracy_by_category()
+
+        assert len(results) == 2
+        # Results should be sorted by total (descending)
+        politics = next(r for r in results if r.category == "politics")
+        assert politics.total == 2
+        assert politics.correct == 1
+        assert politics.accuracy == 0.5
+
+        crypto = next(r for r in results if r.category == "crypto")
+        assert crypto.total == 1
+        assert crypto.correct == 1
+        assert crypto.accuracy == 1.0
+
+    @pytest.mark.asyncio
+    async def test_get_accuracy_by_category_empty(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting accuracy by category with no validated predictions."""
+        mock_prediction_repo.get_validated_with_market = AsyncMock(return_value=[])
+
+        results = await tracker.get_accuracy_by_category()
+
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_get_accuracy_by_category_no_category(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting accuracy by category when market has no category."""
+        mock_prediction_repo.get_validated_with_market = AsyncMock(
+            return_value=[
+                (
+                    Prediction(
+                        id=1,
+                        market_id="m1",
+                        predicted_probability=0.7,
+                        confidence=0.8,
+                        is_correct=True,
+                    ),
+                    Market(
+                        id="m1",
+                        title="Test 1",
+                        category=None,  # No category
+                    ),
+                ),
+            ]
+        )
+
+        results = await tracker.get_accuracy_by_category()
+
+        assert len(results) == 1
+        assert results[0].category == "other"
+        assert results[0].total == 1
+
+    # ==================== get_accuracy_by_date_range tests ====================
+
+    @pytest.mark.asyncio
+    async def test_get_accuracy_by_date_range(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting accuracy by date range."""
+        start = datetime(2026, 1, 1)
+        end = datetime(2026, 1, 31)
+
+        mock_prediction_repo.get_validated_by_date_range = AsyncMock(
+            return_value=[
+                Prediction(
+                    id=1,
+                    market_id="m1",
+                    predicted_probability=0.7,
+                    confidence=0.8,
+                    is_correct=True,
+                ),
+                Prediction(
+                    id=2,
+                    market_id="m2",
+                    predicted_probability=0.6,
+                    confidence=0.7,
+                    is_correct=True,
+                ),
+            ]
+        )
+
+        result = await tracker.get_accuracy_by_date_range(start, end)
+
+        assert result.start_date == start
+        assert result.end_date == end
+        assert result.total == 2
+        assert result.correct == 2
+        assert result.accuracy == 1.0
+
+    @pytest.mark.asyncio
+    async def test_get_accuracy_by_date_range_empty(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting accuracy by date range with no predictions."""
+        start = datetime(2026, 1, 1)
+        end = datetime(2026, 1, 31)
+
+        mock_prediction_repo.get_validated_by_date_range = AsyncMock(return_value=[])
+
+        result = await tracker.get_accuracy_by_date_range(start, end)
+
+        assert result.total == 0
+        assert result.accuracy is None
+
+    # ======== get_confidence_accuracy_correlation tests ========
+
+    @pytest.mark.asyncio
+    async def test_get_confidence_accuracy_correlation(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting confidence-accuracy correlation."""
+        mock_prediction_repo.get_all_validated = AsyncMock(
+            return_value=[
+                Prediction(
+                    id=1,
+                    market_id="m1",
+                    predicted_probability=0.7,
+                    confidence=0.85,  # 0.8-0.9 range
+                    is_correct=True,
+                ),
+                Prediction(
+                    id=2,
+                    market_id="m2",
+                    predicted_probability=0.6,
+                    confidence=0.75,  # 0.7-0.8 range
+                    is_correct=False,
+                ),
+                Prediction(
+                    id=3,
+                    market_id="m3",
+                    predicted_probability=0.8,
+                    confidence=0.95,  # 0.9-1.0 range
+                    is_correct=True,
+                ),
+            ]
+        )
+
+        results = await tracker.get_confidence_accuracy_correlation()
+
+        assert len(results) == 3
+
+        # Check 0.8-0.9 range
+        high_conf = next((r for r in results if r.confidence_range == "0.8-0.9"), None)
+        assert high_conf is not None
+        assert high_conf.total == 1
+        assert high_conf.accuracy == 1.0
+
+        # Check 0.7-0.8 range
+        mid_conf = next((r for r in results if r.confidence_range == "0.7-0.8"), None)
+        assert mid_conf is not None
+        assert mid_conf.total == 1
+        assert mid_conf.accuracy == 0.0
+
+    @pytest.mark.asyncio
+    async def test_get_confidence_accuracy_correlation_empty(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test getting confidence-accuracy correlation with no predictions."""
+        mock_prediction_repo.get_all_validated = AsyncMock(return_value=[])
+
+        results = await tracker.get_confidence_accuracy_correlation()
+
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_get_confidence_accuracy_correlation_single_range(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test correlation when predictions only exist in one range."""
+        mock_prediction_repo.get_all_validated = AsyncMock(
+            return_value=[
+                Prediction(
+                    id=i,
+                    market_id=f"m{i}",
+                    predicted_probability=0.7,
+                    confidence=0.92,  # All in 0.9-1.0 range
+                    is_correct=True,
+                )
+                for i in range(3)
+            ]
+        )
+
+        results = await tracker.get_confidence_accuracy_correlation()
+
+        assert len(results) == 1
+        assert results[0].confidence_range == "0.9-1.0"
+        assert results[0].total == 3
+
+    @pytest.mark.asyncio
+    async def test_get_confidence_accuracy_correlation_boundary(
+        self, tracker: PredictionTracker, mock_prediction_repo: AsyncMock
+    ) -> None:
+        """Test correlation with confidence at range boundaries."""
+        mock_prediction_repo.get_all_validated = AsyncMock(
+            return_value=[
+                Prediction(
+                    id=1,
+                    market_id="m1",
+                    predicted_probability=0.7,
+                    confidence=0.8,  # Exactly at 0.8 boundary
+                    is_correct=True,
+                ),
+                Prediction(
+                    id=2,
+                    market_id="m2",
+                    predicted_probability=0.6,
+                    confidence=0.9,  # Exactly at 0.9 boundary
+                    is_correct=False,
+                ),
+            ]
+        )
+
+        results = await tracker.get_confidence_accuracy_correlation()
+
+        # 0.8 should be in 0.8-0.9 range (half-open interval [0.8, 0.9))
+        conf_08 = next((r for r in results if r.confidence_range == "0.8-0.9"), None)
+        assert conf_08 is not None
+        assert conf_08.total == 1
+
+        # 0.9 should be in 0.9-1.0 range
+        conf_09 = next((r for r in results if r.confidence_range == "0.9-1.0"), None)
+        assert conf_09 is not None
+        assert conf_09.total == 1

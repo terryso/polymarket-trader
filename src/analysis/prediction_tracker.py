@@ -1,6 +1,7 @@
 """Prediction tracking and validation.
 
 Story 6.1: 预测结果验证机制
+Story 6.2: 准确率统计
 
 This module provides functionality to validate LLM predictions against
 resolved market outcomes and calculate accuracy statistics.
@@ -8,15 +9,26 @@ resolved market outcomes and calculate accuracy statistics.
 
 from __future__ import annotations
 
-__all__ = ["PredictionTracker", "ValidationResult", "AccuracyResult"]
+__all__ = [
+    "PredictionTracker",
+    "ValidationResult",
+    "AccuracyResult",
+    "AccuracyStatistics",
+    "CategoryAccuracy",
+    "ConfidenceAccuracy",
+    "DateRangeAccuracy",
+]
 
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from src.models.prediction import Prediction, Recommendation
 from src.utils.logger import OPERATION_EMOJIS, get_logger
 
 if TYPE_CHECKING:
+    from src.models.market import Market
     from src.storage.repositories.market_repo import MarketRepository
     from src.storage.repositories.prediction_repo import PredictionRepository
 
@@ -52,6 +64,84 @@ class AccuracyResult:
         accuracy: Accuracy ratio (0-1), None if no predictions
     """
 
+    total: int
+    correct: int
+    accuracy: float | None
+
+
+@dataclass
+class AccuracyStatistics:
+    """Overall accuracy statistics.
+
+    Story 6.2: 准确率统计
+
+    Attributes:
+        total: Total validated predictions
+        correct: Number of correct predictions
+        incorrect: Number of incorrect predictions
+        accuracy: Accuracy ratio (0-1), None if no predictions
+    """
+
+    total: int
+    correct: int
+    incorrect: int
+    accuracy: float | None
+
+
+@dataclass
+class CategoryAccuracy:
+    """Accuracy statistics for a single category.
+
+    Story 6.2: 准确率统计
+
+    Attributes:
+        category: Market category
+        total: Total validated predictions in this category
+        correct: Number of correct predictions
+        accuracy: Accuracy ratio (0-1), None if no predictions
+    """
+
+    category: str
+    total: int
+    correct: int
+    accuracy: float | None
+
+
+@dataclass
+class ConfidenceAccuracy:
+    """Accuracy statistics for a confidence range.
+
+    Story 6.2: 准确率统计
+
+    Attributes:
+        confidence_range: Confidence range (e.g., "0.8-0.9")
+        total: Total validated predictions in this range
+        correct: Number of correct predictions
+        accuracy: Accuracy ratio (0-1), None if no predictions
+    """
+
+    confidence_range: str
+    total: int
+    correct: int
+    accuracy: float | None
+
+
+@dataclass
+class DateRangeAccuracy:
+    """Accuracy statistics for a date range.
+
+    Story 6.2: 准确率统计
+
+    Attributes:
+        start_date: Start of date range
+        end_date: End of date range
+        total: Total validated predictions in this range
+        correct: Number of correct predictions
+        accuracy: Accuracy ratio (0-1), None if no predictions
+    """
+
+    start_date: datetime
+    end_date: datetime
     total: int
     correct: int
     accuracy: float | None
@@ -291,3 +381,194 @@ class PredictionTracker:
             return "NO"
         else:  # Exactly 0.5 - neutral
             return None
+
+    # ==================== Story 6.2: 准确率统计 ====================
+
+    async def get_overall_accuracy(self) -> AccuracyStatistics:
+        """Get overall accuracy statistics for all validated predictions.
+
+        Story 6.2: 准确率统计
+
+        Returns:
+            AccuracyStatistics with total, correct, incorrect, and accuracy
+        """
+        self._logger.info(f"{OPERATION_EMOJIS['data']} Calculating overall accuracy")
+
+        validated = await self._prediction_repo.get_all_validated()
+
+        if not validated:
+            return AccuracyStatistics(
+                total=0,
+                correct=0,
+                incorrect=0,
+                accuracy=None,
+            )
+
+        correct = sum(1 for p in validated if p.is_correct)
+        total = len(validated)
+        accuracy = correct / total
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Overall accuracy: "
+            f"{accuracy:.1%} ({correct}/{total})"
+        )
+
+        return AccuracyStatistics(
+            total=total,
+            correct=correct,
+            incorrect=total - correct,
+            accuracy=accuracy,
+        )
+
+    async def get_accuracy_by_category(self) -> list[CategoryAccuracy]:
+        """Get accuracy statistics grouped by market category.
+
+        Story 6.2: 准确率统计
+
+        Returns:
+            List of CategoryAccuracy for each category with validated predictions
+        """
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Calculating accuracy by category"
+        )
+
+        # Get validated predictions with market info
+        validated_with_markets = await self._prediction_repo.get_validated_with_market()
+
+        # Group by category
+        by_category: dict[str, list[Prediction]] = defaultdict(list)
+        for prediction, market in validated_with_markets:
+            category = market.category.value if market.category else "other"
+            by_category[category].append(prediction)
+
+        # Calculate accuracy for each category
+        results: list[CategoryAccuracy] = []
+        for category, predictions in by_category.items():
+            correct = sum(1 for p in predictions if p.is_correct)
+            total = len(predictions)
+            accuracy = correct / total if total > 0 else None
+
+            results.append(
+                CategoryAccuracy(
+                    category=category,
+                    total=total,
+                    correct=correct,
+                    accuracy=accuracy,
+                )
+            )
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Accuracy by category: "
+            f"{len(results)} categories"
+        )
+
+        return sorted(results, key=lambda x: x.total, reverse=True)
+
+    async def get_accuracy_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> DateRangeAccuracy:
+        """Get accuracy statistics for a specific date range.
+
+        Story 6.2: 准确率统计
+
+        Args:
+            start_date: Start of date range (validated_at >= start_date)
+            end_date: End of date range (validated_at <= end_date)
+
+        Returns:
+            DateRangeAccuracy with statistics for the date range
+        """
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Calculating accuracy for date range: "
+            f"{start_date.date()} to {end_date.date()}"
+        )
+
+        validated = await self._prediction_repo.get_validated_by_date_range(
+            start_date, end_date
+        )
+
+        if not validated:
+            return DateRangeAccuracy(
+                start_date=start_date,
+                end_date=end_date,
+                total=0,
+                correct=0,
+                accuracy=None,
+            )
+
+        correct = sum(1 for p in validated if p.is_correct)
+        total = len(validated)
+        accuracy = correct / total
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Date range accuracy: "
+            f"{accuracy:.1%} ({correct}/{total})"
+        )
+
+        return DateRangeAccuracy(
+            start_date=start_date,
+            end_date=end_date,
+            total=total,
+            correct=correct,
+            accuracy=accuracy,
+        )
+
+    async def get_confidence_accuracy_correlation(self) -> list[ConfidenceAccuracy]:
+        """Get accuracy statistics grouped by confidence ranges.
+
+        Story 6.2: 准确率统计
+
+        Confidence ranges:
+        - 0.5-0.6: Low confidence
+        - 0.6-0.7: Medium-low confidence
+        - 0.7-0.8: Medium confidence
+        - 0.8-0.9: Medium-high confidence
+        - 0.9-1.0: High confidence
+
+        Returns:
+            List of ConfidenceAccuracy for each confidence range
+        """
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Calculating confidence-accuracy correlation"
+        )
+
+        validated = await self._prediction_repo.get_all_validated()
+
+        # Define confidence ranges (half-open intervals [min, max))
+        ranges = [
+            (0.5, 0.6, "0.5-0.6"),
+            (0.6, 0.7, "0.6-0.7"),
+            (0.7, 0.8, "0.7-0.8"),
+            (0.8, 0.9, "0.8-0.9"),
+            (0.9, 1.01, "0.9-1.0"),  # Use 1.01 to include 1.0 in the range
+        ]
+
+        results: list[ConfidenceAccuracy] = []
+
+        for min_conf, max_conf, range_label in ranges:
+            in_range = [p for p in validated if min_conf <= p.confidence < max_conf]
+
+            if not in_range:
+                continue
+
+            correct = sum(1 for p in in_range if p.is_correct)
+            total = len(in_range)
+            accuracy = correct / total
+
+            results.append(
+                ConfidenceAccuracy(
+                    confidence_range=range_label,
+                    total=total,
+                    correct=correct,
+                    accuracy=accuracy,
+                )
+            )
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['data']} Confidence-accuracy correlation: "
+            f"{len(results)} ranges with data"
+        )
+
+        return results

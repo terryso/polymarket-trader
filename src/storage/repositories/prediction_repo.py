@@ -17,6 +17,7 @@ __all__ = ["PredictionRepository"]
 
 import json
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import aiosqlite
 
@@ -24,6 +25,9 @@ from src.exceptions import DatabaseError
 from src.models.prediction import Prediction, Recommendation
 from src.storage.database import get_connection
 from src.utils.logger import OPERATION_EMOJIS, get_logger
+
+if TYPE_CHECKING:
+    from src.models.market import Market
 
 logger = get_logger(__name__)
 
@@ -290,6 +294,167 @@ class PredictionRepository:
                 f"{OPERATION_EMOJIS['data']} Failed to get validated predictions: {e}"
             )
             raise
+
+    # ==================== Story 6.2: 准确率统计 ====================
+
+    async def get_all_validated(self) -> list[Prediction]:
+        """Get all validated predictions (is_correct is not None).
+
+        Story 6.2: 准确率统计
+
+        This is an alias for get_validated_predictions() with a clearer name
+        for accuracy statistics use cases.
+
+        Returns:
+            List of validated predictions
+        """
+        return await self.get_validated_predictions()
+
+    async def get_validated_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[Prediction]:
+        """Get validated predictions within a date range.
+
+        Story 6.2: 准确率统计
+
+        Args:
+            start_date: Start of date range
+            end_date: End of date range
+
+        Returns:
+            List of validated predictions in the date range
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    """
+                    SELECT * FROM predictions
+                    WHERE is_correct IS NOT NULL
+                    AND validated_at >= ?
+                    AND validated_at <= ?
+                    ORDER BY validated_at DESC
+                    """,
+                    (start_date.isoformat(), end_date.isoformat()),
+                )
+                rows = await cursor.fetchall()
+
+            predictions = [self._row_to_prediction(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(predictions)} "
+                f"validated predictions in date range"
+            )
+            return predictions
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to get validated predictions "
+                f"by date range: {e}"
+            )
+            raise
+
+    async def get_validated_with_market(self) -> list[tuple[Prediction, Market]]:
+        """Get all validated predictions with their associated market info.
+
+        Story 6.2: 准确率统计
+
+        Returns:
+            List of (Prediction, Market) tuples
+        """
+        from src.models.market import Market
+
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute("""
+                    SELECT p.*, m.id as market_id_col, m.title, m.description,
+                           m.category, m.yes_price, m.no_price, m.liquidity,
+                           m.deadline, m.resolution_status, m.resolution_outcome,
+                           m.created_at as market_created_at,
+                           m.updated_at as market_updated_at
+                    FROM predictions p
+                    JOIN markets m ON p.market_id = m.id
+                    WHERE p.is_correct IS NOT NULL
+                    ORDER BY p.validated_at DESC
+                    """)
+                rows = await cursor.fetchall()
+
+            results: list[tuple[Prediction, Market]] = []
+            for row in rows:
+                prediction = self._row_to_prediction(row)
+                market = self._row_to_market(row)
+                results.append((prediction, market))
+
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(results)} "
+                f"validated predictions with market info"
+            )
+            return results
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to get validated predictions "
+                f"with market: {e}"
+            )
+            raise
+
+    def _row_to_market(self, row: aiosqlite.Row) -> Market:
+        """Convert a database row to a Market model.
+
+        Args:
+            row: Database row from markets table (prefixed columns)
+
+        Returns:
+            Market model instance
+        """
+        from src.models.market import Market, MarketCategory
+
+        # Parse category
+        category: MarketCategory | None = None
+        if row["category"]:
+            try:
+                category = MarketCategory(row["category"])
+            except ValueError:
+                category = None
+
+        # Parse deadline
+        deadline: datetime | None = None
+        if row["deadline"]:
+            try:
+                deadline = datetime.fromisoformat(row["deadline"])
+            except ValueError:
+                deadline = None
+
+        # Parse market_created_at
+        market_created_at: datetime | None = None
+        if row["market_created_at"]:
+            try:
+                market_created_at = datetime.fromisoformat(row["market_created_at"])
+            except ValueError:
+                market_created_at = None
+
+        # Parse market_updated_at
+        market_updated_at: datetime | None = None
+        if row["market_updated_at"]:
+            try:
+                market_updated_at = datetime.fromisoformat(row["market_updated_at"])
+            except ValueError:
+                market_updated_at = None
+
+        return Market(
+            id=row["market_id_col"],
+            title=row["title"],
+            description=row["description"],
+            category=category,
+            yes_price=row["yes_price"],
+            no_price=row["no_price"],
+            liquidity=row["liquidity"],
+            deadline=deadline,
+            resolution_status=row["resolution_status"],
+            resolution_outcome=row["resolution_outcome"],
+            created_at=market_created_at,
+            updated_at=market_updated_at,
+        )
 
     async def get_latest_prediction(self, market_id: str) -> Prediction | None:
         """Get the most recent prediction for a specific market.
