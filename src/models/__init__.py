@@ -20,6 +20,7 @@ from src.models.api_response import (
     PaginationMeta,
 )
 from src.models.market import Market, MarketCategory
+from src.models.market_response import MarketListItem, MarketListQueryParams, MarketResponse
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.prediction import Prediction, PredictionResult, Recommendation
 from src.models.statistics import DailyStats, Statistics
@@ -35,6 +36,10 @@ __all__ = [
     # Market
     "Market",
     "MarketCategory",
+    # Market Response (API models)
+    "MarketListItem",
+    "MarketResponse",
+    "MarketListQueryParams",
     # Trade
     "Trade",
     "TradeType",
