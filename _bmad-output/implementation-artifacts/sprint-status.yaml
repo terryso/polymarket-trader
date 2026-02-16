@@ -71,10 +71,10 @@ development_status:
   # Epic 4: 风险控制与熔断系统
   epic-4: in-progress
   4-1-risk-control-configuration: done
-  4-2-thread-safe-state-management: ready-for-dev
-  4-3-circuit-breaker-implementation: review
-  4-4-pre-trade-risk-check: ready-for-dev
-  4-5-position-management: ready-for-dev
+  4-2-thread-safe-state-management: done
+  4-3-circuit-breaker-implementation: done
+  4-4-pre-trade-risk-check: done
+  4-5-position-management: done
   epic-4-retrospective: optional
 
   # Epic 5: Paper Trading 模拟交易
