@@ -25,7 +25,7 @@ from __future__ import annotations
 
 __all__ = ["TradeRepository"]
 
-from datetime import datetime
+from datetime import date, datetime
 
 import aiosqlite
 
@@ -263,6 +263,76 @@ class TradeRepository:
             raise DatabaseError(
                 message="Failed to get recent trades",
                 operation="get_recent_trades",
+                original_exception=e,
+            ) from e
+
+    async def get_by_date_range(
+        self,
+        start_date: date,
+        end_date: date,
+        mode: TradeMode | None = None,
+    ) -> list[Trade]:
+        """Get trades within a date range.
+
+        Args:
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            mode: Optional trading mode filter
+
+        Returns:
+            List of trades within the date range, ordered by created_at descending
+
+        Raises:
+            DatabaseError: If database operation fails
+
+        Example:
+            >>> from datetime import date, timedelta
+            >>> end_date = date.today()
+            >>> start_date = end_date - timedelta(days=7)
+            >>> trades = await repo.get_by_date_range(
+            ...     start_date, end_date, TradeMode.PAPER
+            ... )
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+
+                if mode is not None:
+                    cursor = await conn.execute(
+                        """
+                        SELECT * FROM trades
+                        WHERE date(created_at) >= ?
+                        AND date(created_at) <= ?
+                        AND mode = ?
+                        ORDER BY created_at DESC
+                        """,
+                        (start_date.isoformat(), end_date.isoformat(), mode.value),
+                    )
+                else:
+                    cursor = await conn.execute(
+                        """
+                        SELECT * FROM trades
+                        WHERE date(created_at) >= ?
+                        AND date(created_at) <= ?
+                        ORDER BY created_at DESC
+                        """,
+                        (start_date.isoformat(), end_date.isoformat()),
+                    )
+                rows = await cursor.fetchall()
+
+            trades = [self._row_to_trade(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(trades)} trades "
+                f"from {start_date} to {end_date}"
+            )
+            return trades
+        except aiosqlite.Error as e:
+            logger.error(
+                f"Failed to get trades for range {start_date} to {end_date}: {e}"
+            )
+            raise DatabaseError(
+                message=f"Failed to get trades for range: {start_date} to {end_date}",
+                operation="get_trades_by_date_range",
                 original_exception=e,
             ) from e
 
