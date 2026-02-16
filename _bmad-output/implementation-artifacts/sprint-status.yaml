@@ -82,8 +82,8 @@ development_status:
   5-1-trade-record-data-model: done
   5-2-paper-trading-executor: done
   5-3-trading-decision-flow: done
-  5-4-simulated-position-pnl-calculation: ready-for-dev
-  5-5-statistics-data-recording: backlog
+  5-4-simulated-position-pnl-calculation: done
+  5-5-statistics-data-recording: done
   epic-5-retrospective: optional
 
   # Epic 6: 预测追踪与学习日志

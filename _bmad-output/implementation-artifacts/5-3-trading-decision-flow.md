@@ -1,6 +1,6 @@
 # Story 5.3: 交易决策流程
 
-Status: review
+Status: done
 
 ## Story
 
