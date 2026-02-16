@@ -60,8 +60,8 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: LLM 智能分析引擎
-  epic-3: backlog
-  3-1-llm-api-client: backlog
+  epic-3: in-progress
+  3-1-llm-api-client: done
   3-2-llm-prompt-template: backlog
   3-3-llm-analysis-engine: backlog
   3-4-prediction-result-storage: backlog
