@@ -1,6 +1,6 @@
 # Story 6.1: 预测结果验证机制
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -34,45 +34,45 @@ validated_at DATETIME
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 PredictionTracker 类 (AC: 1, 2, 3)
-  - [ ] 1.1 创建 `src/analysis/prediction_tracker.py`
-  - [ ] 1.2 实现 `__init__` 方法，注入依赖 (MarketRepository, PredictionRepository)
-  - [ ] 1.3 实现 `check_resolved_markets()` 方法
-  - [ ] 1.4 实现 `validate_prediction(prediction, actual_outcome)` 方法
-  - [ ] 1.5 实现 `calculate_accuracy(predictions)` 方法
-  - [ ] 1.6 添加日志记录 (📊 emoji)
-  - [ ] 1.7 更新 `src/analysis/__init__.py` 导出
+- [x] Task 1: 创建 PredictionTracker 类 (AC: 1, 2, 3)
+  - [x] 1.1 创建 `src/analysis/prediction_tracker.py`
+  - [x] 1.2 实现 `__init__` 方法，注入依赖 (MarketRepository, PredictionRepository)
+  - [x] 1.3 实现 `check_resolved_markets()` 方法
+  - [x] 1.4 实现 `validate_prediction(prediction, actual_outcome)` 方法
+  - [x] 1.5 实现 `calculate_accuracy(predictions)` 方法
+  - [x] 1.6 添加日志记录 (📊 emoji)
+  - [x] 1.7 更新 `src/analysis/__init__.py` 导出
 
-- [ ] Task 2: 扩展 MarketRepository (AC: 2)
-  - [ ] 2.1 添加 `get_resolved_markets()` 方法
-  - [ ] 2.2 返回 `resolution_status = 'RESOLVED'` 的市场
-  - [ ] 2.3 添加单元测试
+- [x] Task 2: 扩展 MarketRepository (AC: 2)
+  - [x] 2.1 添加 `get_resolved_markets()` 方法
+  - [x] 2.2 返回 `resolution_status = 'RESOLVED'` 的市场
+  - [x] 2.3 添加单元测试
 
-- [ ] Task 3: 扩展 PredictionRepository (AC: 2)
-  - [ ] 3.1 添加 `get_unvalidated_predictions()` 方法
-  - [ ] 3.2 添加 `get_validated_predictions()` 方法
-  - [ ] 3.3 确认 `update_prediction_result()` 方法已存在 (已在 Story 3.4 实现)
-  - [ ] 3.4 添加单元测试
+- [x] Task 3: 扩展 PredictionRepository (AC: 2)
+  - [x] 3.1 添加 `get_unvalidated_predictions()` 方法
+  - [x] 3.2 添加 `get_validated_predictions()` 方法
+  - [x] 3.3 确认 `update_prediction_result()` 方法已存在 (已在 Story 3.4 实现)
+  - [x] 3.4 添加单元测试
 
-- [ ] Task 4: 实现预测验证逻辑 (AC: 2)
-  - [ ] 4.1 定义预测方向判断逻辑
-  - [ ] 4.2 实现 `predicts_yes(prediction)` 辅助函数
-  - [ ] 4.3 实现验证结果计算: `is_correct = (预测方向 == 实际结果)`
-  - [ ] 4.4 处理边界情况 (无预测、部分验证)
+- [x] Task 4: 实现预测验证逻辑 (AC: 2)
+  - [x] 4.1 定义预测方向判断逻辑
+  - [x] 4.2 实现 `predicts_yes(prediction)` 辅助函数
+  - [x] 4.3 实现验证结果计算: `is_correct = (预测方向 == 实际结果)`
+  - [x] 4.4 处理边界情况 (无预测、部分验证)
 
-- [ ] Task 5: 编写单元测试 (AC: All)
-  - [ ] 5.1 创建 `tests/test_analysis/test_prediction_tracker.py`
-  - [ ] 5.2 测试 `check_resolved_markets()` 方法
-  - [ ] 5.3 测试 `validate_prediction()` 方法
-  - [ ] 5.4 测试 `calculate_accuracy()` 方法
-  - [ ] 5.5 测试边界情况 (空列表、无已结算市场)
-  - [ ] 5.6 Mock 所有外部依赖
+- [x] Task 5: 编写单元测试 (AC: All)
+  - [x] 5.1 创建 `tests/test_analysis/test_prediction_tracker.py`
+  - [x] 5.2 测试 `check_resolved_markets()` 方法
+  - [x] 5.3 测试 `validate_prediction()` 方法
+  - [x] 5.4 测试 `calculate_accuracy()` 方法
+  - [x] 5.5 测试边界情况 (空列表、无已结算市场)
+  - [x] 5.6 Mock 所有外部依赖
 
-- [ ] Task 6: 代码质量检查 (AC: All)
-  - [ ] 6.1 运行 `mypy src/analysis/prediction_tracker.py` 无错误
-  - [ ] 6.2 运行 `black --check` 通过
-  - [ ] 6.3 运行 `isort --check` 通过
-  - [ ] 6.4 运行完整测试套件确保通过
+- [x] Task 6: 代码质量检查 (AC: All)
+  - [x] 6.1 运行 `mypy src/analysis/prediction_tracker.py` 无错误
+  - [x] 6.2 运行 `black --check` 通过
+  - [x] 6.3 运行 `isort --check` 通过
+  - [x] 6.4 运行完整测试套件确保通过
 
 ## Dev Notes
 
