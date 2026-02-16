@@ -91,7 +91,7 @@ development_status:
   6-1-prediction-result-validation-mechanism: done
   6-2-accuracy-statistics: done
   6-3-learning-log-generation: done
-  6-4-prediction-history-query-api: backlog
+  6-4-prediction-history-query-api: ready-for-dev
   6-5-performance-analysis-and-insights: backlog
   epic-6-retrospective: optional
 

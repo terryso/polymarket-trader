@@ -789,9 +789,7 @@ class TestPredictionRepository:
     # ==================== Edge field tests ====================
 
     @pytest.mark.asyncio
-    async def test_save_prediction_with_edge(
-        self, repo: PredictionRepository
-    ) -> None:
+    async def test_save_prediction_with_edge(self, repo: PredictionRepository) -> None:
         """Test that edge field is saved to database."""
         prediction = Prediction(
             market_id="test-market-edge",
@@ -1162,3 +1160,774 @@ class TestPredictionRepository:
 
             call_args = mock_conn.execute.call_args
             assert "ORDER BY validated_at DESC" in call_args[0][0]
+
+    # ==================== Story 6.4: 预测历史查询 API 测试 ====================
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_correct(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with correct status."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 1 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import (
+                PredictionOutcomeStatus,
+                PredictionQueryResult,
+            )
+
+            result = await repo.get_predictions_with_outcome(
+                status=PredictionOutcomeStatus.CORRECT
+            )
+
+            assert isinstance(result, PredictionQueryResult)
+            assert result.total >= 0
+            # Verify query filters for correct predictions
+            call_args = mock_conn.execute.call_args
+            assert "is_correct = 1" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_incorrect(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with incorrect status."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 0 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import (
+                PredictionOutcomeStatus,
+            )
+
+            await repo.get_predictions_with_outcome(
+                status=PredictionOutcomeStatus.INCORRECT
+            )
+
+            # Verify query filters for incorrect predictions
+            call_args = mock_conn.execute.call_args
+            assert "is_correct = 0" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_pending(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with pending status."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 2 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import (
+                PredictionOutcomeStatus,
+            )
+
+            await repo.get_predictions_with_outcome(
+                status=PredictionOutcomeStatus.PENDING
+            )
+
+            # Verify query filters for pending predictions
+            call_args = mock_conn.execute.call_args
+            assert "validated_at IS NULL" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_all(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with all status (no filter)."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 10 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import (
+                PredictionOutcomeStatus,
+            )
+
+            await repo.get_predictions_with_outcome(status=PredictionOutcomeStatus.ALL)
+
+            # Verify query has no WHERE clause for status
+            call_args = mock_conn.execute.call_args
+            sql = call_args[0][0]
+            # Check the count query doesn't have status filter
+            count_sql_start = sql.find("SELECT COUNT")
+            count_sql_end = sql.find("FROM predictions")
+            count_section = sql[count_sql_start:count_sql_end]
+            assert "is_correct" not in count_section
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_string_status(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome accepts string status."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 1 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            # Pass string instead of enum
+            result = await repo.get_predictions_with_outcome(status="correct")
+
+            assert result.total == 1
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_with_pagination(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with custom pagination."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 100 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import PaginationParams
+
+            pagination = PaginationParams(page=2, per_page=10)
+            result = await repo.get_predictions_with_outcome(pagination=pagination)
+
+            assert result.page == 2
+            assert result.per_page == 10
+            assert result.has_next is True  # 100 total, page 2, per_page 10
+            assert result.has_prev is True
+
+            # Verify LIMIT and OFFSET
+            call_args = mock_conn.execute.call_args
+            params = call_args[0][1]
+            # Second query (data query) has LIMIT and OFFSET as last params
+            assert params[-2] == 10  # LIMIT
+            assert params[-1] == 10  # OFFSET (page 2 - 1) * 10
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_with_sorting(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with custom sorting."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 0 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import (
+                PredictionSortBy,
+                SortOrder,
+                SortParams,
+            )
+
+            sort = SortParams(
+                sort_by=PredictionSortBy.CONFIDENCE, sort_order=SortOrder.ASC
+            )
+            await repo.get_predictions_with_outcome(sort=sort)
+
+            # Verify ORDER BY clause
+            call_args = mock_conn.execute.call_args
+            sql = call_args[0][0]
+            assert "p.confidence ASC" in sql
+
+    @pytest.mark.asyncio
+    async def test_get_correct_predictions(self, repo: PredictionRepository) -> None:
+        """Test convenience method get_correct_predictions."""
+        with patch.object(
+            repo,
+            "get_predictions_with_outcome",
+            new_callable=AsyncMock,
+        ) as mock_method:
+            from src.storage.repositories.prediction_repo import (
+                PaginationParams,
+                PredictionOutcomeStatus,
+                PredictionQueryResult,
+                SortParams,
+            )
+
+            mock_method.return_value = PredictionQueryResult(
+                predictions=[],
+                total=0,
+                page=1,
+                per_page=20,
+                has_next=False,
+                has_prev=False,
+            )
+
+            await repo.get_correct_predictions()
+
+            mock_method.assert_called_once()
+            call_kwargs = mock_method.call_args[1]
+            assert call_kwargs["status"] == PredictionOutcomeStatus.CORRECT
+
+    @pytest.mark.asyncio
+    async def test_get_incorrect_predictions(self, repo: PredictionRepository) -> None:
+        """Test convenience method get_incorrect_predictions."""
+        with patch.object(
+            repo,
+            "get_predictions_with_outcome",
+            new_callable=AsyncMock,
+        ) as mock_method:
+            from src.storage.repositories.prediction_repo import (
+                PredictionOutcomeStatus,
+                PredictionQueryResult,
+            )
+
+            mock_method.return_value = PredictionQueryResult(
+                predictions=[],
+                total=0,
+                page=1,
+                per_page=20,
+                has_next=False,
+                has_prev=False,
+            )
+
+            await repo.get_incorrect_predictions()
+
+            mock_method.assert_called_once()
+            call_kwargs = mock_method.call_args[1]
+            assert call_kwargs["status"] == PredictionOutcomeStatus.INCORRECT
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_by_confidence_range(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_by_confidence_range."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 5 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import PredictionQueryResult
+
+            result = await repo.get_predictions_by_confidence_range(
+                min_confidence=0.8,
+                max_confidence=1.0,
+            )
+
+            assert isinstance(result, PredictionQueryResult)
+            assert result.total == 5
+
+            # Verify confidence range in query
+            call_args = mock_conn.execute.call_args
+            sql = call_args[0][0]
+            assert "confidence >= ?" in sql
+            assert "confidence <= ?" in sql
+            params = call_args[0][1]
+            assert params[0] == 0.8
+            assert params[1] == 1.0
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_by_confidence_range_with_pagination(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_by_confidence_range with pagination."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 50 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import PaginationParams
+
+            pagination = PaginationParams(page=3, per_page=15)
+            result = await repo.get_predictions_by_confidence_range(
+                min_confidence=0.5,
+                max_confidence=0.7,
+                pagination=pagination,
+            )
+
+            assert result.page == 3
+            assert result.per_page == 15
+            assert result.has_next is True  # 50 total, page 3 * 15 = 45
+            assert result.has_prev is True
+
+    def test_get_predictions_by_confidence_range_invalid_min(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_by_confidence_range with invalid min_confidence."""
+        import asyncio
+
+        with pytest.raises(ValueError, match="min_confidence"):
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_predictions_by_confidence_range(
+                    min_confidence=-0.1,
+                    max_confidence=1.0,
+                )
+            )
+
+    def test_get_predictions_by_confidence_range_invalid_max(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_by_confidence_range with invalid max_confidence."""
+        import asyncio
+
+        with pytest.raises(ValueError, match="max_confidence"):
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_predictions_by_confidence_range(
+                    min_confidence=0.0,
+                    max_confidence=1.5,
+                )
+            )
+
+    def test_get_predictions_by_confidence_range_min_greater_than_max(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_by_confidence_range with min > max."""
+        import asyncio
+
+        with pytest.raises(ValueError, match="min_confidence.*must be <="):
+            asyncio.get_event_loop().run_until_complete(
+                repo.get_predictions_by_confidence_range(
+                    min_confidence=0.9,
+                    max_confidence=0.8,
+                )
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_by_confidence_range_database_error(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_by_confidence_range database error handling."""
+        import aiosqlite
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            with pytest.raises(aiosqlite.Error):
+                await repo.get_predictions_by_confidence_range(
+                    min_confidence=0.5,
+                    max_confidence=1.0,
+                )
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_database_error(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome database error handling."""
+        import aiosqlite
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            with pytest.raises(aiosqlite.Error):
+                await repo.get_predictions_with_outcome()
+
+    def test_pagination_params_defaults(self) -> None:
+        """Test PaginationParams default values."""
+        from src.storage.repositories.prediction_repo import PaginationParams
+
+        params = PaginationParams()
+        assert params.page == 1
+        assert params.per_page == 20
+
+    def test_pagination_params_page_less_than_one_raises_error(self) -> None:
+        """Test PaginationParams raises ValueError when page < 1."""
+        from src.storage.repositories.prediction_repo import PaginationParams
+
+        with pytest.raises(ValueError, match=r"page must be >= 1, got 0"):
+            PaginationParams(page=0, per_page=20)
+
+        with pytest.raises(ValueError, match=r"page must be >= 1, got -1"):
+            PaginationParams(page=-1, per_page=20)
+
+    def test_pagination_params_per_page_less_than_one_raises_error(self) -> None:
+        """Test PaginationParams raises ValueError when per_page < 1."""
+        from src.storage.repositories.prediction_repo import PaginationParams
+
+        with pytest.raises(ValueError, match=r"per_page must be >= 1, got 0"):
+            PaginationParams(page=1, per_page=0)
+
+        with pytest.raises(ValueError, match=r"per_page must be >= 1, got -5"):
+            PaginationParams(page=1, per_page=-5)
+
+    def test_pagination_params_per_page_too_large_raises_error(self) -> None:
+        """Test PaginationParams raises ValueError when per_page > 1000."""
+        from src.storage.repositories.prediction_repo import PaginationParams
+
+        with pytest.raises(ValueError, match=r"per_page must be <= 1000, got 1001"):
+            PaginationParams(page=1, per_page=1001)
+
+        with pytest.raises(ValueError, match=r"per_page must be <= 1000, got 5000"):
+            PaginationParams(page=1, per_page=5000)
+
+    def test_pagination_params_valid_boundary_values(self) -> None:
+        """Test PaginationParams accepts valid boundary values."""
+        from src.storage.repositories.prediction_repo import PaginationParams
+
+        # Minimum valid values
+        params_min = PaginationParams(page=1, per_page=1)
+        assert params_min.page == 1
+        assert params_min.per_page == 1
+
+        # Maximum valid per_page
+        params_max = PaginationParams(page=1, per_page=1000)
+        assert params_max.per_page == 1000
+
+        # Large page number
+        params_large_page = PaginationParams(page=999999, per_page=50)
+        assert params_large_page.page == 999999
+
+    def test_sort_params_defaults(self) -> None:
+        """Test SortParams default values."""
+        from src.storage.repositories.prediction_repo import (
+            PredictionSortBy,
+            SortOrder,
+            SortParams,
+        )
+
+        params = SortParams()
+        assert params.sort_by == PredictionSortBy.DATE
+        assert params.sort_order == SortOrder.DESC
+
+    def test_get_sort_clause_date(self, repo: PredictionRepository) -> None:
+        """Test _get_sort_clause with date sort."""
+        from src.storage.repositories.prediction_repo import (
+            PredictionSortBy,
+            SortOrder,
+            SortParams,
+        )
+
+        sort = SortParams(sort_by=PredictionSortBy.DATE, sort_order=SortOrder.DESC)
+        clause = repo._get_sort_clause(sort)
+        assert "p.created_at" in clause
+        assert "DESC" in clause
+
+    def test_get_sort_clause_confidence(self, repo: PredictionRepository) -> None:
+        """Test _get_sort_clause with confidence sort."""
+        from src.storage.repositories.prediction_repo import (
+            PredictionSortBy,
+            SortOrder,
+            SortParams,
+        )
+
+        sort = SortParams(sort_by=PredictionSortBy.CONFIDENCE, sort_order=SortOrder.ASC)
+        clause = repo._get_sort_clause(sort)
+        assert "p.confidence" in clause
+        assert "ASC" in clause
+
+    def test_get_sort_clause_accuracy(self, repo: PredictionRepository) -> None:
+        """Test _get_sort_clause with accuracy sort."""
+        from src.storage.repositories.prediction_repo import (
+            PredictionSortBy,
+            SortOrder,
+            SortParams,
+        )
+
+        sort = SortParams(sort_by=PredictionSortBy.ACCURACY, sort_order=SortOrder.DESC)
+        clause = repo._get_sort_clause(sort)
+        assert "p.is_correct" in clause
+        assert "DESC" in clause
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_with_market_info(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that get_predictions_with_outcome returns (Prediction, Market) tuples."""
+        from datetime import datetime
+
+        # Create mock row with prediction and market data
+        mock_row = self._create_mock_row_with_market(
+            prediction_id=1,
+            market_id="test-market-123",
+            predicted_probability=0.75,
+            confidence=0.85,
+            market_title="Test Market Title",
+            market_category="crypto",
+        )
+
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 1 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[mock_row])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.get_predictions_with_outcome()
+
+            assert len(result.predictions) == 1
+            prediction, market = result.predictions[0]
+            assert prediction.id == 1
+            assert prediction.market_id == "test-market-123"
+            assert market.title == "Test Market Title"
+
+    def _create_mock_row_with_market(
+        self,
+        prediction_id: int,
+        market_id: str,
+        predicted_probability: float,
+        confidence: float,
+        market_title: str,
+        market_category: str | None = None,
+        market_description: str | None = None,
+        market_yes_price: float | None = None,
+        market_no_price: float | None = None,
+        market_liquidity: float | None = None,
+        market_deadline: str | None = None,
+        market_resolution_status: str | None = None,
+        market_resolution_outcome: str | None = None,
+        market_created_at: str | None = None,
+        market_updated_at: str | None = None,
+        reasoning: str | None = None,
+        key_assumptions: str | None = None,
+        model_used: str | None = None,
+        recommendation: str | None = None,
+        edge: float | None = None,
+        actual_outcome: str | None = None,
+        is_correct: int | None = None,
+        validated_at: str | None = None,
+        created_at: str | None = None,
+    ) -> MagicMock:
+        """Create a mock database row with prediction and market data for testing."""
+        mock_row = MagicMock()
+        data = {
+            # Prediction fields
+            "id": prediction_id,
+            "market_id": market_id,
+            "predicted_probability": predicted_probability,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "key_assumptions": key_assumptions,
+            "model_used": model_used,
+            "recommendation": recommendation,
+            "edge": edge,
+            "actual_outcome": actual_outcome,
+            "is_correct": is_correct,
+            "validated_at": validated_at,
+            "created_at": created_at,
+            # Market fields (prefixed in query)
+            "market_id_col": market_id,
+            "title": market_title,
+            "description": market_description,
+            "category": market_category,
+            "yes_price": market_yes_price,
+            "no_price": market_no_price,
+            "liquidity": market_liquidity,
+            "deadline": market_deadline,
+            "resolution_status": market_resolution_status,
+            "resolution_outcome": market_resolution_outcome,
+            "market_created_at": market_created_at,
+            "market_updated_at": market_updated_at,
+        }
+
+        # Mock keys() method for checking column existence
+        mock_row.keys = MagicMock(return_value=list(data.keys()))
+
+        # Use side_effect to properly implement __getitem__
+        def getitem(key: str) -> Any:
+            return data[key]
+
+        mock_row.__getitem__.side_effect = getitem
+
+        return mock_row
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_by_confidence_range_with_market_info(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that get_predictions_by_confidence_range returns (Prediction, Market) tuples."""
+        mock_row = self._create_mock_row_with_market(
+            prediction_id=1,
+            market_id="test-market-456",
+            predicted_probability=0.90,
+            confidence=0.95,
+            market_title="High Confidence Market",
+            market_category="politics",
+        )
+
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 1 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[mock_row])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.get_predictions_by_confidence_range(
+                min_confidence=0.9,
+                max_confidence=1.0,
+            )
+
+            assert len(result.predictions) == 1
+            prediction, market = result.predictions[0]
+            assert prediction.confidence == 0.95
+            assert market.title == "High Confidence Market"
+
+    @pytest.mark.asyncio
+    async def test_get_predictions_with_outcome_empty_result(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test get_predictions_with_outcome with no matching results."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 0 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.get_predictions_with_outcome()
+
+            assert result.predictions == []
+            assert result.total == 0
+            assert result.has_next is False
+            assert result.has_prev is False
+
+    @pytest.mark.asyncio
+    async def test_pagination_edge_cases(self, repo: PredictionRepository) -> None:
+        """Test pagination edge cases (page 1, no next/prev)."""
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__.side_effect = lambda k: 5 if k == "total" else None
+
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone = AsyncMock(return_value=mock_count_row)
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+
+        mock_conn = AsyncMock()
+        mock_conn.row_factory = MagicMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            from src.storage.repositories.prediction_repo import PaginationParams
+
+            # Page 1 with 5 total items, per_page=20
+            pagination = PaginationParams(page=1, per_page=20)
+            result = await repo.get_predictions_with_outcome(pagination=pagination)
+
+            assert result.page == 1
+            assert result.has_next is False  # 5 < 20
+            assert result.has_prev is False  # page 1 has no prev

@@ -13,10 +13,20 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["PredictionRepository"]
+__all__ = [
+    "PredictionRepository",
+    "PredictionOutcomeStatus",
+    "PredictionSortBy",
+    "SortOrder",
+    "PaginationParams",
+    "SortParams",
+    "PredictionQueryResult",
+]
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import aiosqlite
@@ -30,6 +40,110 @@ if TYPE_CHECKING:
     from src.models.market import Market
 
 logger = get_logger(__name__)
+
+
+# ==================== Story 6.4: 预测历史查询 API 数据模型 ====================
+
+
+class PredictionOutcomeStatus(str, Enum):
+    """Status filter for prediction queries.
+
+    Attributes:
+        ALL: Return all predictions (no filter)
+        CORRECT: Return only correct predictions (is_correct = TRUE)
+        INCORRECT: Return only incorrect predictions (is_correct = FALSE)
+        PENDING: Return only pending predictions (validated_at IS NULL)
+    """
+
+    ALL = "all"
+    CORRECT = "correct"
+    INCORRECT = "incorrect"
+    PENDING = "pending"
+
+
+class PredictionSortBy(str, Enum):
+    """Sort field for prediction queries.
+
+    Attributes:
+        DATE: Sort by prediction creation date (created_at)
+        CONFIDENCE: Sort by confidence level
+        ACCURACY: Sort by correctness (is_correct)
+    """
+
+    DATE = "date"
+    CONFIDENCE = "confidence"
+    ACCURACY = "accuracy"
+
+
+class SortOrder(str, Enum):
+    """Sort order for queries.
+
+    Attributes:
+        ASC: Ascending order
+        DESC: Descending order
+    """
+
+    ASC = "asc"
+    DESC = "desc"
+
+
+@dataclass
+class PaginationParams:
+    """Pagination parameters for queries.
+
+    Attributes:
+        page: Page number (1-indexed, must be >= 1)
+        per_page: Items per page (must be >= 1 and <= 1000)
+
+    Raises:
+        ValueError: If page < 1, per_page < 1, or per_page > 1000
+    """
+
+    page: int = 1
+    per_page: int = 20
+
+    def __post_init__(self) -> None:
+        """Validate pagination parameters after initialization."""
+        if self.page < 1:
+            raise ValueError(f"page must be >= 1, got {self.page}")
+        if self.per_page < 1:
+            raise ValueError(f"per_page must be >= 1, got {self.per_page}")
+        if self.per_page > 1000:
+            raise ValueError(f"per_page must be <= 1000, got {self.per_page}")
+
+
+@dataclass
+class SortParams:
+    """Sort parameters for queries.
+
+    Attributes:
+        sort_by: Field to sort by
+        sort_order: Sort order (asc/desc)
+    """
+
+    sort_by: PredictionSortBy = PredictionSortBy.DATE
+    sort_order: SortOrder = SortOrder.DESC
+
+
+@dataclass
+class PredictionQueryResult:
+    """Result of a prediction query with pagination.
+
+    Attributes:
+        predictions: List of (Prediction, Market) tuples
+        total: Total number of matching records
+        page: Current page number
+        per_page: Items per page
+        has_next: Whether there's a next page
+        has_prev: Whether there's a previous page
+    """
+
+    predictions: list[tuple[Prediction, Market]]
+    total: int
+    page: int
+    per_page: int
+    has_next: bool
+    has_prev: bool
 
 
 class PredictionRepository:
@@ -632,3 +746,338 @@ class PredictionRepository:
             validated_at=validated_at,
             created_at=created_at,
         )
+
+    # ==================== Story 6.4: 预测历史查询 API ====================
+
+    def _get_sort_clause(self, sort: SortParams) -> str:
+        """Build SQL ORDER BY clause from sort parameters.
+
+        Args:
+            sort: Sort parameters
+
+        Returns:
+            SQL ORDER BY clause string
+        """
+        sort_fields = {
+            PredictionSortBy.DATE: "p.created_at",
+            PredictionSortBy.CONFIDENCE: "p.confidence",
+            PredictionSortBy.ACCURACY: "p.is_correct",
+        }
+
+        field = sort_fields.get(sort.sort_by, "p.created_at")
+        order = "DESC" if sort.sort_order == SortOrder.DESC else "ASC"
+
+        return f"ORDER BY {field} {order}"
+
+    def _get_status_where_clause(
+        self,
+        status: PredictionOutcomeStatus,
+    ) -> tuple[str, list]:
+        """Build SQL WHERE clause for status filter.
+
+        Args:
+            status: Status filter
+
+        Returns:
+            Tuple of (where_clause, params)
+        """
+        if status == PredictionOutcomeStatus.CORRECT:
+            return "WHERE p.is_correct = 1", []
+        elif status == PredictionOutcomeStatus.INCORRECT:
+            return "WHERE p.is_correct = 0", []
+        elif status == PredictionOutcomeStatus.PENDING:
+            return "WHERE p.validated_at IS NULL", []
+        else:  # ALL
+            return "", []
+
+    async def get_predictions_with_outcome(
+        self,
+        status: PredictionOutcomeStatus | str = PredictionOutcomeStatus.ALL,
+        pagination: PaginationParams | None = None,
+        sort: SortParams | None = None,
+    ) -> PredictionQueryResult:
+        """Get predictions filtered by outcome status.
+
+        Args:
+            status: Filter by prediction outcome status
+            pagination: Pagination parameters (default: page=1, per_page=20)
+            sort: Sort parameters (default: date desc)
+
+        Returns:
+            PredictionQueryResult with predictions and pagination info
+
+        Example:
+            >>> result = await repo.get_predictions_with_outcome(
+            ...     status="correct",
+            ...     pagination=PaginationParams(page=1, per_page=10),
+            ...     sort=SortParams(sort_by="confidence", sort_order="desc"),
+            ... )
+            >>> len(result.predictions)
+            10
+            >>> result.total
+            45
+        """
+        from src.models.market import Market
+
+        if pagination is None:
+            pagination = PaginationParams()
+        if sort is None:
+            sort = SortParams()
+
+        # Normalize status
+        if isinstance(status, str):
+            status = PredictionOutcomeStatus(status.lower())
+
+        logger.info(
+            f"{OPERATION_EMOJIS['data']} Querying predictions with status: "
+            f"{status.value}, page={pagination.page}, per_page={pagination.per_page}"
+        )
+
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+
+                # Build WHERE clause
+                where_clause, where_params = self._get_status_where_clause(status)
+                sort_clause = self._get_sort_clause(sort)
+
+                # Get total count
+                count_sql = f"""
+                    SELECT COUNT(*) as total
+                    FROM predictions p
+                    {where_clause}
+                """
+                cursor = await conn.execute(count_sql, where_params)
+                count_row = await cursor.fetchone()
+                total = count_row["total"] if count_row else 0
+
+                # Get paginated results with market info
+                offset = (pagination.page - 1) * pagination.per_page
+                query_sql = f"""
+                    SELECT p.*, m.id as market_id_col, m.title, m.description,
+                           m.category, m.yes_price, m.no_price, m.liquidity,
+                           m.deadline, m.resolution_status, m.resolution_outcome,
+                           m.created_at as market_created_at,
+                           m.updated_at as market_updated_at
+                    FROM predictions p
+                    JOIN markets m ON p.market_id = m.id
+                    {where_clause}
+                    {sort_clause}
+                    LIMIT ? OFFSET ?
+                """
+                cursor = await conn.execute(
+                    query_sql,
+                    where_params + [pagination.per_page, offset],
+                )
+                rows = await cursor.fetchall()
+
+            # Convert rows to (Prediction, Market) tuples
+            predictions: list[tuple[Prediction, Market]] = []
+            for row in rows:
+                prediction = self._row_to_prediction(row)
+                market = self._row_to_market(row)
+                predictions.append((prediction, market))
+
+            # Calculate pagination info
+            has_next = (pagination.page * pagination.per_page) < total
+            has_prev = pagination.page > 1
+
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(predictions)} predictions "
+                f"(total: {total})"
+            )
+
+            return PredictionQueryResult(
+                predictions=predictions,
+                total=total,
+                page=pagination.page,
+                per_page=pagination.per_page,
+                has_next=has_next,
+                has_prev=has_prev,
+            )
+        except aiosqlite.Error as e:
+            logger.error(f"{OPERATION_EMOJIS['data']} Failed to query predictions: {e}")
+            raise
+
+    async def get_correct_predictions(
+        self,
+        pagination: PaginationParams | None = None,
+        sort: SortParams | None = None,
+    ) -> PredictionQueryResult:
+        """Get all correct predictions.
+
+        Convenience method for get_predictions_with_outcome(status="correct").
+
+        Args:
+            pagination: Pagination parameters
+            sort: Sort parameters
+
+        Returns:
+            PredictionQueryResult with correct predictions
+
+        Example:
+            >>> result = await repo.get_correct_predictions()
+            >>> all(p.is_correct for p, m in result.predictions)
+            True
+        """
+        return await self.get_predictions_with_outcome(
+            status=PredictionOutcomeStatus.CORRECT,
+            pagination=pagination,
+            sort=sort,
+        )
+
+    async def get_incorrect_predictions(
+        self,
+        pagination: PaginationParams | None = None,
+        sort: SortParams | None = None,
+    ) -> PredictionQueryResult:
+        """Get all incorrect predictions.
+
+        Convenience method for get_predictions_with_outcome(status="incorrect").
+
+        Args:
+            pagination: Pagination parameters
+            sort: Sort parameters
+
+        Returns:
+            PredictionQueryResult with incorrect predictions
+
+        Example:
+            >>> result = await repo.get_incorrect_predictions()
+            >>> all(not p.is_correct for p, m in result.predictions)
+            True
+        """
+        return await self.get_predictions_with_outcome(
+            status=PredictionOutcomeStatus.INCORRECT,
+            pagination=pagination,
+            sort=sort,
+        )
+
+    async def get_predictions_by_confidence_range(
+        self,
+        min_confidence: float,
+        max_confidence: float,
+        pagination: PaginationParams | None = None,
+        sort: SortParams | None = None,
+    ) -> PredictionQueryResult:
+        """Get predictions within a confidence range.
+
+        Args:
+            min_confidence: Minimum confidence (0-1, inclusive)
+            max_confidence: Maximum confidence (0-1, inclusive)
+            pagination: Pagination parameters
+            sort: Sort parameters
+
+        Returns:
+            PredictionQueryResult with predictions in confidence range
+
+        Raises:
+            ValueError: If confidence values are invalid
+
+        Example:
+            >>> result = await repo.get_predictions_by_confidence_range(
+            ...     min_confidence=0.8,
+            ...     max_confidence=1.0,
+            ... )
+            >>> all(
+            ...     0.8 <= p.confidence <= 1.0
+            ...     for p, m in result.predictions
+            ... )
+            True
+        """
+        from src.models.market import Market
+
+        # Validate confidence range
+        if not (0 <= min_confidence <= 1):
+            raise ValueError(
+                f"min_confidence must be between 0 and 1, got {min_confidence}"
+            )
+        if not (0 <= max_confidence <= 1):
+            raise ValueError(
+                f"max_confidence must be between 0 and 1, got {max_confidence}"
+            )
+        if min_confidence > max_confidence:
+            raise ValueError(
+                f"min_confidence ({min_confidence}) must be <= "
+                f"max_confidence ({max_confidence})"
+            )
+
+        if pagination is None:
+            pagination = PaginationParams()
+        if sort is None:
+            sort = SortParams()
+
+        logger.info(
+            f"{OPERATION_EMOJIS['data']} Querying predictions with confidence: "
+            f"[{min_confidence}, {max_confidence}]"
+        )
+
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+
+                sort_clause = self._get_sort_clause(sort)
+
+                # Get total count
+                count_sql = """
+                    SELECT COUNT(*) as total
+                    FROM predictions p
+                    WHERE p.confidence >= ? AND p.confidence <= ?
+                """
+                cursor = await conn.execute(
+                    count_sql,
+                    (min_confidence, max_confidence),
+                )
+                count_row = await cursor.fetchone()
+                total = count_row["total"] if count_row else 0
+
+                # Get paginated results with market info
+                offset = (pagination.page - 1) * pagination.per_page
+                query_sql = f"""
+                    SELECT p.*, m.id as market_id_col, m.title, m.description,
+                           m.category, m.yes_price, m.no_price, m.liquidity,
+                           m.deadline, m.resolution_status, m.resolution_outcome,
+                           m.created_at as market_created_at,
+                           m.updated_at as market_updated_at
+                    FROM predictions p
+                    JOIN markets m ON p.market_id = m.id
+                    WHERE p.confidence >= ? AND p.confidence <= ?
+                    {sort_clause}
+                    LIMIT ? OFFSET ?
+                """
+                cursor = await conn.execute(
+                    query_sql,
+                    (min_confidence, max_confidence, pagination.per_page, offset),
+                )
+                rows = await cursor.fetchall()
+
+            # Convert rows to (Prediction, Market) tuples
+            predictions: list[tuple[Prediction, Market]] = []
+            for row in rows:
+                prediction = self._row_to_prediction(row)
+                market = self._row_to_market(row)
+                predictions.append((prediction, market))
+
+            # Calculate pagination info
+            has_next = (pagination.page * pagination.per_page) < total
+            has_prev = pagination.page > 1
+
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Found {len(predictions)} predictions "
+                f"in confidence range (total: {total})"
+            )
+
+            return PredictionQueryResult(
+                predictions=predictions,
+                total=total,
+                page=pagination.page,
+                per_page=pagination.per_page,
+                has_next=has_next,
+                has_prev=has_prev,
+            )
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to query predictions by "
+                f"confidence range: {e}"
+            )
+            raise
