@@ -7,6 +7,13 @@ Example:
     >>> from src.analysis import MarketFilter, FilterResult, FilterStatistics
     >>> filter = MarketFilter()
     >>> result = filter.filter_markets(markets)
+
+    >>> from src.analysis import (
+    ...     MARKET_ANALYST_SYSTEM_PROMPT,
+    ...     build_market_analysis_prompt,
+    ...     parse_llm_analysis_response,
+    ...     LLMAnalysisResult,
+    ... )
 """
 
 from __future__ import annotations
@@ -16,9 +23,25 @@ from src.analysis.market_filter import (
     FilterStatistics,
     MarketFilter,
 )
+from src.analysis.prompts import (
+    LLMAnalysisResult,
+    MARKET_ANALYST_SYSTEM_PROMPT,
+    Recommendation,
+    build_market_analysis_prompt,
+    parse_llm_analysis_response,
+    validate_analysis_result,
+)
 
 __all__ = [
+    # Market filter
     "MarketFilter",
     "FilterResult",
     "FilterStatistics",
+    # LLM prompts
+    "MARKET_ANALYST_SYSTEM_PROMPT",
+    "Recommendation",
+    "LLMAnalysisResult",
+    "build_market_analysis_prompt",
+    "parse_llm_analysis_response",
+    "validate_analysis_result",
 ]
