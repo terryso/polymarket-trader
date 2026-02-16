@@ -300,6 +300,102 @@ class PredictionRepository:
             )
             raise
 
+    # ==================== Story 7.4: 预测与统计 API ====================
+
+    async def get_by_id(self, prediction_id: int) -> Prediction | None:
+        """Get a prediction by its ID.
+
+        Story 7.4: 预测与统计 API
+
+        Args:
+            prediction_id: The prediction ID to query
+
+        Returns:
+            Prediction if found, None otherwise
+
+        Example:
+            >>> prediction = await repo.get_by_id(1)
+            >>> if prediction:
+            ...     print(f"Market: {prediction.market_id}")
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    "SELECT * FROM predictions WHERE id = ?",
+                    (prediction_id,),
+                )
+                row = await cursor.fetchone()
+
+            if row is None:
+                return None
+            return self._row_to_prediction(row)
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to get prediction "
+                f"{prediction_id}: {e}"
+            )
+            raise
+
+    async def get_all(self, limit: int = 100) -> list[Prediction]:
+        """Get all predictions with optional limit.
+
+        Story 7.4: 预测与统计 API
+
+        Args:
+            limit: Maximum number of predictions to return (default: 100)
+
+        Returns:
+            List of Prediction models, ordered by created_at descending
+
+        Example:
+            >>> predictions = await repo.get_all(limit=50)
+            >>> len(predictions)
+            50
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    """
+                    SELECT * FROM predictions
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+                rows = await cursor.fetchall()
+
+            predictions = [self._row_to_prediction(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Retrieved {len(predictions)} predictions"
+            )
+            return predictions
+        except aiosqlite.Error as e:
+            logger.error(f"{OPERATION_EMOJIS['data']} Failed to get predictions: {e}")
+            raise
+
+    async def count(self) -> int:
+        """Get total count of predictions.
+
+        Story 7.4: 预测与统计 API
+
+        Returns:
+            Total number of predictions
+
+        Example:
+            >>> total = await repo.count()
+            >>> print(f"Total predictions: {total}")
+        """
+        try:
+            async with get_connection() as conn:
+                cursor = await conn.execute("SELECT COUNT(*) FROM predictions")
+                row = await cursor.fetchone()
+                return row[0] if row else 0
+        except aiosqlite.Error as e:
+            logger.error(f"{OPERATION_EMOJIS['data']} Failed to count predictions: {e}")
+            raise
+
     async def get_pending_predictions(self) -> list[Prediction]:
         """Get all pending predictions (for unresolved markets).
 

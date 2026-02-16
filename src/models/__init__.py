@@ -24,7 +24,21 @@ from src.models.market_response import MarketListItem, MarketListQueryParams, Ma
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.position_response import PositionListItem, PositionResponse
 from src.models.prediction import Prediction, PredictionResult, Recommendation
+from src.models.prediction_response import (
+    AccuracyStats,
+    CategoryAccuracy,
+    PredictionListItem,
+    PredictionResponse,
+)
 from src.models.statistics import DailyStats, Statistics
+from src.models.statistics_response import (
+    CapitalHistoryPoint,
+    DailyStatsItem,
+    OverviewStats,
+    PerformanceData,
+    TradesByDayPoint,
+    WinRateHistoryPoint,
+)
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.models.trade_response import (
     TradeListItem,
@@ -55,6 +69,11 @@ __all__ = [
     "Prediction",
     "PredictionResult",
     "Recommendation",
+    # Prediction Response (API models)
+    "PredictionListItem",
+    "PredictionResponse",
+    "AccuracyStats",
+    "CategoryAccuracy",
     # Position
     "Position",
     "PositionStatus",
@@ -69,4 +88,11 @@ __all__ = [
     # Statistics
     "Statistics",
     "DailyStats",
+    # Statistics Response (API models)
+    "OverviewStats",
+    "DailyStatsItem",
+    "CapitalHistoryPoint",
+    "WinRateHistoryPoint",
+    "TradesByDayPoint",
+    "PerformanceData",
 ]

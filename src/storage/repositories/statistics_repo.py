@@ -268,6 +268,50 @@ class StatisticsRepository:
                 original_exception=e,
             ) from e
 
+    # ==================== Story 7.4: 预测与统计 API ====================
+
+    async def get_all(self, limit: int = 100) -> list[Statistics]:
+        """Get all statistics with optional limit.
+
+        Story 7.4: 预测与统计 API
+
+        Args:
+            limit: Maximum number of statistics to return (default: 100)
+
+        Returns:
+            List of Statistics models, ordered by date descending
+
+        Example:
+            >>> stats = await repo.get_all(limit=50)
+            >>> len(stats)
+            50
+        """
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    """
+                    SELECT * FROM statistics
+                    ORDER BY date DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+                rows = await cursor.fetchall()
+
+            stats_list = [self._row_to_statistics(row) for row in rows]
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Retrieved {len(stats_list)} statistics"
+            )
+            return stats_list
+        except aiosqlite.Error as e:
+            logger.error(f"{OPERATION_EMOJIS['data']} Failed to get statistics: {e}")
+            raise DatabaseError(
+                message="Failed to get statistics",
+                operation="get_all_statistics",
+                original_exception=e,
+            ) from e
+
     def _row_to_statistics(self, row: aiosqlite.Row) -> Statistics:
         """Convert a database row to a Statistics model.
 
