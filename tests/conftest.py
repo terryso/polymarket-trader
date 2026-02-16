@@ -15,6 +15,9 @@ import pytest_asyncio
 # Configure pytest-asyncio
 pytest_plugins = ("pytest_asyncio",)
 
+# Note: .env file is loaded only for integration tests via tests/integration/conftest.py
+# This keeps unit tests isolated from environment variables
+
 
 @pytest.fixture(scope="session", autouse=True)
 def disable_retry_delays() -> Generator[None, None, None]:

@@ -25,11 +25,20 @@ class TestLLMSettings:
 
     def test_default_values(self) -> None:
         """Test default values are set correctly."""
-        settings = LLMSettings()
-        assert settings.api_base == "https://open.bigmodel.cn/api/paas/v4"
-        assert settings.api_key == ""
-        assert settings.model == "glm-4"
-        assert settings.timeout == 30
+        # Clear LLM env vars to test defaults
+        with patch.dict(
+            os.environ,
+            {"LLM_API_BASE": "", "LLM_API_KEY": "", "LLM_MODEL": "", "LLM_TIMEOUT": ""},
+            clear=False,
+        ):
+            # Remove the env vars if they exist
+            for key in ["LLM_API_BASE", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT"]:
+                os.environ.pop(key, None)
+            settings = LLMSettings()
+            assert settings.api_base == "https://open.bigmodel.cn/api/paas/v4"
+            assert settings.api_key == ""
+            assert settings.model == "glm-4"
+            assert settings.timeout == 30
 
     def test_custom_values(self) -> None:
         """Test custom values can be set."""
@@ -114,6 +123,9 @@ class TestPolymarketSettings:
 
     def test_default_values(self) -> None:
         """Test default values are empty strings."""
+        # Clear Polymarket env vars to test defaults
+        for key in ["PK", "YOUR_PROXY_WALLET", "BOT_TRADER_ADDRESS"]:
+            os.environ.pop(key, None)
         settings = PolymarketSettings()
         assert settings.pk == ""
         assert settings.proxy_wallet == ""
