@@ -561,6 +561,8 @@ class TestMain:
 class TestIntegration:
     """Integration tests for the main module."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_full_startup_shutdown_cycle(self) -> None:
         """Test complete startup and shutdown cycle."""
