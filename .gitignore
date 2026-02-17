@@ -160,3 +160,10 @@ dashboard/_bmad-output/
 
 # Bot runtime files
 .bot.pid
+
+# Playwright CLI
+.playwright-cli/
+
+# Verification screenshots
+verification-*.png
+*-verification.png
