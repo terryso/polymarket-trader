@@ -1,0 +1,79 @@
+# polymarket-trader.service - Systemd service file for Polymarket Trader
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/
+#      sudo cp scripts/polymarket-trader.service /etc/systemd/system/
+#
+#   2. Edit the file and replace placeholders:
+#      - <USER>      : Your username
+#      - <GROUP>     : Your group (usually same as username)
+#      - <PROJECT_DIR>: Full path to project directory
+#
+#   3. Reload systemd:
+#      sudo systemctl daemon-reload
+#
+#   4. Enable and start the service:
+#      sudo systemctl enable polymarket-trader
+#      sudo systemctl start polymarket-trader
+#
+#   5. Check status:
+#      sudo systemctl status polymarket-trader
+#
+#   6. View logs:
+#      sudo journalctl -u polymarket-trader -f
+#
+# Environment Variables:
+#   Create a file at /etc/polymarket-trader/env with your environment variables:
+#   BOT_MODE=paper
+#   BOT_LOG_LEVEL=INFO
+#   POLYMARKET_API_KEY=your_key
+#   LLM_API_KEY=your_key
+#
+
+[Unit]
+Description=Polymarket Trader - LLM-powered automated trading system
+Documentation=https://github.com/yourusername/polymarket-trader
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<USER>
+Group=<GROUP>
+WorkingDirectory=<PROJECT_DIR>
+
+# Environment
+EnvironmentFile=-/etc/polymarket-trader/env
+Environment="BOT_MODE=paper"
+Environment="BOT_LOG_LEVEL=INFO"
+
+# Command to start the application
+# Using the virtual environment Python directly
+ExecStart=<PROJECT_DIR>/.venv/bin/python -m src.main --mode ${BOT_MODE}
+
+# Restart configuration
+Restart=on-failure
+RestartSec=10
+
+# Timeout configuration
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Resource limits (adjust as needed)
+# LimitNOFILE=65536
+# MemoryMax=1G
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Standard output and error
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=polymarket-trader
+
+# Nice level (lower = higher priority)
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
