@@ -1,5 +1,9 @@
 # Story 8.6: 运行脚本与进程管理
 
+**Status:** done
+**Created:** 2026-02-17
+**Completed:** 2026-02-17
+
 ## Story
 
 As a **用户**,

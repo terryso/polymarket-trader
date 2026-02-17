@@ -100,11 +100,11 @@ development_status:
   epic-7-retrospective: optional
 
   # Epic 8: 系统调度与自动化运行
-  epic-8: in-progress
+  epic-8: done
   8-1-apscheduler-configuration: done
   8-2-scheduled-task-configuration: done
   8-3-main-entry-and-startup-flow: done
   8-4-auto-recovery-mechanism: done
   8-5-error-handling-and-alerting: done
-  8-6-run-scripts-and-process-management: ready-for-dev
+  8-6-run-scripts-and-process-management: done
   epic-8-retrospective: optional
