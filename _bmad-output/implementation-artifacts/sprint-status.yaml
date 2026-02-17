@@ -103,7 +103,7 @@ development_status:
   epic-8: in-progress
   8-1-apscheduler-configuration: ready-for-dev
   8-2-scheduled-task-configuration: ready-for-dev
-  8-3-main-entry-and-startup-flow: backlog
+  8-3-main-entry-and-startup-flow: ready-for-dev
   8-4-auto-recovery-mechanism: backlog
   8-5-error-handling-and-alerting: backlog
   8-6-run-scripts-and-process-management: backlog

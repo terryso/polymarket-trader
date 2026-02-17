@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "LLM-powered Polymarket trading system"
 requires-python = ">=3.10"
 
+[project.scripts]
+polymarket-trader = "src.main:main"
+
 [tool.black]
 line-length = 88
 target-version = ['py310', 'py311', 'py312']

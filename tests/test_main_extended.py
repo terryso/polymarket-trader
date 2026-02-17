@@ -14,66 +14,58 @@ import pytest
 from src.main import Application, main
 
 
-class TestApplicationRun:
-    """Tests for the Application.run method."""
+class TestApplicationStart:
+    """Tests for the Application.start method."""
 
     @pytest.mark.asyncio
-    async def test_run_with_signal_handlers(self) -> None:
-        """Test run method sets up signal handlers."""
+    async def test_start_with_signal_handlers(self) -> None:
+        """Test start method sets up signal handlers."""
         app = Application()
 
-        # Create a task that will trigger shutdown after a short delay
         async def trigger_shutdown() -> None:
             await asyncio.sleep(0.01)
             if app._shutdown_event:
                 app._shutdown_event.set()
 
-        # Run both tasks concurrently
-        run_task = asyncio.create_task(app.run())
-        trigger_task = asyncio.create_task(trigger_shutdown())
+        with (
+            patch.object(app, "_check_existing_instance"),
+            patch.object(app, "initialize", new_callable=AsyncMock),
+            patch.object(app, "_write_pid_file"),
+            patch.object(app, "start_dashboard", new_callable=AsyncMock),
+            patch.object(app, "register_scheduled_tasks", new_callable=AsyncMock),
+            patch.object(app, "_setup_signal_handlers") as mock_setup_signals,
+            patch.object(app, "shutdown", new_callable=AsyncMock),
+        ):
+            app.scheduler = MagicMock()
+            app.scheduler.is_running = False
 
-        await asyncio.gather(run_task, trigger_task)
+            run_task = asyncio.create_task(app.start())
+            trigger_task = asyncio.create_task(trigger_shutdown())
 
-        assert app._running is False
+            await asyncio.gather(run_task, trigger_task)
+
+            mock_setup_signals.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_run_signal_handler_sigint(self) -> None:
+    async def test_start_signal_handler_sigint(self) -> None:
         """Test SIGINT signal triggers shutdown.
 
-        This test verifies that signal handlers are registered during run()
+        This test verifies that signal handlers are registered during start()
         by checking that the signal handler code path is exercised.
         """
         app = Application()
-
-        # The run() method sets up signal handlers for SIGINT and SIGTERM.
-        # We verify this by checking the code path indirectly through the
-        # _handle_signal method behavior.
 
         # First, verify that _handle_signal works correctly
         app._shutdown_event = asyncio.Event()
         assert not app._shutdown_event.is_set()
 
         # Simulate signal handling
-        await app._handle_signal()
+        await app._handle_signal(signal.SIGINT)
         assert app._shutdown_event.is_set()
 
-        # Verify run() sets up and tears down correctly
-        async def quick_shutdown():
-            await asyncio.sleep(0.01)
-            if app._shutdown_event:
-                app._shutdown_event.set()
-
-        run_task = asyncio.create_task(app.run())
-        shutdown_task = asyncio.create_task(quick_shutdown())
-
-        await asyncio.gather(run_task, shutdown_task)
-
-        # After run completes, app should be shut down
-        assert app._running is False
-
     @pytest.mark.asyncio
-    async def test_run_creates_shutdown_event(self) -> None:
-        """Test run creates shutdown event."""
+    async def test_start_creates_shutdown_event(self) -> None:
+        """Test start creates shutdown event."""
         app = Application()
 
         async def trigger_shutdown() -> None:
@@ -81,39 +73,60 @@ class TestApplicationRun:
             if app._shutdown_event:
                 app._shutdown_event.set()
 
-        run_task = asyncio.create_task(app.run())
-        trigger_task = asyncio.create_task(trigger_shutdown())
+        with (
+            patch.object(app, "_check_existing_instance"),
+            patch.object(app, "initialize", new_callable=AsyncMock),
+            patch.object(app, "_write_pid_file"),
+            patch.object(app, "start_dashboard", new_callable=AsyncMock),
+            patch.object(app, "register_scheduled_tasks", new_callable=AsyncMock),
+            patch.object(app, "_setup_signal_handlers"),
+            patch.object(app, "shutdown", new_callable=AsyncMock),
+        ):
+            app.scheduler = MagicMock()
+            app.scheduler.is_running = False
 
-        await asyncio.gather(run_task, trigger_task)
+            run_task = asyncio.create_task(app.start())
+            trigger_task = asyncio.create_task(trigger_shutdown())
 
-        # shutdown_event should have been created
-        assert app._shutdown_event is not None
+            await asyncio.gather(run_task, trigger_task)
+
+            # shutdown_event should have been created
+            assert app._shutdown_event is not None
 
 
-class TestApplicationStartupShutdown:
-    """Tests for startup and shutdown edge cases."""
+class TestApplicationInitialize:
+    """Tests for initialize and shutdown edge cases."""
 
     @pytest.mark.asyncio
-    async def test_startup_logs_trading_mode(self) -> None:
-        """Test startup logs trading mode."""
-        app = Application()
+    async def test_initialize_logs_trading_mode(self) -> None:
+        """Test initialize logs trading mode."""
+        app = Application(mode="live")
 
-        with patch("src.main.logger") as mock_logger:
-            await app.startup()
+        with (
+            patch("src.main.setup_logging"),
+            patch("src.main.init_db", new_callable=AsyncMock),
+            patch("src.core.state.ThreadSafeState.restore", new_callable=AsyncMock) as mock_restore,
+            patch("src.core.scheduler.Scheduler"),
+        ):
+            mock_restore.return_value = MagicMock()
 
-            # Verify logging calls
-            log_calls = [str(call) for call in mock_logger.info.call_args_list]
-            assert any("Starting" in str(call) for call in log_calls)
+            with patch("src.main.logger") as mock_logger:
+                await app.initialize()
+
+                # Verify logging calls
+                log_calls = [str(call) for call in mock_logger.info.call_args_list]
+                assert any("Mode" in str(call) for call in log_calls)
 
     @pytest.mark.asyncio
-    async def test_shutdown_when_not_running(self) -> None:
-        """Test shutdown when app is not running."""
+    async def test_shutdown_when_not_initialized(self) -> None:
+        """Test shutdown when app is not fully initialized."""
         app = Application()
-        app._running = False
+        app.scheduler = None
+        app.state = None
 
-        await app.shutdown()
-
-        assert app._running is False
+        with patch("src.main.close_db", new_callable=AsyncMock):
+            # Should not raise an error
+            await app.shutdown()
 
     @pytest.mark.asyncio
     async def test_multiple_signal_handling(self) -> None:
@@ -122,61 +135,91 @@ class TestApplicationStartupShutdown:
         app._shutdown_event = asyncio.Event()
 
         # First signal
-        await app._handle_signal()
+        await app._handle_signal(signal.SIGTERM)
         assert app._shutdown_event.is_set()
 
         # Second signal should not raise
-        await app._handle_signal()
+        await app._handle_signal(signal.SIGINT)
 
 
 class TestMainFunctionEdgeCases:
     """Edge case tests for main function."""
 
-    @pytest.mark.asyncio
-    async def test_main_with_keyboard_interrupt(self) -> None:
+    def test_main_with_keyboard_interrupt(self) -> None:
         """Test main handles KeyboardInterrupt."""
-        with patch("src.main.Application") as mock_app_class:
-            mock_app = AsyncMock()
-            mock_app.run.side_effect = KeyboardInterrupt()
-            mock_app_class.return_value = mock_app
+        with (
+            patch("src.main.asyncio.run", side_effect=KeyboardInterrupt),
+            patch("src.main.logger"),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
 
-            # KeyboardInterrupt should propagate
-            with pytest.raises(KeyboardInterrupt):
-                await main()
+            assert exc_info.value.code == 130
 
-    @pytest.mark.asyncio
-    async def test_main_with_asyncio_cancelled_error(self) -> None:
-        """Test main handles CancelledError."""
-        with patch("src.main.Application") as mock_app_class:
-            mock_app = AsyncMock()
-            mock_app.run.side_effect = asyncio.CancelledError()
-            mock_app_class.return_value = mock_app
+    def test_main_with_asyncio_cancelled_error(self) -> None:
+        """Test main handles CancelledError as graceful shutdown."""
+        with (
+            patch("src.main.asyncio.run", side_effect=asyncio.CancelledError),
+            patch("src.main.logger"),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
 
-            # CancelledError should propagate
-            with pytest.raises(asyncio.CancelledError):
-                await main()
+            # CancelledError should result in exit code 0 (graceful shutdown)
+            assert exc_info.value.code == 0
 
-    @pytest.mark.asyncio
-    async def test_main_exit_codes(self) -> None:
+    def test_main_exit_codes(self) -> None:
         """Test main sets correct exit codes."""
         from src.exceptions import BotError
 
         # Test BotError exit code
-        with patch("src.main.Application") as mock_app_class:
-            mock_app = AsyncMock()
-            mock_app.run.side_effect = BotError("Test error")
-            mock_app_class.return_value = mock_app
+        with (
+            patch("src.main.asyncio.run", side_effect=BotError("Test error")),
+            patch("src.main.logger"),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
 
-            with patch("sys.exit") as mock_exit:
-                await main()
-                mock_exit.assert_called_once_with(1)
+            assert exc_info.value.code == 1
 
         # Test unexpected error exit code
-        with patch("src.main.Application") as mock_app_class:
-            mock_app = AsyncMock()
-            mock_app.run.side_effect = RuntimeError("Unexpected!")
-            mock_app_class.return_value = mock_app
+        with (
+            patch("src.main.asyncio.run", side_effect=RuntimeError("Unexpected!")),
+            patch("src.main.logger"),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
 
-            with patch("sys.exit") as mock_exit:
-                await main()
-                mock_exit.assert_called_once_with(1)
+            assert exc_info.value.code == 1
+
+
+class TestApplicationPidFileEdgeCases:
+    """Additional edge case tests for PID file handling."""
+
+    def test_check_existing_instance_with_empty_file(self, tmp_path) -> None:
+        """Test instance check with empty PID file."""
+        from pathlib import Path
+
+        app = Application(mode="paper")
+        pid_file = tmp_path / ".bot.pid"
+
+        with patch("src.main.PID_FILE", pid_file):
+            # Write empty content
+            pid_file.write_text("")
+
+            # Should not raise an error, file is empty
+            app._check_existing_instance()
+
+    def test_check_existing_instance_with_whitespace_file(self, tmp_path) -> None:
+        """Test instance check with whitespace-only PID file."""
+        from pathlib import Path
+
+        app = Application(mode="paper")
+        pid_file = tmp_path / ".bot.pid"
+
+        with patch("src.main.PID_FILE", pid_file):
+            # Write whitespace
+            pid_file.write_text("   \n\t  ")
+
+            # Should not raise an error
+            app._check_existing_instance()
