@@ -14,8 +14,10 @@ __all__ = [
     "SanitizingFilter",
     "EmojiFormatter",
     "FileEmojiFormatter",
+    "ErrorLogFormatter",
     "get_logger",
     "setup_logging",
+    "setup_error_log_handler",
 ]
 
 import logging
@@ -103,6 +105,37 @@ class FileEmojiFormatter(logging.Formatter):
         """
         record.emoji = LOG_EMOJIS.get(record.levelname, "")
         return super().format(record)
+
+
+class ErrorLogFormatter(logging.Formatter):
+    """Formatter for dedicated error log file with JSON-like structure."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format the log record with extra context.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            Formatted log message with context.
+        """
+        record.emoji = LOG_EMOJIS.get(record.levelname, "")
+        base_message = super().format(record)
+
+        # Add extra fields if present
+        extra = getattr(record, "extra", None) or getattr(record, "__dict__", {})
+        context_parts = []
+
+        # Extract context and traceback from extra
+        if "context" in extra and extra["context"]:
+            context_parts.append(f"context={extra['context']}")
+        if "traceback" in extra and extra["traceback"]:
+            context_parts.append(f"traceback={extra['traceback']}")
+
+        if context_parts:
+            base_message = f"{base_message} | {' | '.join(context_parts)}"
+
+        return base_message
 
 
 def get_logger(
@@ -196,3 +229,38 @@ def setup_logging(log_level: str = "INFO", log_dir: str = "logs") -> None:
     app_logger = get_logger("polymarket_trader", log_level, log_dir)
     root_logger.addHandler(app_logger.handlers[0])
     root_logger.addHandler(app_logger.handlers[1])
+
+    # Add dedicated error log handler
+    error_handler = setup_error_log_handler(log_dir)
+    root_logger.addHandler(error_handler)
+
+
+def setup_error_log_handler(log_dir: str = "logs") -> RotatingFileHandler:
+    """Setup dedicated error log file handler.
+
+    Creates a rotating file handler that only captures ERROR and CRITICAL
+    level messages, separate from the main log file.
+
+    Args:
+        log_dir: Directory for log files
+
+    Returns:
+        Configured RotatingFileHandler for error logs
+    """
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    error_handler = RotatingFileHandler(
+        log_path / "errors.log",
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding="utf-8",
+    )
+    error_handler.setLevel(logging.ERROR)
+
+    # Use special formatter with extra context
+    error_format = "%(asctime)s | %(levelname)-8s | %(name)s | %(emoji)s %(message)s"
+    error_handler.setFormatter(ErrorLogFormatter(error_format, datefmt="%Y-%m-%d %H:%M:%S"))
+    error_handler.addFilter(SanitizingFilter())
+
+    return error_handler

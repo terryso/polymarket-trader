@@ -1,10 +1,25 @@
-"""Core logic modules: state management, scheduler, circuit breaker, tasks, recovery."""
+"""Core logic modules: state management, scheduler, circuit breaker, tasks, recovery, error handling, alerting."""
 
+from src.core.alerting import (
+    Alert,
+    AlertChannel,
+    AlertLevel,
+    AlertManager,
+    LogAlertChannel,
+    WebhookAlertChannel,
+)
 from src.core.circuit_breaker import (
     BreakerTrigger,
     BreakerTriggerType,
     CircuitBreaker,
     CircuitBreakerResult,
+)
+from src.core.error_handler import (
+    ErrorHandler,
+    get_error_handler,
+    setup_error_handler,
+    setup_global_exception_handler,
+    setup_async_exception_handler,
 )
 from src.core.recovery import RecoveryManager, RecoveryResult
 from src.core.scheduler import Scheduler, scheduler
@@ -22,17 +37,35 @@ from src.core.tasks import (
 )
 
 __all__ = [
+    # Alerting
+    "Alert",
+    "AlertChannel",
+    "AlertLevel",
+    "AlertManager",
+    "LogAlertChannel",
+    "WebhookAlertChannel",
+    # Circuit breaker
     "BreakerTrigger",
     "BreakerTriggerType",
     "CircuitBreaker",
     "CircuitBreakerResult",
+    # Error handling
+    "ErrorHandler",
+    "get_error_handler",
+    "setup_error_handler",
+    "setup_global_exception_handler",
+    "setup_async_exception_handler",
+    # Recovery
     "RecoveryManager",
     "RecoveryResult",
+    # Scheduler
     "Scheduler",
     "scheduler",
+    # State
     "StateSnapshot",
     "ThreadSafeState",
     "get_state_manager",
+    # Tasks
     "TaskManager",
     "task_manager",
     "register_all_tasks",

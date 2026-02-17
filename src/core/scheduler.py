@@ -6,6 +6,8 @@ for managing scheduled tasks in the trading system.
 
 from __future__ import annotations
 
+import asyncio
+from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -152,8 +154,11 @@ class Scheduler:
         Returns:
             The job ID.
         """
+        # Wrap function with error handling
+        wrapped_func = self._wrap_job_with_error_handling(func, id)
+
         job: Job = self.scheduler.add_job(
-            func=func,
+            func=wrapped_func,
             trigger=trigger,
             id=id,
             name=name or id,
@@ -165,6 +170,98 @@ class Scheduler:
             extra={"job_id": id, "job_name": name},
         )
         return str(job.id)
+
+    def _wrap_job_with_error_handling(
+        self, job_func: Callable[..., Any], job_id: str
+    ) -> Callable[..., Any]:
+        """Wrap a job function with error handling.
+
+        Ensures that errors in one job don't affect other jobs and
+        properly logs and reports failures.
+
+        Args:
+            job_func: The original job function
+            job_id: The job identifier for logging
+
+        Returns:
+            Wrapped function with error handling
+        """
+
+        @wraps(job_func)
+        async def async_wrapped_job(*args: Any, **kwargs: Any) -> Any:
+            """Async wrapper with error handling."""
+            try:
+                result = await job_func(*args, **kwargs)
+                # Job succeeded, reset failure count
+                self._reset_job_failure(job_id)
+                return result
+            except Exception as e:
+                # Record and handle the failure
+                self._handle_job_failure(job_id, e)
+                # Re-raise to let APScheduler know the job failed
+                raise
+
+        @wraps(job_func)
+        def sync_wrapped_job(*args: Any, **kwargs: Any) -> Any:
+            """Sync wrapper with error handling."""
+            try:
+                result = job_func(*args, **kwargs)
+                # Job succeeded, reset failure count
+                self._reset_job_failure(job_id)
+                return result
+            except Exception as e:
+                # Record and handle the failure
+                self._handle_job_failure(job_id, e)
+                raise
+
+        # Return appropriate wrapper based on function type
+        if asyncio.iscoroutinefunction(job_func):
+            return async_wrapped_job
+        return sync_wrapped_job
+
+    def _handle_job_failure(self, job_id: str, error: Exception) -> None:
+        """Handle a job failure.
+
+        Logs the error and records it with the alert manager if available.
+
+        Args:
+            job_id: The ID of the failed job
+            error: The exception that caused the failure
+        """
+        logger.error(
+            f"Job {job_id} failed: {type(error).__name__} - {error}",
+            extra={"job_id": job_id, "error_type": type(error).__name__},
+        )
+
+        # Try to record with alert manager if available
+        try:
+            from src.core.error_handler import get_error_handler
+
+            error_handler = get_error_handler()
+            error_handler.handle_exception(
+                error,
+                {"source": job_id, "job_id": job_id},
+            )
+            if error_handler.alert_manager:
+                error_handler.alert_manager.record_failure(job_id)
+        except Exception as e:
+            logger.warning(f"Could not record job failure with alert manager: {e}")
+
+    def _reset_job_failure(self, job_id: str) -> None:
+        """Reset failure count for a successful job.
+
+        Args:
+            job_id: The ID of the successful job
+        """
+        try:
+            from src.core.error_handler import get_error_handler
+
+            error_handler = get_error_handler()
+            if error_handler.alert_manager:
+                error_handler.alert_manager.reset_failures(job_id)
+        except Exception:
+            # Silently ignore if error handler not available
+            pass
 
     def remove_job(self, job_id: str) -> bool:
         """Remove a scheduled job.

@@ -36,6 +36,7 @@ from src.storage.database import close_db, init_db
 from src.utils.logger import get_logger, setup_logging
 
 if TYPE_CHECKING:
+    from src.core.alerting import AlertManager
     from src.core.scheduler import Scheduler
     from src.core.state import ThreadSafeState
     from uvicorn import Server
@@ -77,6 +78,7 @@ class Application:
         self.config_path = config_path
         self.state: ThreadSafeState | None = None
         self.scheduler: Scheduler | None = None
+        self.alert_manager: AlertManager | None = None
         self._shutdown_event: asyncio.Event | None = None
         self._dashboard_task: asyncio.Task | None = None
         self._dashboard_server: Server | None = None
@@ -86,9 +88,10 @@ class Application:
 
         This method performs the following initialization steps:
         1. Setup logging with configuration
-        2. Initialize the database
-        3. Restore or create state manager with recovery
-        4. Initialize the scheduler
+        2. Setup error handling and alerting
+        3. Initialize the database
+        4. Restore or create state manager with recovery
+        5. Initialize the scheduler
 
         Raises:
             ConfigurationError: If configuration is invalid.
@@ -102,11 +105,29 @@ class Application:
         setup_logging(log_level=settings.log_level, log_dir="logs")
         logger.debug("Logging configured")
 
-        # 2. Initialize database
+        # 2. Setup error handling and alerting
+        from src.core.alerting import AlertManager, AlertLevel, LogAlertChannel
+        from src.core.error_handler import (
+            setup_error_handler,
+            setup_global_exception_handler,
+            setup_async_exception_handler,
+        )
+
+        self.alert_manager = AlertManager(
+            channels=[LogAlertChannel()],
+            min_level=AlertLevel.WARNING,
+            consecutive_failure_threshold=3,
+        )
+        setup_error_handler(alert_manager=self.alert_manager)
+        setup_global_exception_handler()
+        setup_async_exception_handler()
+        logger.info("Error handling and alerting initialized")
+
+        # 3. Initialize database
         await init_db()
         logger.info("Database initialized")
 
-        # 3. Initialize state manager with recovery from database
+        # 4. Initialize state manager with recovery from database
         from src.core.state import ThreadSafeState
 
         self.state = ThreadSafeState(initial_capital=settings.initial_capital)
