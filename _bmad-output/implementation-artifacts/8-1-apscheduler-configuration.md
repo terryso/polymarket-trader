@@ -2,7 +2,7 @@
 
 **Story ID:** 8-1-apscheduler-configuration
 **Epic:** Epic 8 - 系统调度与自动化运行
-**Status:** ready-for-dev
+**Status:** done
 **Created:** 2026-02-17
 
 ---
