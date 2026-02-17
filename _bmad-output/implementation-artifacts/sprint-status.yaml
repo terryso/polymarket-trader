@@ -102,7 +102,7 @@ development_status:
   # Epic 8: 系统调度与自动化运行
   epic-8: in-progress
   8-1-apscheduler-configuration: ready-for-dev
-  8-2-scheduled-task-configuration: backlog
+  8-2-scheduled-task-configuration: ready-for-dev
   8-3-main-entry-and-startup-flow: backlog
   8-4-auto-recovery-mechanism: backlog
   8-5-error-handling-and-alerting: backlog

@@ -302,6 +302,65 @@ class SchedulerSettings(BaseSettings):
     )
 
 
+class TaskScheduleSettings(BaseSettings):
+    """Task schedule configuration settings.
+
+    定时任务频率配置，定义各个定时任务的执行间隔。
+
+    Story 8.2: 定时任务配置
+
+    Attributes:
+        fetch_markets_interval_hours: 市场获取间隔 (小时)
+        check_positions_interval_seconds: 持仓检查间隔 (秒)
+        daily_statistics_hour: 每日统计执行时间 (小时, 0-23)
+        validate_predictions_hour: 预测验证执行时间 (小时, 0-23)
+        reset_daily_state_hour: 每日状态重置时间 (小时, 0-23)
+        state_persist_interval_minutes: 状态持久化间隔 (分钟)
+    """
+
+    model_config = SettingsConfigDict(env_prefix="")
+
+    fetch_markets_interval_hours: int = Field(
+        default=2,
+        alias="SCHEDULE_FETCH_MARKETS_INTERVAL_HOURS",
+        gt=0,
+        description="Interval in hours for fetching markets from Polymarket",
+    )
+    check_positions_interval_seconds: int = Field(
+        default=60,
+        alias="SCHEDULE_CHECK_POSITIONS_INTERVAL_SECONDS",
+        gt=0,
+        description="Interval in seconds for checking open positions",
+    )
+    daily_statistics_hour: int = Field(
+        default=0,
+        alias="SCHEDULE_DAILY_STATISTICS_HOUR",
+        ge=0,
+        le=23,
+        description="Hour of day (0-23) to run daily statistics",
+    )
+    validate_predictions_hour: int = Field(
+        default=6,
+        alias="SCHEDULE_VALIDATE_PREDICTIONS_HOUR",
+        ge=0,
+        le=23,
+        description="Hour of day (0-23) to validate predictions",
+    )
+    reset_daily_state_hour: int = Field(
+        default=0,
+        alias="SCHEDULE_RESET_DAILY_STATE_HOUR",
+        ge=0,
+        le=23,
+        description="Hour of day (0-23) to reset daily state",
+    )
+    state_persist_interval_minutes: int = Field(
+        default=5,
+        alias="SCHEDULE_STATE_PERSIST_INTERVAL_MINUTES",
+        gt=0,
+        description="Interval in minutes for persisting state to database",
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -337,6 +396,7 @@ class Settings(BaseSettings):
     risk: RiskControlSettings = Field(default_factory=RiskControlSettings)
     market_filter: MarketFilterSettings = Field(default_factory=MarketFilterSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
+    task_schedule: TaskScheduleSettings = Field(default_factory=TaskScheduleSettings)
 
     # Convenience properties for common settings
     @property
