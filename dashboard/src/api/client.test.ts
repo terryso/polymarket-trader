@@ -61,10 +61,10 @@ describe('API Client', () => {
 
 describe('API Client Environment', () => {
   it('should use default API base URL when environment variable is not set', async () => {
-    // The module should use 'http://localhost:8000' as default
+    // The module should use empty string as default (relative paths)
     const { API_BASE_URL } = await import('./client');
 
-    // Default should be localhost:8000
-    expect(API_BASE_URL).toBeDefined();
+    // Default should be empty string for proxy/same-origin requests
+    expect(API_BASE_URL).toBe('');
   });
 });
