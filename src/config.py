@@ -269,6 +269,39 @@ class MarketFilterSettings(BaseSettings):
     )
 
 
+class SchedulerSettings(BaseSettings):
+    """Scheduler configuration settings.
+
+    调度器配置，包括时区、任务存储和执行器设置。
+
+    Attributes:
+        timezone: 调度器时区 (默认 UTC)
+        jobstores_db: (保留供未来使用) SQLite 任务存储数据库路径
+            - 当前使用 MemoryJobStore，此配置暂未生效
+            - 未来如需持久化任务，可用于 SQLite 或 SQLAlchemy jobstore
+        executors_pool_size: 线程池执行器大小
+    """
+
+    model_config = SettingsConfigDict(env_prefix="")
+
+    timezone: str = Field(
+        default="UTC",
+        alias="SCHEDULER_TIMEZONE",
+        description="Scheduler timezone",
+    )
+    jobstores_db: str = Field(
+        default="data/scheduler.db",
+        alias="SCHEDULER_JOBSTORES_DB",
+        description="SQLite jobstore database path (reserved for future use)",
+    )
+    executors_pool_size: int = Field(
+        default=10,
+        alias="SCHEDULER_EXECUTORS_DEFAULT_POOL_SIZE",
+        gt=0,
+        description="Thread pool executor size",
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -303,6 +336,7 @@ class Settings(BaseSettings):
     trading: TradingSettings = Field(default_factory=TradingSettings)
     risk: RiskControlSettings = Field(default_factory=RiskControlSettings)
     market_filter: MarketFilterSettings = Field(default_factory=MarketFilterSettings)
+    scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
 
     # Convenience properties for common settings
     @property
