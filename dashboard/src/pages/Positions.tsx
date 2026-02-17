@@ -21,7 +21,7 @@ const Positions = () => {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6" data-testid="loading-skeleton">
           <div>
             <Skeleton className="h-7 w-24" />
             <Skeleton className="h-5 w-36 mt-1" />
@@ -45,7 +45,7 @@ const Positions = () => {
             <h2 className="text-xl font-bold text-foreground">持仓</h2>
             <p className="text-sm text-muted-foreground mt-1">当前持有头寸</p>
           </div>
-          <Alert variant="destructive">
+          <Alert variant="destructive" data-testid="error-alert">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               无法加载数据: {error.message}
@@ -76,16 +76,18 @@ const Positions = () => {
             icon={<Wallet className="h-4 w-4" />}
             title="总持仓价值"
             value={`$${totalValue.toFixed(2)}`}
+            testId="stat-total-value"
           />
           <StatCard
             icon={<Wallet className="h-4 w-4" />}
             title="总浮动盈亏"
             value={`${totalPnL >= 0 ? "+" : ""}$${totalPnL.toFixed(2)}`}
             subtitleColor={totalPnL >= 0 ? "profit" : "loss"}
+            testId="stat-total-pnl"
           />
         </div>
 
-        <div className="stat-card overflow-hidden p-0">
+        <div className="stat-card overflow-hidden p-0" data-testid="positions-table">
           {positions && positions.length > 0 ? (
             <Table>
               <TableHeader>
@@ -125,7 +127,7 @@ const Positions = () => {
               </TableBody>
             </Table>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
+            <div className="p-8 text-center text-muted-foreground" data-testid="empty-state">
               暂无持仓数据
             </div>
           )}

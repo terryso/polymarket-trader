@@ -72,7 +72,7 @@ const Trades = () => {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6" data-testid="loading-skeleton">
           <div>
             <Skeleton className="h-7 w-32" />
             <Skeleton className="h-5 w-24 mt-1" />
@@ -93,7 +93,7 @@ const Trades = () => {
             <h2 className="text-xl font-bold text-foreground">交易历史</h2>
             <p className="text-sm text-muted-foreground mt-1">交易记录</p>
           </div>
-          <Alert variant="destructive">
+          <Alert variant="destructive" data-testid="error-alert">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               无法加载数据: {error.message}
@@ -131,19 +131,19 @@ const Trades = () => {
         </div>
 
         <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1" data-testid="mode-filter">
             <FilterButton active={modeFilter === "all"} onClick={() => handleModeFilter("all")}>全部</FilterButton>
             <FilterButton active={modeFilter === "paper"} onClick={() => handleModeFilter("paper")}>Paper</FilterButton>
             <FilterButton active={modeFilter === "live"} onClick={() => handleModeFilter("live")}>Live</FilterButton>
           </div>
-          <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1" data-testid="type-filter">
             <FilterButton active={typeFilter === "all"} onClick={() => handleTypeFilter("all")}>全部</FilterButton>
             <FilterButton active={typeFilter === "buy"} onClick={() => handleTypeFilter("buy")}>买入</FilterButton>
             <FilterButton active={typeFilter === "sell"} onClick={() => handleTypeFilter("sell")}>卖出</FilterButton>
           </div>
         </div>
 
-        <div className="stat-card overflow-hidden p-0">
+        <div className="stat-card overflow-hidden p-0" data-testid="trades-table">
           {paged.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
@@ -188,7 +188,7 @@ const Trades = () => {
               </Table>
             </div>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
+            <div className="p-8 text-center text-muted-foreground" data-testid="empty-state">
               暂无交易记录
             </div>
           )}

@@ -17,7 +17,7 @@ const Index = () => {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6" data-testid="loading-skeleton">
           <div>
             <Skeleton className="h-7 w-32" />
             <Skeleton className="h-5 w-48 mt-1" />
@@ -46,7 +46,7 @@ const Index = () => {
             <h2 className="text-xl font-bold text-foreground">Dashboard</h2>
             <p className="text-sm text-muted-foreground mt-1">系统运行概览</p>
           </div>
-          <Alert variant="destructive">
+          <Alert variant="destructive" data-testid="error-alert">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               无法加载数据: {overviewError.message}
@@ -88,6 +88,7 @@ const Index = () => {
             value={`$${(overview?.current_capital ?? 0).toFixed(2)}`}
             subtitle={todayPnLPercent >= 0 ? `+${todayPnLPercent.toFixed(1)}%` : `${todayPnLPercent.toFixed(1)}%`}
             subtitleColor={todayPnLPercent >= 0 ? "profit" : "loss"}
+            testId="stat-total-capital"
           />
           <StatCard
             icon={<TrendingUp className="h-4 w-4" />}
@@ -95,12 +96,14 @@ const Index = () => {
             value={`${todayPnL >= 0 ? "+" : ""}$${todayPnL.toFixed(2)}`}
             subtitle={todayPnLPercent >= 0 ? `+${todayPnLPercent.toFixed(1)}%` : `${todayPnLPercent.toFixed(1)}%`}
             subtitleColor={todayPnL >= 0 ? "profit" : "loss"}
+            testId="stat-today-pnl"
           />
           <StatCard
             icon={<Target className="h-4 w-4" />}
             title="胜率"
             value={`${((overview?.win_rate ?? 0) * 100).toFixed(1)}%`}
             subtitle={overview ? `${overview.winning_trades}/${overview.total_trades}` : "-"}
+            testId="stat-win-rate"
           />
           <StatCard
             icon={<Activity className="h-4 w-4" />}
@@ -108,6 +111,7 @@ const Index = () => {
             value={status?.trading_enabled ? "🟢 运行中" : "🟡 已暂停"}
             subtitle={formatUptime(status?.uptime_hours)}
             subtitleColor={statusColor as "profit" | "loss" | "muted"}
+            testId="stat-system-status"
           />
         </div>
 

@@ -8,9 +8,10 @@ interface StatCardProps {
   subtitle?: string;
   subtitleColor?: "profit" | "loss" | "muted";
   className?: string;
+  testId?: string;
 }
 
-export function StatCard({ icon, title, value, subtitle, subtitleColor = "muted", className }: StatCardProps) {
+export function StatCard({ icon, title, value, subtitle, subtitleColor = "muted", className, testId }: StatCardProps) {
   const subtitleClasses = {
     profit: "profit-text",
     loss: "loss-text",
@@ -18,14 +19,14 @@ export function StatCard({ icon, title, value, subtitle, subtitleColor = "muted"
   };
 
   return (
-    <div className={cn("stat-card", className)}>
+    <div className={cn("stat-card", className)} data-testid={testId}>
       <div className="flex items-center gap-2 mb-3">
         <span className="text-muted-foreground">{icon}</span>
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</span>
       </div>
-      <div className="text-2xl font-bold font-mono text-foreground">{value}</div>
+      <div className="text-2xl font-bold font-mono text-foreground" data-testid={testId ? `${testId}-value` : undefined}>{value}</div>
       {subtitle && (
-        <div className={cn("text-xs mt-1 font-medium", subtitleClasses[subtitleColor])}>
+        <div className={cn("text-xs mt-1 font-medium", subtitleClasses[subtitleColor])} data-testid={testId ? `${testId}-subtitle` : undefined}>
           {subtitle}
         </div>
       )}
