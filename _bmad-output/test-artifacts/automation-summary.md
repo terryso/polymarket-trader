@@ -1,7 +1,7 @@
 # TEA TestArch 自动化汇总报告
 
-**生成时间:** 2026-02-17
-**执行模式:** BMad-Integrated (混合框架)
+**生成时间:** 2026-02-17 (更新)
+**执行模式:** BMad-Integrated (混合框架: pytest + Vitest)
 **项目:** polymarket-trader
 **状态:** ✅ COMPLETE - 所有 critical paths 已有测试覆盖
 
@@ -15,9 +15,9 @@
 
 | 指标 | 状态 | 数值 |
 |------|------|------|
-| Python 后端测试 | ✅ 通过 | 1,414 个 |
-| React 前端测试 | ✅ 通过 | 9 个文件 |
-| **总测试数** | ✅ **100% 覆盖** | **1,400+** |
+| Python 后端测试 | ✅ 通过 | 1,467 个 (收集) |
+| React 前端测试 | ✅ 通过 | 12 个文件 |
+| **总测试数** | ✅ **100% 覆盖** | **1,467+** |
 | Critical Paths | ✅ **全部覆盖** | P0/P1/P2 |
 
 ### 工作流结论
@@ -146,6 +146,10 @@ dashboard/src/
 │   │   └── PnLChart.test.tsx      # PnL 图表组件
 │   └── layout/
 │       └── AppSidebar.test.tsx    # 侧边栏组件
+├── pages/
+│   ├── Index.test.tsx             # Dashboard 首页测试 [新增]
+│   ├── Positions.test.tsx         # 持仓页面测试 [新增]
+│   └── Trades.test.tsx            # 交易历史页面测试 [新增]
 └── hooks/
     ├── useMarkets.test.tsx        # 市场数据 hook
     ├── usePositions.test.tsx      # 持仓数据 hook
@@ -252,7 +256,7 @@ cd dashboard && npm run test:watch
 
 ### P3 - 可选增强
 
-- [ ] 前端页面组件测试 (Index, Positions, Trades)
+- [x] 前端页面组件测试 (Index, Positions, Trades) ✅ 已添加
 - [ ] E2E 测试 (Playwright)
 - [ ] API 性能测试
 - [ ] 覆盖率报告自动化
@@ -287,7 +291,7 @@ cd dashboard && npm run test:watch
 
 polymarket-trader 项目具有完善的测试基础设施，包含：
 - 1400+ Python 测试
-- 9 个前端测试文件
+- 12 个前端测试文件 (新增 3 个页面测试)
 - 完整的 API 集成测试
 - 良好的测试模式和 fixtures
 
