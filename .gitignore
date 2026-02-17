@@ -157,3 +157,6 @@ temp/
 *.tmp
 *.temp
 dashboard/_bmad-output/
+
+# Bot runtime files
+.bot.pid
