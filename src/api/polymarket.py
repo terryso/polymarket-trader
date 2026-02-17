@@ -23,9 +23,9 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["PolymarketClient", "GammaMarket"]
+__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance"]
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -40,6 +40,28 @@ from src.exceptions import NetworkError, RateLimitError, RequestTimeoutError
 from src.models import Market, MarketCategory
 from src.utils.logger import OPERATION_EMOJIS, get_logger
 from src.utils.retry import retry
+
+
+@dataclass
+class WalletBalance:
+    """Wallet balance information from Polymarket.
+
+    Contains USDC balance and metadata for the connected wallet.
+
+    Attributes:
+        usdc_balance: USDC balance in USD
+        last_updated: Timestamp when balance was fetched
+        error: Error message if balance fetch failed
+    """
+
+    usdc_balance: float | None = None
+    last_updated: datetime | None = None
+    error: str | None = None
+
+    @property
+    def is_success(self) -> bool:
+        """Check if balance fetch was successful."""
+        return self.error is None and self.usdc_balance is not None
 
 
 @dataclass
@@ -433,6 +455,98 @@ class PolymarketClient:
             return self._parse_order_book_response(response)
         except Exception as e:
             raise self._map_exception(e, endpoint=f"get_order_book/{token_id}")
+
+    def get_wallet_balance(
+        self, wallet_address: str | None = None
+    ) -> WalletBalance:
+        """Get USDC balance for a wallet from Polygon network.
+
+        Queries the USDC contract on Polygon directly via RPC to get
+        the real wallet balance.
+
+        Args:
+            wallet_address: Wallet address to check (default: proxy_wallet from settings)
+
+        Returns:
+            WalletBalance with USDC balance or error information
+
+        Example:
+            >>> client = PolymarketClient()
+            >>> balance = client.get_wallet_balance()
+            >>> if balance.is_success:
+            ...     print(f"USDC Balance: ${balance.usdc_balance:.2f}")
+            >>> else:
+            ...     print(f"Error: {balance.error}")
+        """
+        # Use proxy_wallet from settings if not specified
+        wallet = wallet_address or settings.polymarket.proxy_wallet
+
+        if not wallet:
+            return WalletBalance(
+                usdc_balance=None,
+                error="No wallet address configured",
+            )
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['network']} Fetching wallet balance for: "
+            f"{wallet[:6]}...{wallet[-4:]}"
+        )
+
+        try:
+            # USDC contract address on Polygon (Polymarket uses this)
+            USDC_CONTRACT = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+            POLYGON_RPC = "https://polygon-rpc.com"
+
+            # balanceOf(address) function selector
+            # keccak256("balanceOf(address)") first 4 bytes = 0x70a08231
+            data = "0x70a08231" + wallet[2:].lower().zfill(64)
+
+            client = self._get_http_client()
+            response = client.post(
+                POLYGON_RPC,
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "eth_call",
+                    "params": [{"to": USDC_CONTRACT, "data": data}, "latest"],
+                    "id": 1,
+                },
+                timeout=10.0,
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            if "result" not in result:
+                return WalletBalance(
+                    usdc_balance=None,
+                    last_updated=datetime.now(),
+                    error=f"RPC error: {result.get('error', 'Unknown error')}",
+                )
+
+            # Parse balance from hex
+            balance_hex = result["result"]
+            balance_wei = int(balance_hex, 16)
+            usdc_balance = balance_wei / 1_000_000  # USDC has 6 decimals
+
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Wallet balance: ${usdc_balance:.2f} USDC"
+            )
+
+            return WalletBalance(
+                usdc_balance=usdc_balance,
+                last_updated=datetime.now(),
+                error=None,
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            self._logger.warning(
+                f"{OPERATION_EMOJIS['network']} Failed to fetch wallet balance: {error_msg}"
+            )
+            return WalletBalance(
+                usdc_balance=None,
+                last_updated=datetime.now(),
+                error=error_msg,
+            )
 
     def _parse_markets_response(
         self, response: dict[str, Any] | list[dict[str, Any]]

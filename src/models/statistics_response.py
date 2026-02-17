@@ -30,6 +30,8 @@ class OverviewStats(BaseModel):
         open_positions: Number of open positions
         trading_enabled: Whether trading is enabled
         mode: Current trading mode
+        wallet_balance: Real USDC balance from wallet (None if fetch failed)
+        wallet_balance_error: Error message if wallet balance fetch failed
     """
 
     current_capital: float = Field(..., description="Current capital (USD)")
@@ -43,6 +45,12 @@ class OverviewStats(BaseModel):
     open_positions: int = Field(..., description="Open positions count")
     trading_enabled: bool = Field(..., description="Trading enabled")
     mode: str = Field(..., description="Trading mode (PAPER/LIVE)")
+    wallet_balance: float | None = Field(
+        None, description="Real USDC balance from wallet"
+    )
+    wallet_balance_error: str | None = Field(
+        None, description="Error message if wallet balance fetch failed"
+    )
 
 
 class DailyStatsItem(BaseModel):

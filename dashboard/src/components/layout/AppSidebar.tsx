@@ -85,7 +85,15 @@ export function AppSidebar() {
             <span className={modeClass}>{modeDisplay}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">资金</span>
+            <span className="text-muted-foreground">钱包余额</span>
+            <span className="text-foreground font-mono font-medium">
+              {overview?.wallet_balance !== null && overview?.wallet_balance !== undefined
+                ? `$${overview.wallet_balance.toFixed(2)}`
+                : "-"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">系统记账</span>
             <span className="text-foreground font-mono font-medium">${(overview?.current_capital ?? mockStats.totalCapital).toFixed(2)}</span>
           </div>
           <div className="flex items-center justify-between">

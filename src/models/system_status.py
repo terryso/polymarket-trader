@@ -28,6 +28,8 @@ class SystemStatus(BaseModel):
         reduced_mode: Whether system is in reduced position mode
         last_market_fetch: Timestamp of last market data fetch
         uptime_hours: System uptime in hours
+        wallet_balance: Real USDC balance from wallet (None if fetch failed)
+        wallet_balance_error: Error message if wallet balance fetch failed
     """
 
     trading_enabled: bool = Field(..., description="Trading enabled status")
@@ -41,6 +43,12 @@ class SystemStatus(BaseModel):
         None, description="Last market fetch timestamp"
     )
     uptime_hours: float | None = Field(None, description="System uptime (hours)")
+    wallet_balance: float | None = Field(
+        None, description="Real USDC balance from wallet"
+    )
+    wallet_balance_error: str | None = Field(
+        None, description="Error message if wallet balance fetch failed"
+    )
 
     @field_serializer("last_market_fetch")
     def serialize_datetime(self, dt: datetime | None, _info: Any) -> str | None:

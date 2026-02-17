@@ -5,7 +5,7 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { useOverview, useSystemStatus } from "@/hooks/useStatistics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { DollarSign, TrendingUp, Target, Activity, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, Target, Activity, AlertCircle, Wallet } from "lucide-react";
 
 const Index = () => {
   const { data: overview, isLoading: overviewLoading, error: overviewError } = useOverview();
@@ -73,6 +73,19 @@ const Index = () => {
     return `${h}h ${m}m`;
   };
 
+  // Format wallet balance
+  const formatWalletBalance = (balance: number | null | undefined): string => {
+    if (balance === null || balance === undefined) return "-";
+    return `$${balance.toFixed(2)}`;
+  };
+
+  // Calculate wallet vs system capital difference
+  const walletVsSystemDiff = overview?.wallet_balance !== null &&
+    overview?.wallet_balance !== undefined &&
+    overview?.current_capital
+    ? overview.wallet_balance - overview.current_capital
+    : null;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -81,10 +94,18 @@ const Index = () => {
           <p className="text-sm text-muted-foreground mt-1">系统运行概览</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <StatCard
+            icon={<Wallet className="h-4 w-4" />}
+            title="钱包余额"
+            value={formatWalletBalance(overview?.wallet_balance)}
+            subtitle="真实 USDC"
+            subtitleColor="muted"
+            testId="stat-wallet-balance"
+          />
           <StatCard
             icon={<DollarSign className="h-4 w-4" />}
-            title="总资金"
+            title="系统记账"
             value={`$${(overview?.current_capital ?? 0).toFixed(2)}`}
             subtitle={todayPnLPercent >= 0 ? `+${todayPnLPercent.toFixed(1)}%` : `${todayPnLPercent.toFixed(1)}%`}
             subtitleColor={todayPnLPercent >= 0 ? "profit" : "loss"}

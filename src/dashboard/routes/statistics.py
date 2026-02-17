@@ -28,6 +28,7 @@ from src.models.statistics_response import (
 )
 from src.models.system_status import SanitizedSettings, SystemStatus
 from src.models.trade import TradeMode, TradeStatus
+from src.api.polymarket import PolymarketClient
 from src.storage.database import get_connection
 from src.storage.repositories.position_repo import PositionRepository
 from src.storage.repositories.statistics_repo import StatisticsRepository
@@ -127,6 +128,20 @@ async def get_overview(
     total_pnl = current_capital - initial_capital
     total_pnl_pct = total_pnl / initial_capital if initial_capital > 0 else 0.0
 
+    # Fetch real wallet balance from Polymarket
+    wallet_balance: float | None = None
+    wallet_balance_error: str | None = None
+    try:
+        client = PolymarketClient()
+        balance_result = client.get_wallet_balance()
+        if balance_result.is_success:
+            wallet_balance = balance_result.usdc_balance
+        else:
+            wallet_balance_error = balance_result.error
+    except Exception as e:
+        logger.warning(f"Failed to fetch wallet balance: {e}")
+        wallet_balance_error = str(e)
+
     overview = OverviewStats(
         current_capital=current_capital,
         initial_capital=initial_capital,
@@ -139,6 +154,8 @@ async def get_overview(
         open_positions=open_positions_count,
         trading_enabled=state_snapshot.trading_enabled,
         mode=settings.trading_mode.upper(),
+        wallet_balance=wallet_balance,
+        wallet_balance_error=wallet_balance_error,
     )
 
     return ApiResponse(success=True, data=overview, error=None)
@@ -345,6 +362,20 @@ async def get_system_status(
     # Calculate uptime
     uptime_hours = (time.time() - _app_start_time) / 3600
 
+    # Fetch real wallet balance from Polymarket
+    wallet_balance: float | None = None
+    wallet_balance_error: str | None = None
+    try:
+        client = PolymarketClient()
+        balance_result = client.get_wallet_balance()
+        if balance_result.is_success:
+            wallet_balance = balance_result.usdc_balance
+        else:
+            wallet_balance_error = balance_result.error
+    except Exception as e:
+        logger.warning(f"Failed to fetch wallet balance: {e}")
+        wallet_balance_error = str(e)
+
     status = SystemStatus(
         trading_enabled=state_snapshot.trading_enabled,
         mode=settings.trading_mode.upper(),
@@ -355,6 +386,8 @@ async def get_system_status(
         reduced_mode=state_snapshot.reduced_mode,
         last_market_fetch=last_market_fetch,
         uptime_hours=round(uptime_hours, 2),
+        wallet_balance=wallet_balance,
+        wallet_balance_error=wallet_balance_error,
     )
 
     return ApiResponse(success=True, data=status, error=None)

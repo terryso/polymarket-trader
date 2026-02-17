@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.polymarket import WalletBalance
 from src.core.state import StateSnapshot
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.statistics import Statistics
@@ -219,8 +220,16 @@ class TestGetOverview:
         mock_trade_repo.get_recent.return_value = sample_trades
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
-        response = client.get("/api/statistics/overview")
-        assert response.status_code == 200
+
+        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.get_wallet_balance.return_value = WalletBalance(
+                usdc_balance=100.0, error=None
+            )
+            mock_client_class.return_value = mock_client
+
+            response = client.get("/api/statistics/overview")
+            assert response.status_code == 200
 
     def test_get_overview_format(
         self,
@@ -236,17 +245,27 @@ class TestGetOverview:
         mock_trade_repo.get_recent.return_value = sample_trades
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
-        response = client.get("/api/statistics/overview")
-        data = response.json()
-        assert "success" in data
-        assert "data" in data
-        assert "current_capital" in data["data"]
-        assert "total_pnl" in data["data"]
-        assert "win_rate" in data["data"]
-        assert "total_trades" in data["data"]
-        assert "open_positions" in data["data"]
-        assert "trading_enabled" in data["data"]
-        assert "mode" in data["data"]
+
+        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.get_wallet_balance.return_value = WalletBalance(
+                usdc_balance=100.0, error=None
+            )
+            mock_client_class.return_value = mock_client
+
+            response = client.get("/api/statistics/overview")
+            data = response.json()
+            assert "success" in data
+            assert "data" in data
+            assert "current_capital" in data["data"]
+            assert "total_pnl" in data["data"]
+            assert "win_rate" in data["data"]
+            assert "total_trades" in data["data"]
+            assert "open_positions" in data["data"]
+            assert "trading_enabled" in data["data"]
+            assert "mode" in data["data"]
+            assert "wallet_balance" in data["data"]
+            assert "wallet_balance_error" in data["data"]
 
     def test_get_overview_values(
         self,
@@ -262,13 +281,23 @@ class TestGetOverview:
         mock_trade_repo.get_recent.return_value = sample_trades
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
-        response = client.get("/api/statistics/overview")
-        data = response.json()
-        assert data["data"]["current_capital"] == 200.0
-        assert data["data"]["initial_capital"] == 200.0
-        assert data["data"]["total_pnl"] == 0.0
-        assert data["data"]["open_positions"] == 1
-        assert data["data"]["trading_enabled"] is True
+
+        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.get_wallet_balance.return_value = WalletBalance(
+                usdc_balance=150.0, error=None
+            )
+            mock_client_class.return_value = mock_client
+
+            response = client.get("/api/statistics/overview")
+            data = response.json()
+            assert data["data"]["current_capital"] == 200.0
+            assert data["data"]["initial_capital"] == 200.0
+            assert data["data"]["total_pnl"] == 0.0
+            assert data["data"]["open_positions"] == 1
+            assert data["data"]["trading_enabled"] is True
+            assert data["data"]["wallet_balance"] == 150.0
+            assert data["data"]["wallet_balance_error"] is None
 
     def test_get_overview_empty_trades(
         self,
@@ -283,10 +312,45 @@ class TestGetOverview:
         mock_trade_repo.get_recent.return_value = []
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
-        response = client.get("/api/statistics/overview")
-        data = response.json()
-        assert data["data"]["total_trades"] == 0
-        assert data["data"]["win_rate"] == 0.0
+
+        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.get_wallet_balance.return_value = WalletBalance(
+                usdc_balance=100.0, error=None
+            )
+            mock_client_class.return_value = mock_client
+
+            response = client.get("/api/statistics/overview")
+            data = response.json()
+            assert data["data"]["total_trades"] == 0
+            assert data["data"]["win_rate"] == 0.0
+
+    def test_get_overview_wallet_balance_error(
+        self,
+        client: TestClient,
+        mock_trade_repo: MagicMock,
+        mock_position_repo: MagicMock,
+        mock_state: MagicMock,
+        sample_trades: list[Trade],
+        sample_positions: list[Position],
+        sample_state_snapshot: StateSnapshot,
+    ) -> None:
+        """Test overview handles wallet balance fetch error."""
+        mock_trade_repo.get_recent.return_value = sample_trades
+        mock_position_repo.get_open_positions.return_value = sample_positions
+        mock_state.get_state.return_value = sample_state_snapshot
+
+        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.get_wallet_balance.return_value = WalletBalance(
+                usdc_balance=None, error="Network error"
+            )
+            mock_client_class.return_value = mock_client
+
+            response = client.get("/api/statistics/overview")
+            data = response.json()
+            assert data["data"]["wallet_balance"] is None
+            assert data["data"]["wallet_balance_error"] == "Network error"
 
 
 class TestGetDailyStats:

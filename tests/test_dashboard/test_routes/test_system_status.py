@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.polymarket import WalletBalance
 from src.core.state import StateSnapshot
 
 
@@ -113,8 +114,16 @@ def client(mock_state: MagicMock, mock_settings: MagicMock) -> Generator[TestCli
 
                 # Mock settings in the statistics module
                 with patch("src.dashboard.routes.statistics.settings", mock_settings):
-                    with TestClient(app, raise_server_exceptions=False) as c:
-                        yield c
+                    # Mock PolymarketClient to avoid real HTTP requests
+                    with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+                        mock_client = MagicMock()
+                        mock_client.get_wallet_balance.return_value = WalletBalance(
+                            usdc_balance=100.0, error=None
+                        )
+                        mock_client_class.return_value = mock_client
+
+                        with TestClient(app, raise_server_exceptions=False) as c:
+                            yield c
 
                 app.dependency_overrides.clear()
 

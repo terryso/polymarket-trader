@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppSidebar } from "./AppSidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -14,13 +15,33 @@ const localStorageMock = {
 };
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
+// Mock useOverview hook
+vi.mock("@/hooks/useStatistics", () => ({
+  useOverview: vi.fn(() => ({
+    data: {
+      mode: "PAPER",
+      current_capital: 200.0,
+      wallet_balance: null,
+    },
+  })),
+}));
+
 const renderWithProviders = (component: React.ReactNode) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
   return render(
-    <BrowserRouter>
-      <ThemeProvider>
-        <SidebarProvider>{component}</SidebarProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider>
+          <SidebarProvider>{component}</SidebarProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 };
 
@@ -46,9 +67,14 @@ describe("AppSidebar", () => {
     expect(screen.getByText("Paper")).toBeInTheDocument();
   });
 
-  it("renders capital display", () => {
+  it("renders wallet balance display", () => {
     renderWithProviders(<AppSidebar />);
-    expect(screen.getByText("资金")).toBeInTheDocument();
+    expect(screen.getByText("钱包余额")).toBeInTheDocument();
+  });
+
+  it("renders system capital display", () => {
+    renderWithProviders(<AppSidebar />);
+    expect(screen.getByText("系统记账")).toBeInTheDocument();
     // mockStats.totalCapital is 200.0
     expect(screen.getByText("$200.00")).toBeInTheDocument();
   });

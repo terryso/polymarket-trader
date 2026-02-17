@@ -22,6 +22,8 @@ export interface OverviewStats {
   open_positions: number;
   trading_enabled: boolean;
   mode: string;
+  wallet_balance: number | null;
+  wallet_balance_error: string | null;
 }
 
 export interface DailyStatsItem {
@@ -70,6 +72,8 @@ export interface SystemStatus {
   reduced_mode: boolean;
   last_market_fetch: string | null;
   uptime_hours: number | null;
+  wallet_balance: number | null;
+  wallet_balance_error: string | null;
 }
 
 export interface SanitizedSettings {

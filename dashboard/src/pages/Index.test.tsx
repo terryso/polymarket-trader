@@ -121,6 +121,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -155,6 +157,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -170,6 +174,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -197,6 +203,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -212,6 +220,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -238,6 +248,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -253,6 +265,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -279,6 +293,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -294,6 +310,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -320,6 +338,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -335,6 +355,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -361,6 +383,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -376,6 +400,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -417,6 +443,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -443,6 +471,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -458,6 +488,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -484,6 +516,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -499,6 +533,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: "2026-02-17T10:00:00Z",
           uptime_hours: 24.5,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -542,6 +578,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: null,
           uptime_hours: null,
+          wallet_balance: null,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -569,6 +607,8 @@ describe("Index Page", () => {
           open_positions: 2,
           trading_enabled: true,
           mode: "PAPER",
+          wallet_balance: 150.0,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useOverview>);
@@ -584,6 +624,8 @@ describe("Index Page", () => {
           reduced_mode: false,
           last_market_fetch: null,
           uptime_hours: null,
+          wallet_balance: 150.0,
+          wallet_balance_error: null,
         },
         error: null,
       } as ReturnType<typeof useSystemStatus>);
@@ -591,8 +633,9 @@ describe("Index Page", () => {
       const { default: Index } = await import("./Index");
       render(<Index />, { wrapper: createWrapper() });
 
-      // Should display "-" for null uptime
-      expect(screen.getByText("-")).toBeInTheDocument();
+      // Should display "-" for null uptime (use getAllByText since there may be multiple "-" values)
+      const dashes = screen.getAllByText("-");
+      expect(dashes.length).toBeGreaterThanOrEqual(1);
     });
   });
 });
