@@ -5,6 +5,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { mockStats } from "@/data/mockData";
 import { useTheme } from "@/components/ThemeProvider";
+import { useOverview } from "@/hooks/useStatistics";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -22,6 +23,12 @@ const navItems = [
 export function AppSidebar() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { data: overview } = useOverview();
+
+  // Get mode from API or fallback to mock data
+  const mode = overview?.mode || "PAPER";
+  const modeDisplay = mode === "LIVE" ? "Live" : "Paper";
+  const modeClass = mode === "LIVE" ? "badge-live" : "badge-paper";
 
   const statusColor =
     mockStats.systemStatus === "running"
@@ -75,11 +82,11 @@ export function AppSidebar() {
         <div className="space-y-2.5 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">模式</span>
-            <span className="badge-paper">Paper</span>
+            <span className={modeClass}>{modeDisplay}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">资金</span>
-            <span className="text-foreground font-mono font-medium">${mockStats.totalCapital.toFixed(2)}</span>
+            <span className="text-foreground font-mono font-medium">${(overview?.current_capital ?? mockStats.totalCapital).toFixed(2)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">状态</span>

@@ -12,10 +12,27 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _get_env_file() -> str | None:
+    """Get .env file path, or None if running tests.
+
+    Returns None during pytest to ensure unit tests use default values
+    instead of reading from .env file.
+    """
+    # Check if running under pytest
+    if "PYTEST_CURRENT_TEST" in os.environ or "PYTEST_VERSION" in os.environ:
+        return None
+    return ".env"
+
+
 class LLMSettings(BaseSettings):
     """LLM API configuration settings."""
 
-    model_config = SettingsConfigDict(env_prefix="LLM_")
+    model_config = SettingsConfigDict(
+        env_prefix="LLM_",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     api_base: str = Field(
         default="https://open.bigmodel.cn/api/paas/v4", description="LLM API base URL"
@@ -38,7 +55,12 @@ class LLMSettings(BaseSettings):
 class PolymarketSettings(BaseSettings):
     """Polymarket configuration settings."""
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     pk: str = Field(default="", description="Polymarket private key")
     proxy_wallet: str = Field(
@@ -79,7 +101,12 @@ class PolymarketSettings(BaseSettings):
 class TradingSettings(BaseSettings):
     """Trading parameters configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     trade_unit: float = Field(
         default=10.0, alias="TRADE_UNIT", gt=0, description="Base trade unit in USD"
@@ -139,7 +166,12 @@ class RiskControlSettings(BaseSettings):
         0.40
     """
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # 资金管理
     max_single_ratio: float = Field(
@@ -243,7 +275,12 @@ class RiskControlSettings(BaseSettings):
 class MarketFilterSettings(BaseSettings):
     """Market filter parameters configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     min_liquidity: float = Field(
         default=10000.0,
@@ -282,7 +319,12 @@ class SchedulerSettings(BaseSettings):
         executors_pool_size: 线程池执行器大小
     """
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     timezone: str = Field(
         default="UTC",
@@ -318,7 +360,12 @@ class TaskScheduleSettings(BaseSettings):
         state_persist_interval_minutes: 状态持久化间隔 (分钟)
     """
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     fetch_markets_interval_hours: int = Field(
         default=2,
@@ -365,7 +412,7 @@ class Settings(BaseSettings):
     """Main application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_get_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

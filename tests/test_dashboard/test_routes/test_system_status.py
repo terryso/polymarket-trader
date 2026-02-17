@@ -6,6 +6,7 @@ including /status and /settings endpoints.
 Story 7.5: 系统状态 API
 """
 
+import os
 from datetime import datetime
 from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,6 +15,59 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.core.state import StateSnapshot
+
+
+@pytest.fixture
+def mock_settings() -> MagicMock:
+    """Create mock settings with default test values."""
+    settings = MagicMock()
+    settings.trading_mode = "paper"
+    settings.log_level = "INFO"
+    settings.initial_capital = 200.0
+    settings.trading = MagicMock()
+    settings.trading.initial_capital = 200.0
+    settings.trading.trade_unit = 10.0
+    settings.risk = MagicMock()
+    settings.risk.max_single_ratio = 0.2
+    settings.risk.min_confidence = 0.75
+    settings.risk.min_edge = 0.1
+    settings.risk.daily_loss_limit = 0.3
+    settings.risk.max_open_markets = 3
+    settings.llm = MagicMock()
+    settings.llm.model = "glm-4"
+    settings.llm.api_base = "https://open.bigmodel.cn/api/paas/v4"
+    settings.llm.api_key = "test-api-key-12345"
+    settings.polymarket = MagicMock()
+    settings.polymarket.proxy_wallet = "0x1234567890abcdef1234567890abcdef12345678"
+    return settings
+
+
+@pytest.fixture(autouse=True)
+def reset_settings_env() -> Generator[None, None, None]:
+    """Reset settings environment variables and cache for each test."""
+    # Clear settings cache
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+
+    # Save and clear relevant env vars
+    saved_env = {}
+    env_keys = ["TRADING_MODE", "LLM_API_BASE", "LLM_MODEL", "LLM_API_KEY"]
+    for key in env_keys:
+        if key in os.environ:
+            saved_env[key] = os.environ[key]
+
+    yield
+
+    # Restore env vars
+    for key in env_keys:
+        if key in os.environ:
+            del os.environ[key]
+    for key, val in saved_env.items():
+        os.environ[key] = val
+
+    # Clear cache again
+    get_settings.cache_clear()
 
 
 @pytest.fixture
@@ -39,7 +93,7 @@ def mock_state() -> MagicMock:
 
 
 @pytest.fixture
-def client(mock_state: MagicMock) -> Generator[TestClient, None, None]:
+def client(mock_state: MagicMock, mock_settings: MagicMock) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
@@ -57,8 +111,10 @@ def client(mock_state: MagicMock) -> Generator[TestClient, None, None]:
 
                 app.dependency_overrides[get_state] = mock_get_state
 
-                with TestClient(app, raise_server_exceptions=False) as c:
-                    yield c
+                # Mock settings in the statistics module
+                with patch("src.dashboard.routes.statistics.settings", mock_settings):
+                    with TestClient(app, raise_server_exceptions=False) as c:
+                        yield c
 
                 app.dependency_overrides.clear()
 

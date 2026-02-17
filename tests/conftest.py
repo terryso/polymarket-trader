@@ -5,6 +5,7 @@ the Polymarket Trader application.
 """
 
 import asyncio
+import os
 from typing import Any, AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -17,6 +18,77 @@ pytest_plugins = ("pytest_asyncio",)
 
 # Note: .env file is loaded only for integration tests via tests/integration/conftest.py
 # This keeps unit tests isolated from environment variables
+
+# Environment variables that should be cleared for unit tests
+ENV_VARS_TO_CLEAR = [
+    "LLM_API_BASE",
+    "LLM_API_KEY",
+    "LLM_MODEL",
+    "LLM_TIMEOUT",
+    "PK",
+    "YOUR_PROXY_WALLET",
+    "BOT_TRADER_ADDRESS",
+    "TRADE_UNIT",
+    "SLIPPAGE_TOLERANCE",
+    "PCT_PROFIT",
+    "PCT_LOSS",
+    "INITIAL_CAPITAL",
+    "MAX_SINGLE_RATIO",
+    "MIN_CONFIDENCE",
+    "MIN_EDGE",
+    "MAX_OPEN_MARKETS",
+    "MAX_CONCURRENT_TRADES",
+    "DAILY_LOSS_LIMIT",
+    "CONSECUTIVE_LOSSES_LIMIT",
+    "CAPITAL_THRESHOLD",
+    "MIN_LIQUIDITY",
+    "MIN_DEADLINE_DAYS",
+    "TRADING_MODE",
+    "LOG_LEVEL",
+]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolate_env_vars() -> Generator[None, None, None]:
+    """Clear environment variables from .env for unit test isolation.
+
+    This fixture ensures unit tests don't read from the actual .env file.
+    Integration tests can still use .env by loading it explicitly.
+    """
+    # Save original values
+    original_values = {}
+    for key in ENV_VARS_TO_CLEAR:
+        if key in os.environ:
+            original_values[key] = os.environ[key]
+            del os.environ[key]
+
+    # Clear settings cache so it doesn't use cached values from .env
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+
+    yield
+
+    # Restore original values
+    for key, value in original_values.items():
+        os.environ[key] = value
+
+    # Clear cache again after tests
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_settings_cache() -> Generator[None, None, None]:
+    """Clear settings cache before and after each test.
+
+    This ensures tests don't share cached settings from other tests
+    that may have modified environment variables.
+    """
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture(scope="session", autouse=True)
