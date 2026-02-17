@@ -26,9 +26,11 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from src.models.api_response import (
     ApiResponse,
+    ErrorDetail,
     ErrorCode,
     PaginatedResponse,
     PaginationMeta,
@@ -190,3 +192,107 @@ async def get_trade(
 
     logger.info(f"💰 Retrieved trade {trade_id}")
     return ApiResponse(success=True, data=response, error=None)
+
+
+# ==================== Story 5.6: 交易历史同步 ====================
+
+
+class SyncStatusResponse(BaseModel):
+    """Sync status response model."""
+
+    last_sync_at: str | None = None
+    is_syncing: bool = False
+    can_sync: bool = False
+    last_error: str | None = None
+    total_synced: int = 0
+
+
+class SyncResultResponse(BaseModel):
+    """Sync result response model."""
+
+    new_trades: int = 0
+    updated_trades: int = 0
+    consistent_trades: int = 0
+    inconsistent_trades: int = 0
+    total_fetched: int = 0
+    last_sync_at: str
+    error: str | None = None
+
+
+@router.get(
+    "/sync/status",
+    response_model=ApiResponse[SyncStatusResponse],
+    summary="Get sync status",
+    description="Get the current trade sync status.",
+)
+async def get_sync_status() -> ApiResponse[SyncStatusResponse]:
+    """Get current trade sync status.
+
+    Returns information about the last sync and whether sync is available.
+
+    Returns:
+        Sync status information
+    """
+    from src.trading.trade_sync import TradeSyncService
+
+    logger.info("💰 Getting trade sync status")
+
+    service = TradeSyncService()
+    status = await service.get_sync_status()
+
+    response = SyncStatusResponse(
+        last_sync_at=status.last_sync_at.isoformat() if status.last_sync_at else None,
+        is_syncing=status.is_syncing,
+        can_sync=status.can_sync,
+        last_error=status.last_error,
+        total_synced=status.total_synced,
+    )
+
+    return ApiResponse(success=True, data=response, error=None)
+
+
+@router.post(
+    "/sync",
+    response_model=ApiResponse[SyncResultResponse],
+    summary="Sync trades from Polymarket",
+    description="Synchronize trade history from Polymarket API to local database.",
+)
+async def sync_trades() -> ApiResponse[SyncResultResponse]:
+    """Sync trades from Polymarket API.
+
+    Fetches order history from Polymarket and syncs with local database.
+    Requires API credentials to be configured.
+
+    Returns:
+        Sync result with statistics
+    """
+    from src.trading.trade_sync import TradeSyncService
+
+    logger.info("💰 Starting trade sync")
+
+    service = TradeSyncService()
+    result = await service.sync_trades()
+
+    response = SyncResultResponse(
+        new_trades=result.new_trades,
+        updated_trades=result.updated_trades,
+        consistent_trades=result.consistent_trades,
+        inconsistent_trades=result.inconsistent_trades,
+        total_fetched=result.total_fetched,
+        last_sync_at=result.last_sync_at.isoformat(),
+        error=result.error,
+    )
+
+    if result.is_success:
+        logger.info(
+            f"💰 Sync complete: {result.new_trades} new, "
+            f"{result.updated_trades} updated"
+        )
+        return ApiResponse(success=True, data=response, error=None)
+    else:
+        logger.warning(f"💰 Sync failed: {result.error}")
+        return ApiResponse(
+            success=False,
+            data=response,
+            error=ErrorDetail(code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"),
+        )

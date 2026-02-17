@@ -254,3 +254,25 @@ export interface PredictionListQueryParams {
   per_page?: number;
   validated?: boolean;
 }
+
+// ============================================================================
+// Trade Sync Types (Story 5.6)
+// ============================================================================
+
+export interface SyncStatus {
+  last_sync_at: string | null;
+  is_syncing: boolean;
+  can_sync: boolean;
+  last_error: string | null;
+  total_synced: number;
+}
+
+export interface SyncResult {
+  new_trades: number;
+  updated_trades: number;
+  consistent_trades: number;
+  inconsistent_trades: number;
+  total_fetched: number;
+  last_sync_at: string;
+  error: string | null;
+}

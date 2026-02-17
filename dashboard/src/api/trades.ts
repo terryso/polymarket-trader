@@ -6,8 +6,8 @@
  * Story 7.6: 前端 API 集成
  */
 
-import { getPaginated, get } from './client';
-import type { TradeListItem, TradeResponse, TradeListQueryParams } from './types';
+import { getPaginated, get, post } from './client';
+import type { TradeListItem, TradeResponse, TradeListQueryParams, SyncStatus, SyncResult } from './types';
 
 /**
  * Get trade history with pagination and filtering.
@@ -42,9 +42,29 @@ export async function fetchTrade(tradeId: number): Promise<TradeResponse> {
 }
 
 /**
+ * Get trade sync status.
+ *
+ * Story 5.6: 交易历史同步
+ */
+export async function fetchSyncStatus(): Promise<SyncStatus> {
+  return get<SyncStatus>('/api/trades/sync/status');
+}
+
+/**
+ * Sync trades from Polymarket.
+ *
+ * Story 5.6: 交易历史同步
+ */
+export async function syncTrades(): Promise<SyncResult> {
+  return post<SyncResult>('/api/trades/sync');
+}
+
+/**
  * Trades API object with all methods.
  */
 export const tradesApi = {
   getList: fetchTrades,
   getById: fetchTrade,
+  getSyncStatus: fetchSyncStatus,
+  sync: syncTrades,
 };
