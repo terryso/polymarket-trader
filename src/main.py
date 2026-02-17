@@ -87,7 +87,7 @@ class Application:
         This method performs the following initialization steps:
         1. Setup logging with configuration
         2. Initialize the database
-        3. Restore or create state manager
+        3. Restore or create state manager with recovery
         4. Initialize the scheduler
 
         Raises:
@@ -106,11 +106,25 @@ class Application:
         await init_db()
         logger.info("Database initialized")
 
-        # 3. Initialize state manager (restore from database if available)
+        # 3. Initialize state manager with recovery from database
         from src.core.state import ThreadSafeState
 
-        self.state = await ThreadSafeState.restore(initial_capital=settings.initial_capital)
-        logger.info("State manager initialized")
+        self.state = ThreadSafeState(initial_capital=settings.initial_capital)
+        recovery_result = await self.state.load_from_storage()
+
+        if recovery_result.success:
+            logger.info("State manager initialized with recovered state")
+            if recovery_result.warnings:
+                logger.warning(
+                    f"Recovery completed with {len(recovery_result.warnings)} warnings"
+                )
+            if recovery_result.errors:
+                logger.error(
+                    f"Recovery completed with {len(recovery_result.errors)} errors - "
+                    "trading may be disabled for safety"
+                )
+        else:
+            logger.warning("State manager initialized with fresh state (recovery failed)")
 
         # 4. Initialize scheduler
         from src.core.scheduler import Scheduler

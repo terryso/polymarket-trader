@@ -10,6 +10,7 @@ Usage:
         PositionRepository,
         TradeRepository,
         StatisticsRepository,
+        StateRepository,
     )
 
     market_repo = MarketRepository()
@@ -26,6 +27,9 @@ Usage:
 
     stats_repo = StatisticsRepository()
     await stats_repo.save(stats)
+
+    state_repo = StateRepository()
+    await state_repo.save_state({"current_capital": 150.0})
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ from __future__ import annotations
 from src.storage.repositories.market_repo import MarketRepository
 from src.storage.repositories.position_repo import PositionRepository
 from src.storage.repositories.prediction_repo import PredictionRepository
+from src.storage.repositories.state_repo import StateRepository
 from src.storage.repositories.statistics_repo import StatisticsRepository
 from src.storage.repositories.trade_repo import TradeRepository
 
@@ -42,4 +47,5 @@ __all__ = [
     "PositionRepository",
     "TradeRepository",
     "StatisticsRepository",
+    "StateRepository",
 ]

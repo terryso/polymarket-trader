@@ -27,12 +27,16 @@ __all__ = ["StateSnapshot", "ThreadSafeState", "get_state_manager"]
 import asyncio
 import json
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
 from src.config import settings
 from src.storage.database import get_connection
 from src.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from src.core.recovery import RecoveryResult
 
 logger = get_logger(__name__)
 
@@ -317,6 +321,62 @@ class ThreadSafeState:
             )
             await conn.commit()
             logger.info("State persisted to database")
+
+    async def load_from_storage(self) -> "RecoveryResult":
+        """Load state from storage using RecoveryManager.
+
+        Uses the RecoveryManager to properly recover state with
+        validation and consistency checks.
+
+        Returns:
+            RecoveryResult with recovery status and any warnings/errors
+
+        Example:
+            >>> result = await state.load_from_storage()
+            >>> if result.success:
+            ...     print("State loaded successfully")
+        """
+        from src.core.recovery import RecoveryManager
+        from src.storage.repositories.position_repo import PositionRepository
+        from src.storage.repositories.state_repo import StateRepository
+
+        state_repo = StateRepository()
+        position_repo = PositionRepository()
+
+        recovery_manager = RecoveryManager(
+            state_repo=state_repo,
+            position_repo=position_repo,
+            initial_capital=self._capital,
+        )
+
+        result = await recovery_manager.recover()
+
+        if result.success:
+            async with self._lock:
+                self._capital = result.recovered_state.get(
+                    "current_capital", self._capital
+                )
+                self._daily_pnl = result.recovered_state.get("daily_pnl", 0.0)
+                self._consecutive_losses = result.recovered_state.get(
+                    "consecutive_losses", 0
+                )
+                self._open_positions_count = result.recovered_state.get(
+                    "open_positions_count", 0
+                )
+                self._trading_enabled = result.recovered_state.get(
+                    "trading_enabled", True
+                )
+                self._reduced_mode = result.recovered_state.get("reduced_mode", False)
+
+            for warning in result.warnings:
+                logger.warning(warning)
+
+            for error in result.errors:
+                logger.error(error)
+
+            logger.info("State loaded from storage")
+
+        return result
 
     @classmethod
     async def restore(cls, initial_capital: float | None = None) -> "ThreadSafeState":

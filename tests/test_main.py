@@ -95,20 +95,28 @@ class TestApplicationInitialize:
     @pytest.mark.asyncio
     async def test_initialize_success(self) -> None:
         """Test successful initialization."""
+        from src.core.recovery import RecoveryResult
+
         app = Application(mode="paper")
+
+        # Create a mock recovery result
+        mock_recovery_result = RecoveryResult(
+            success=True,
+            recovered_state={"current_capital": 200.0, "trading_enabled": True},
+        )
 
         with patch("src.main.setup_logging") as mock_setup_logging, \
              patch("src.main.init_db", new_callable=AsyncMock) as mock_init_db, \
-             patch("src.core.state.ThreadSafeState.restore", new_callable=AsyncMock) as mock_restore, \
+             patch("src.core.state.ThreadSafeState.load_from_storage", new_callable=AsyncMock) as mock_load, \
              patch("src.core.scheduler.Scheduler") as mock_scheduler_class:
-            mock_restore.return_value = MagicMock()
+            mock_load.return_value = mock_recovery_result
             mock_scheduler_class.return_value = MagicMock()
 
             await app.initialize()
 
             mock_setup_logging.assert_called_once()
             mock_init_db.assert_called_once()
-            mock_restore.assert_called_once()
+            mock_load.assert_called_once()
             assert app.state is not None
             assert app.scheduler is not None
 

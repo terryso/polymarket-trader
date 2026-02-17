@@ -104,7 +104,7 @@ development_status:
   8-1-apscheduler-configuration: ready-for-dev
   8-2-scheduled-task-configuration: ready-for-dev
   8-3-main-entry-and-startup-flow: ready-for-dev
-  8-4-auto-recovery-mechanism: backlog
+  8-4-auto-recovery-mechanism: ready-for-dev
   8-5-error-handling-and-alerting: backlog
   8-6-run-scripts-and-process-management: backlog
   epic-8-retrospective: optional

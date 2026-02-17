@@ -1,4 +1,4 @@
-"""Core logic modules: state management, scheduler, circuit breaker, tasks."""
+"""Core logic modules: state management, scheduler, circuit breaker, tasks, recovery."""
 
 from src.core.circuit_breaker import (
     BreakerTrigger,
@@ -6,6 +6,7 @@ from src.core.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerResult,
 )
+from src.core.recovery import RecoveryManager, RecoveryResult
 from src.core.scheduler import Scheduler, scheduler
 from src.core.state import StateSnapshot, ThreadSafeState, get_state_manager
 from src.core.tasks import (
@@ -25,6 +26,8 @@ __all__ = [
     "BreakerTriggerType",
     "CircuitBreaker",
     "CircuitBreakerResult",
+    "RecoveryManager",
+    "RecoveryResult",
     "Scheduler",
     "scheduler",
     "StateSnapshot",
