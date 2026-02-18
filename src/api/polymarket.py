@@ -23,7 +23,7 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance", "OrderHistoryItem", "OrderHistoryResult"]
+__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance", "OrderHistoryItem", "OrderHistoryResult", "BalanceItem", "BalanceResult"]
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -62,6 +62,45 @@ class WalletBalance:
     def is_success(self) -> bool:
         """Check if balance fetch was successful."""
         return self.error is None and self.usdc_balance is not None
+
+
+@dataclass
+class BalanceItem:
+    """Position balance item from Polymarket.
+
+    Represents a single position balance from the user's wallet.
+
+    Attributes:
+        condition_id: Market condition ID
+        outcome: Outcome type (YES/NO)
+        shares: Number of shares held
+        asset_id: Token/asset ID
+        market_title: Optional market title for display
+    """
+
+    condition_id: str
+    outcome: str  # YES/NO
+    shares: float
+    asset_id: str | None = None
+    market_title: str | None = None
+
+
+@dataclass
+class BalanceResult:
+    """Result of fetching wallet balances.
+
+    Attributes:
+        balances: List of balance items
+        error: Error message if fetch failed
+    """
+
+    balances: list[BalanceItem] = field(default_factory=list)
+    error: str | None = None
+
+    @property
+    def is_success(self) -> bool:
+        """Check if balance fetch was successful."""
+        return self.error is None
 
 
 @dataclass
@@ -758,6 +797,125 @@ class PolymarketClient:
             )
             return OrderHistoryResult(
                 orders=[],
+                error=error_msg,
+            )
+
+    def get_balances(self) -> BalanceResult:
+        """Get wallet position balances from Polymarket.
+
+        Fetches the user's current position balances. Requires Level 2 authentication
+        (API credentials must be configured).
+
+        Story 5.7: 同步实际持仓
+
+        Returns:
+            BalanceResult with list of balance items
+
+        Example:
+            >>> client = PolymarketClient()
+            >>> result = client.get_balances()
+            >>> if result.is_success:
+            ...     for balance in result.balances:
+            ...         print(f"{balance.outcome}: {balance.shares} shares")
+            >>> else:
+            ...     print(f"Error: {result.error}")
+        """
+        # Check if we have Level 2 authentication (requires pk + proxy_wallet)
+        if self._auth_level < 2:
+            return BalanceResult(
+                balances=[],
+                error="Position balances require private key and proxy wallet. "
+                "Please configure PK and YOUR_PROXY_WALLET in your .env file.",
+            )
+
+        # Lazily set API credentials (derived from private key)
+        if not self._api_creds_set:
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Deriving API credentials from private key"
+            )
+            derived_creds = self._client.create_or_derive_api_creds()
+            self._client.set_api_creds(derived_creds)
+            self._api_creds_set = True
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} API credentials set "
+                f"(derived key: {derived_creds.api_key[:8]}...)"
+            )
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['network']} Fetching wallet position balances"
+        )
+
+        try:
+            # Use CLOB API /balances endpoint via py-clob-client
+            # The client.balances method returns position balances
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['network']} Calling get_balances()"
+            )
+            response = self._client.balances()
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['network']} balances response type: {type(response)}, count: {len(response) if isinstance(response, list) else 0}"
+            )
+
+            # Parse response
+            balances: list[BalanceItem] = []
+
+            # Response is a list of balance objects
+            if isinstance(response, list):
+                balances_data = response
+            elif isinstance(response, dict) and "balances" in response:
+                balances_data = response["balances"]
+            else:
+                balances_data = []
+
+            for balance_data in balances_data:
+                try:
+                    # Parse balance data
+                    # Format: { "condition_id": "...", "outcome": "Yes/No", "shares": "...", "asset": "..." }
+                    # Note: shares may be a string that needs parsing
+                    shares_raw = balance_data.get("shares", 0)
+                    if isinstance(shares_raw, str):
+                        # May be hex or decimal string
+                        try:
+                            shares = float(int(shares_raw, 16)) / 1_000_000  # Try hex first
+                        except ValueError:
+                            shares = float(shares_raw)  # Try decimal
+                    else:
+                        shares = float(shares_raw)
+
+                    balance = BalanceItem(
+                        condition_id=balance_data.get("condition_id", balance_data.get("market", "")),
+                        outcome=str(balance_data.get("outcome", "YES")).upper(),
+                        shares=shares,
+                        asset_id=balance_data.get("asset", balance_data.get("asset_id")),
+                        market_title=balance_data.get("question", balance_data.get("market_title")),
+                    )
+                    balances.append(balance)
+                except Exception as e:
+                    self._logger.warning(
+                        f"{OPERATION_EMOJIS['network']} Failed to parse balance: {e}"
+                    )
+                    continue
+
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Fetched {len(balances)} position balances"
+            )
+
+            return BalanceResult(
+                balances=balances,
+                error=None,
+            )
+
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            self._logger.warning(
+                f"{OPERATION_EMOJIS['network']} Failed to fetch balances: {error_msg}"
+            )
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['network']} Exception traceback:\n{traceback.format_exc()}"
+            )
+            return BalanceResult(
+                balances=[],
                 error=error_msg,
             )
 

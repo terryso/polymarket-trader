@@ -1,10 +1,13 @@
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { usePositions } from "@/hooks/usePositions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Wallet, AlertCircle } from "lucide-react";
+import { Wallet, AlertCircle, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -13,9 +16,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { positionsApi } from "@/api/positions";
+import type { PositionSyncStatus, PositionSyncResult } from "@/api/types";
 
 const Positions = () => {
   const { data: positions, isLoading, error } = usePositions();
+  const [syncStatus, setSyncStatus] = useState<PositionSyncStatus | null>(null);
+  const [syncResult, setSyncResult] = useState<PositionSyncResult | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Fetch sync status on mount
+  useEffect(() => {
+    positionsApi.getSyncStatus().then(setSyncStatus).catch(console.error);
+  }, []);
 
   // Loading state
   if (isLoading) {
@@ -63,13 +77,121 @@ const Positions = () => {
   );
   const totalPnL = (positions ?? []).reduce((s, p) => s + (p.pnl ?? 0), 0);
 
+  // Handle sync
+  const handleSync = async () => {
+    if (isSyncing || !syncStatus?.can_sync) return;
+
+    setIsSyncing(true);
+    setSyncResult(null);
+
+    try {
+      const result = await positionsApi.sync();
+      setSyncResult(result);
+      // Refresh positions list
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      // Update sync status
+      const status = await positionsApi.getSyncStatus();
+      setSyncStatus(status);
+    } catch (err) {
+      setSyncResult({
+        new_positions: 0,
+        updated_positions: 0,
+        closed_positions: 0,
+        unchanged_positions: 0,
+        total_fetched: 0,
+        last_sync_at: new Date().toISOString(),
+        error: err instanceof Error ? err.message : '同步失败',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Format sync time
+  const formatSyncTime = (ts: string | null): string => {
+    if (!ts) return "从未同步";
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return ts;
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">持仓</h2>
-          <p className="text-sm text-muted-foreground mt-1">当前持有头寸</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">持仓</h2>
+            <p className="text-sm text-muted-foreground mt-1">当前持有头寸</p>
+          </div>
+
+          {/* Sync Section */}
+          <div className="flex items-center gap-3">
+            {syncStatus && (
+              <div className="text-xs text-muted-foreground">
+                <span>最后同步: {formatSyncTime(syncStatus.last_sync_at)}</span>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={isSyncing || !syncStatus?.can_sync}
+              className="h-8"
+              data-testid="sync-button"
+            >
+              {isSyncing ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  同步中...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  同步
+                </>
+              )}
+            </Button>
+          </div>
         </div>
+
+        {/* Sync Result Alert */}
+        {syncResult && (
+          <Alert variant={syncResult.error ? "destructive" : "default"} data-testid="sync-result">
+            {syncResult.error ? (
+              <XCircle className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            <AlertDescription>
+              {syncResult.error ? (
+                syncResult.error
+              ) : (
+                <span>
+                  同步完成: {syncResult.new_positions} 个新增, {syncResult.updated_positions} 个更新, {syncResult.closed_positions} 个关闭
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Can't sync warning */}
+        {syncStatus && !syncStatus.can_sync && (
+          <Alert variant="default" className="bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+              需要配置 Polymarket API 凭证才能同步持仓。
+              请在 .env 文件中设置 PK 和 YOUR_PROXY_WALLET。
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <StatCard

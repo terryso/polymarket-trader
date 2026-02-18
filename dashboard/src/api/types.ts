@@ -276,3 +276,25 @@ export interface SyncResult {
   last_sync_at: string;
   error: string | null;
 }
+
+// ============================================================================
+// Position Sync Types (Story 5.7)
+// ============================================================================
+
+export interface PositionSyncStatus {
+  last_sync_at: string | null;
+  is_syncing: boolean;
+  can_sync: boolean;
+  last_error: string | null;
+  total_positions: number;
+}
+
+export interface PositionSyncResult {
+  new_positions: number;
+  updated_positions: number;
+  closed_positions: number;
+  unchanged_positions: number;
+  total_fetched: number;
+  last_sync_at: string;
+  error: string | null;
+}
