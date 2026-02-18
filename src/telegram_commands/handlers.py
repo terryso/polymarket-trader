@@ -1,12 +1,13 @@
 """Telegram command handlers for bot interactions.
 
 This module provides command handler functions for the Telegram bot,
-implementing /status, /help, /positions, /stats, and /markets commands.
+implementing /status, /help, /positions, /stats, /markets, and /history commands.
 
 Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
 Story 9.8: Telegram 命令处理 - 市场查询
+Story 9.9: Telegram 命令处理 - 交易历史
 
 Usage:
     from src.telegram_commands import setup_command_handlers
@@ -24,6 +25,7 @@ __all__ = [
     "create_positions_handler",
     "create_stats_handler",
     "create_markets_handler",
+    "create_history_handler",
 ]
 
 from collections.abc import Awaitable
@@ -41,9 +43,11 @@ from src.storage.repositories import (
     PositionRepository,
     PredictionRepository,
     StatisticsRepository,
+    TradeRepository,
 )
 from src.telegram_commands.formatters import (
     format_help_message,
+    format_history_message,
     format_markets_message,
     format_positions_message,
     format_stats_message,
@@ -425,6 +429,103 @@ def create_markets_handler(
     return markets_handler
 
 
+def create_history_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a history command handler.
+
+    Story 9.9: Telegram 命令处理 - 交易历史
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /history command
+
+    Example:
+        >>> handler = create_history_handler("123456789")
+        >>> # Register with: application.add_handler(CommandHandler("history", handler))
+    """
+
+    async def history_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /history command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = update.effective_chat.id
+
+        # Verify authorization
+        if authorized_chat_id and str(chat_id) != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Parse parameters
+        limit = 10  # Default limit
+        mode: TradeMode | None = None
+
+        if context.args:
+            for arg in context.args:
+                # Try to parse as number (limit)
+                try:
+                    limit = int(arg)
+                    # Limit range: 1-50
+                    limit = max(1, min(50, limit))
+                    continue
+                except ValueError:
+                    pass
+
+                # Try to parse as mode
+                if arg.lower() == "paper":
+                    mode = TradeMode.PAPER
+                elif arg.lower() == "live":
+                    mode = TradeMode.LIVE
+
+        # Get repositories
+        trade_repo = TradeRepository()
+        market_repo = MarketRepository()
+
+        # Get recent trades
+        if mode:
+            # Get trades filtered by mode and limit
+            all_trades = await trade_repo.get_by_mode(mode)
+            trades = all_trades[:limit]
+        else:
+            trades = await trade_repo.get_recent(limit)
+
+        # Enrich trades with market data
+        trade_data: list[dict] = []
+        for trade in trades:
+            market = await market_repo.get_market(trade.market_id)
+            market_title = (
+                market.title if market else f"Market {trade.market_id[:20]}..."
+            )
+
+            trade_data.append(
+                {
+                    "id": trade.id,
+                    "market_id": trade.market_id,
+                    "market_title": market_title,
+                    "trade_type": trade.trade_type,
+                    "mode": trade.mode,
+                    "amount": trade.amount,
+                    "price": trade.price,
+                    "status": trade.status,
+                    "created_at": trade.created_at,
+                }
+            )
+
+        # Format and send message
+        message = format_history_message([], trade_data, mode)
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"History command processed for chat_id: {chat_id}")
+
+    return history_handler
+
+
 def setup_command_handlers(
     application: Application,
     state_manager: "ThreadSafeState",
@@ -451,6 +552,7 @@ def setup_command_handlers(
     positions_handler = create_positions_handler(authorized_chat_id)
     stats_handler = create_stats_handler(authorized_chat_id)
     markets_handler = create_markets_handler(authorized_chat_id)
+    history_handler = create_history_handler(authorized_chat_id)
 
     # Register handlers
     application.add_handler(CommandHandler("status", status_handler))  # type: ignore[arg-type]
@@ -458,7 +560,8 @@ def setup_command_handlers(
     application.add_handler(CommandHandler("positions", positions_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("stats", stats_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("markets", markets_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("history", history_handler))  # type: ignore[arg-type]
 
     logger.info(
-        "Command handlers registered: /status, /help, /positions, /stats, /markets"
+        "Command handlers registered: /status, /help, /positions, /stats, /markets, /history"
     )

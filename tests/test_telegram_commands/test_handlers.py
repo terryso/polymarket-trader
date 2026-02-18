@@ -4,11 +4,12 @@ Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
 Story 9.8: Telegram 命令处理 - 市场查询
+Story 9.9: Telegram 命令处理 - 交易历史
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,9 +17,11 @@ import pytest
 from src.models.market import Market, MarketCategory
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.statistics import Statistics
-from src.models.trade import TradeMode
+from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.telegram_commands.formatters import (
+    _format_relative_time,
     format_help_message,
+    format_history_message,
     format_markets_message,
     format_positions_message,
     format_stats_message,
@@ -27,6 +30,7 @@ from src.telegram_commands.formatters import (
 )
 from src.telegram_commands.handlers import (
     create_help_handler,
+    create_history_handler,
     create_markets_handler,
     create_positions_handler,
     create_stats_handler,
@@ -279,8 +283,8 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add five handlers: status, help, positions, stats, and markets
-        assert mock_app.add_handler.call_count == 5
+        # Should add six handlers: status, help, positions, stats, markets, and history
+        assert mock_app.add_handler.call_count == 6
 
     def test_setup_registers_handlers_no_auth(self) -> None:
         """Test that handlers are registered without auth."""
@@ -289,8 +293,8 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, None)
 
-        # Should add five handlers: status, help, positions, stats, and markets
-        assert mock_app.add_handler.call_count == 5
+        # Should add six handlers: status, help, positions, stats, markets, and history
+        assert mock_app.add_handler.call_count == 6
 
 
 class TestPositionsFormatter:
@@ -1558,18 +1562,586 @@ class TestMarketsHandler:
             assert high_idx < medium_idx < low_idx
 
 
+class TestHistoryFormatter:
+    """Tests for history message formatter.
+
+    Story 9.9: Telegram 命令处理 - 交易历史
+    """
+
+    def test_format_history_message_with_data(self) -> None:
+        """Test history message with data."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Will Trump win?",
+                "trade_type": TradeType.BUY_YES,
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.65,
+                "status": TradeStatus.FILLED,
+                "created_at": datetime.now() - timedelta(hours=2),
+            },
+            {
+                "id": 2,
+                "market_id": "market-2",
+                "market_title": "BTC > $100k?",
+                "trade_type": TradeType.SELL,
+                "mode": TradeMode.PAPER,
+                "amount": 8.0,
+                "price": 0.55,
+                "status": TradeStatus.FILLED,
+                "created_at": datetime.now() - timedelta(hours=5),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "*最近交易*" in message
+        assert "(2 笔)" in message
+        assert "BUY YES" in message
+        assert "SELL" in message
+        assert "$10.00" in message
+        assert "0.65" in message
+        assert "持仓中" in message
+
+    def test_format_history_message_no_trades(self) -> None:
+        """Test history message with no trades."""
+        message = format_history_message([])
+
+        assert "*最近交易*" in message
+        assert "暂无交易记录" in message
+
+    def test_format_history_message_with_mode(self) -> None:
+        """Test history message with mode filter."""
+        message = format_history_message([], mode=TradeMode.PAPER)
+
+        assert "*最近交易* (PAPER)" in message
+
+    def test_format_history_message_with_trade_models(self) -> None:
+        """Test history message with Trade model objects."""
+        trades = [
+            Trade(
+                id=1,
+                market_id="market-1",
+                trade_type=TradeType.BUY_YES,
+                mode=TradeMode.PAPER,
+                amount=10.0,
+                price=0.65,
+                status=TradeStatus.FILLED,
+                created_at=datetime.now() - timedelta(hours=2),
+            ),
+        ]
+        message = format_history_message(trades)
+
+        assert "*最近交易*" in message
+        assert "(1 笔)" in message
+
+    def test_format_history_message_cancelled_trade(self) -> None:
+        """Test history message with cancelled trade."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Fed rate cut?",
+                "trade_type": TradeType.BUY_YES,
+                "mode": TradeMode.PAPER,
+                "amount": 5.0,
+                "price": 0.72,
+                "status": TradeStatus.CANCELLED,
+                "created_at": datetime.now() - timedelta(days=1),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "已取消" in message
+
+    def test_format_history_message_pending_trade(self) -> None:
+        """Test history message with pending trade."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Test Market",
+                "trade_type": TradeType.BUY_NO,
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.45,
+                "status": TradeStatus.PENDING,
+                "created_at": datetime.now(),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "处理中" in message
+
+    def test_format_relative_time_just_now(self) -> None:
+        """Test relative time formatting for just now."""
+        assert _format_relative_time(datetime.now()) == "刚刚"
+
+    def test_format_relative_time_minutes_ago(self) -> None:
+        """Test relative time formatting for minutes ago."""
+        result = _format_relative_time(datetime.now() - timedelta(minutes=30))
+        assert "分钟前" in result
+
+    def test_format_relative_time_hours_ago(self) -> None:
+        """Test relative time formatting for hours ago."""
+        result = _format_relative_time(datetime.now() - timedelta(hours=5))
+        assert "小时前" in result
+
+    def test_format_relative_time_days_ago(self) -> None:
+        """Test relative time formatting for days ago."""
+        result = _format_relative_time(datetime.now() - timedelta(days=2))
+        assert "天前" in result
+
+    def test_format_relative_time_long_ago(self) -> None:
+        """Test relative time formatting for dates over 30 days."""
+        result = _format_relative_time(datetime.now() - timedelta(days=60))
+        # Should return date string in YYYY-MM-DD format
+        assert "-" in result
+
+    def test_format_history_message_buy_no(self) -> None:
+        """Test history message with BUY NO trade type."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Test Market",
+                "trade_type": TradeType.BUY_NO,
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.35,
+                "status": TradeStatus.FILLED,
+                "created_at": datetime.now(),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "BUY NO" in message
+
+
+class TestHistoryHandler:
+    """Tests for history command handler.
+
+    Story 9.9: Telegram 命令处理 - 交易历史
+    """
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self) -> MagicMock:
+        """Create a mock callback context."""
+        context = MagicMock()
+        context.args = []
+        return context
+
+    @pytest.mark.asyncio
+    async def test_history_handler_default_limit(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test history handler with default 10 limit."""
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            # Setup mock trade repo
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(
+                return_value=[
+                    Trade(
+                        id=i,
+                        market_id=f"market-{i}",
+                        trade_type=TradeType.BUY_YES,
+                        mode=TradeMode.PAPER,
+                        amount=10.0 + i,
+                        price=0.5 + i * 0.05,
+                        shares=10.0,
+                        status=TradeStatus.FILLED,
+                        created_at=datetime.now() - timedelta(hours=i),
+                    )
+                    for i in range(10)
+                ]
+            )
+            MockTradeRepo.return_value = mock_trade_repo
+
+            # Setup mock market repo
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_market = AsyncMock(
+                return_value=Market(
+                    id="market-1",
+                    title="Test Market",
+                )
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            assert "*最近交易*" in call_args.args[0]
+            assert call_args.kwargs.get("parse_mode") == "Markdown"
+
+    @pytest.mark.asyncio
+    async def test_history_handler_custom_limit(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler with custom limit parameter."""
+        mock_context = MagicMock()
+        mock_context.args = ["20"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify limit parameter was passed
+            mock_trade_repo.get_recent.assert_called_once()
+            call_args = mock_trade_repo.get_recent.call_args
+            assert call_args.args[0] == 20
+
+    @pytest.mark.asyncio
+    async def test_history_handler_mode_filter_paper(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler with paper mode filter."""
+        mock_context = MagicMock()
+        mock_context.args = ["paper"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_by_mode = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify mode parameter was passed
+            mock_trade_repo.get_by_mode.assert_called_once()
+            call_args = mock_trade_repo.get_by_mode.call_args
+            assert call_args.args[0] == TradeMode.PAPER
+
+    @pytest.mark.asyncio
+    async def test_history_handler_mode_filter_live(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler with live mode filter."""
+        mock_context = MagicMock()
+        mock_context.args = ["live"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_by_mode = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify mode parameter was passed
+            mock_trade_repo.get_by_mode.assert_called_once()
+            call_args = mock_trade_repo.get_by_mode.call_args
+            assert call_args.args[0] == TradeMode.LIVE
+
+    @pytest.mark.asyncio
+    async def test_history_handler_no_trades(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test history handler with no trades."""
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            assert "暂无交易记录" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_history_handler_unauthorized(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test history handler with unauthorized user."""
+        handler = create_history_handler("999888777")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "*未授权访问*" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_history_handler_no_restriction(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test history handler with no chat ID restriction."""
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            # None means no restriction
+            handler = create_history_handler(None)
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            assert "*最近交易*" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_history_handler_no_effective_chat(self) -> None:
+        """Test history handler when update has no effective_chat."""
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+
+        handler = create_history_handler("123456789")
+        await handler(mock_update, MagicMock())
+
+        # Should not call reply_text
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_history_handler_limit_out_of_range_clamped(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler clamps limit to valid range."""
+        mock_context = MagicMock()
+        mock_context.args = ["100"]  # Over 50
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify limit was clamped to 50
+            mock_trade_repo.get_recent.assert_called_once()
+            call_args = mock_trade_repo.get_recent.call_args
+            assert call_args.args[0] == 50
+
+    @pytest.mark.asyncio
+    async def test_history_handler_limit_below_minimum_clamped(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler clamps limit to minimum of 1."""
+        mock_context = MagicMock()
+        mock_context.args = ["0"]  # Below 1
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify limit was clamped to 1
+            mock_trade_repo.get_recent.assert_called_once()
+            call_args = mock_trade_repo.get_recent.call_args
+            assert call_args.args[0] == 1
+
+    @pytest.mark.asyncio
+    async def test_history_handler_invalid_limit_uses_default(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler with invalid limit parameter uses default."""
+        mock_context = MagicMock()
+        mock_context.args = ["invalid"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify default limit (10) was used
+            mock_trade_repo.get_recent.assert_called_once()
+            call_args = mock_trade_repo.get_recent.call_args
+            assert call_args.args[0] == 10
+
+    @pytest.mark.asyncio
+    async def test_history_handler_combined_limit_and_mode(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test history handler with both limit and mode parameters."""
+        mock_context = MagicMock()
+        mock_context.args = ["5", "paper"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_by_mode = AsyncMock(return_value=[])
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify mode was used (with limit applied to results)
+            mock_trade_repo.get_by_mode.assert_called_once_with(TradeMode.PAPER)
+
+    @pytest.mark.asyncio
+    async def test_history_handler_market_not_found(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test history handler when market is not found."""
+        with (
+            patch(
+                "src.telegram_commands.handlers.TradeRepository"
+            ) as MockTradeRepo,
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+        ):
+            mock_trade_repo = MagicMock()
+            mock_trade_repo.get_recent = AsyncMock(
+                return_value=[
+                    Trade(
+                        id=1,
+                        market_id="unknown-market",
+                        trade_type=TradeType.BUY_YES,
+                        mode=TradeMode.PAPER,
+                        amount=10.0,
+                        price=0.5,
+                        status=TradeStatus.FILLED,
+                        created_at=datetime.now(),
+                    )
+                ]
+            )
+            MockTradeRepo.return_value = mock_trade_repo
+
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_market = AsyncMock(return_value=None)
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_history_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            # Should display market_id as fallback when market not found
+            assert "Market unknown-market" in call_args.args[0]
+
+
 class TestSetupCommandHandlersWithMarkets:
     """Tests for setup_command_handlers with markets handler.
 
     Story 9.8: Telegram 命令处理 - 市场查询
     """
 
-    def test_setup_registers_five_handlers(self) -> None:
-        """Test that five handlers are registered including markets."""
+    def test_setup_registers_six_handlers(self) -> None:
+        """Test that six handlers are registered including history."""
         mock_app = MagicMock()
         mock_state = MagicMock()
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add five handlers: status, help, positions, stats, and markets
-        assert mock_app.add_handler.call_count == 5
+        # Should add six handlers: status, help, positions, stats, markets, and history
+        assert mock_app.add_handler.call_count == 6

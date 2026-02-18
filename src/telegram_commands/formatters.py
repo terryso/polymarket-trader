@@ -6,14 +6,16 @@ Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
 Story 9.8: Telegram 命令处理 - 市场查询
+Story 9.9: Telegram 命令处理 - 交易历史
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.models import Market, MarketCategory
+    from src.models import Market, MarketCategory, Trade, TradeMode
 
 __all__ = [
     "format_status_message",
@@ -22,6 +24,8 @@ __all__ = [
     "format_positions_message",
     "format_stats_message",
     "format_markets_message",
+    "format_history_message",
+    "_format_relative_time",
 ]
 
 
@@ -93,13 +97,9 @@ def format_help_message() -> str:
         "",
         "/status - 查看系统状态",
         "/positions - 查看当前持仓",
-        "/stats - 查看交易统计 (Story 9.7)",
-        "/markets - 查看活跃市场 (Story 9.8)",
-        "/history - 查看交易历史 (Story 9.9)",
-        "/predict - 手动触发分析 (Story 9.10)",
-        "/enable - 启用交易 (Story 9.11)",
-        "/disable - 禁用交易 (Story 9.11)",
-        "/mode - 查看/切换模式 (Story 9.11)",
+        "/stats [days] - 查看交易统计",
+        "/markets [n] [category] - 查看活跃市场",
+        "/history [n] [paper|live] - 查看交易历史",
         "/help - 显示帮助信息",
     ]
 
@@ -315,6 +315,167 @@ def format_markets_message(
                 f"{i}. *{title}*",
                 f"   价格: {price_str} | 流动性: {liquidity_str}",
                 f"   截止: {deadline_str}",
+                "",
+            ]
+        )
+
+    return "\n".join(lines)
+
+
+def _format_relative_time(dt: datetime) -> str:
+    """Format datetime as relative time string.
+
+    Story 9.9: Telegram 命令处理 - 交易历史
+
+    Args:
+        dt: Datetime to format
+
+    Returns:
+        Human-readable relative time string (e.g., "2小时前", "1天前")
+
+    Example:
+        >>> from datetime import datetime, timedelta
+        >>> _format_relative_time(datetime.now())
+        '刚刚'
+        >>> "小时前" in _format_relative_time(datetime.now() - timedelta(hours=5))
+        True
+    """
+    now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
+    diff = now - dt
+
+    if diff < timedelta(minutes=1):
+        return "刚刚"
+    elif diff < timedelta(hours=1):
+        minutes = int(diff.total_seconds() / 60)
+        return f"{minutes}分钟前"
+    elif diff < timedelta(days=1):
+        hours = int(diff.total_seconds() / 3600)
+        return f"{hours}小时前"
+    elif diff < timedelta(days=30):
+        days = diff.days
+        return f"{days}天前"
+    else:
+        return dt.strftime("%Y-%m-%d")
+
+
+def format_history_message(
+    trades: list["Trade"],
+    trade_data: list[dict] | None = None,
+    mode: "TradeMode | None" = None,
+) -> str:
+    """Format a trade history message.
+
+    Story 9.9: Telegram 命令处理 - 交易历史
+
+    Args:
+        trades: List of Trade models to display (optional if trade_data provided)
+        trade_data: List of dicts with enriched trade data (market_title, etc.)
+        mode: Optional mode filter that was applied
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Trade, TradeType, TradeMode, TradeStatus
+        >>> from datetime import datetime
+        >>> trades = [Trade(
+        ...     id=1,
+        ...     market_id="m1",
+        ...     trade_type=TradeType.BUY_YES,
+        ...     mode=TradeMode.PAPER,
+        ...     amount=10.0,
+        ...     price=0.65,
+        ...     status=TradeStatus.FILLED,
+        ...     created_at=datetime.now()
+        ... )]
+        >>> msg = format_history_message(trades)
+        >>> "*最近交易*" in msg
+        True
+    """
+    # If trade_data is provided, use it; otherwise convert trades
+    if trade_data is None:
+        trade_data = []
+        for trade in trades:
+            trade_data.append(
+                {
+                    "id": trade.id,
+                    "market_id": trade.market_id,
+                    "market_title": f"Market {trade.market_id[:20]}...",
+                    "trade_type": trade.trade_type,
+                    "mode": trade.mode,
+                    "amount": trade.amount,
+                    "price": trade.price,
+                    "status": trade.status,
+                    "created_at": trade.created_at,
+                }
+            )
+
+    if not trade_data:
+        mode_text = f" ({mode.value})" if mode else ""
+        return f"\U0001f4dc *最近交易*{mode_text}\n\n暂无交易记录"
+
+    # Header
+    mode_text = f" ({mode.value})" if mode else ""
+    lines = [
+        f"\U0001f4dc *最近交易*{mode_text} ({len(trade_data)} 笔)",
+        "",
+    ]
+
+    # Format each trade
+    for i, t in enumerate(trade_data, 1):
+        # Trade type emoji and text
+        trade_type = t.get("trade_type")
+        if trade_type is None:
+            type_emoji = "\U0001f4b0"  # Money bag
+            type_text = "TRADE"
+        elif hasattr(trade_type, "value"):
+            type_val = trade_type.value
+            if type_val == "BUY_YES":
+                type_emoji = "\U0001f7e2"  # Green circle for YES
+                type_text = "BUY YES"
+            elif type_val == "BUY_NO":
+                type_emoji = "\U0001f534"  # Red circle for NO
+                type_text = "BUY NO"
+            else:  # SELL
+                type_emoji = "\U0001f4b8"  # Money with wings
+                type_text = "SELL"
+        else:
+            type_emoji = "\U0001f4b0"
+            type_text = str(trade_type)
+
+        # Format status
+        status = t.get("status")
+        if status is None:
+            status_text = "\U00002753 处理中"  # Question mark
+        elif hasattr(status, "value"):
+            status_val = status.value
+            if status_val == "FILLED":
+                status_text = "\U00002705 持仓中"  # Check mark - in position
+            elif status_val == "CANCELLED":
+                status_text = "\U0000274c 已取消"  # X mark
+            else:
+                status_text = "\U000023f3 处理中"  # Hourglass
+        else:
+            status_text = str(status)
+
+        # Format amount and price
+        amount_str = f"${t['amount']:.2f}"
+        price_str = f"{t['price']:.2f}"
+
+        # Format time
+        time_str = ""
+        created_at = t.get("created_at")
+        if created_at:
+            time_str = _format_relative_time(created_at)
+
+        # Market title
+        market_title = t.get("market_title", f"Market {t.get('market_id', 'unknown')}")
+
+        lines.extend(
+            [
+                f"{i}. {type_emoji} *{type_text}* {market_title}",
+                f"   {amount_str} @ {price_str} | {time_str}",
+                f"   状态: {status_text}",
                 "",
             ]
         )
