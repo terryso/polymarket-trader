@@ -396,6 +396,7 @@ class TestApplicationStart:
             patch.object(app, "_write_pid_file"),
             patch.object(app, "start_dashboard", new_callable=AsyncMock),
             patch.object(app, "register_scheduled_tasks", new_callable=AsyncMock),
+            patch.object(app, "run_initial_analysis", new_callable=AsyncMock),
             patch.object(app, "_setup_signal_handlers"),
             patch.object(app, "shutdown", new_callable=AsyncMock),
         ):
@@ -426,6 +427,7 @@ class TestApplicationStart:
              patch.object(app, "_write_pid_file") as mock_write_pid, \
              patch.object(app, "start_dashboard", new_callable=AsyncMock) as mock_dash, \
              patch.object(app, "register_scheduled_tasks", new_callable=AsyncMock) as mock_reg, \
+             patch.object(app, "run_initial_analysis", new_callable=AsyncMock) as mock_analysis, \
              patch.object(app, "_setup_signal_handlers") as mock_signals, \
              patch.object(app, "shutdown", new_callable=AsyncMock):
             app.scheduler = MagicMock()

@@ -72,12 +72,14 @@ class LLMClient:
         self._api_key = settings.llm.api_key
         self._model = settings.llm.model
         self._timeout = settings.llm.timeout
+        self._thinking_enabled = settings.llm.thinking_enabled
 
         # Log initialization (with masked API key)
         self._logger.info(
             f"{OPERATION_EMOJIS['network']} Initializing LLM client "
             f"(model={self._model}, api_base={self._api_base}, "
-            f"api_key={self._mask_api_key(self._api_key)})"
+            f"api_key={self._mask_api_key(self._api_key)}, "
+            f"thinking={self._thinking_enabled})"
         )
 
         # Initialize OpenAI client
@@ -134,13 +136,21 @@ class LLMClient:
         """
         self._logger.info(
             f"{OPERATION_EMOJIS['analysis']} Sending LLM request "
-            f"(model={self._model}, messages={len(messages)})"
+            f"(model={self._model}, messages={len(messages)}, thinking={self._thinking_enabled})"
         )
 
         try:
+            # Build extra_body for GLM thinking mode
+            extra_body = None
+            if self._thinking_enabled:
+                extra_body = {"thinking": {"type": "enabled"}}
+            else:
+                extra_body = {"thinking": {"type": "disabled"}}
+
             response = self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
+                extra_body=extra_body,
             )
 
             content = response.choices[0].message.content or ""

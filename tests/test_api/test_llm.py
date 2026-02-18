@@ -36,6 +36,7 @@ def mock_settings() -> MagicMock:
     mock.llm.api_key = "test-api-key-12345678"
     mock.llm.model = "test-model"
     mock.llm.timeout = 30
+    mock.llm.thinking_enabled = True
     return mock
 
 
@@ -92,6 +93,7 @@ class TestMaskApiKey:
             mock_settings.llm.api_key = "test-key"
             mock_settings.llm.model = "test-model"
             mock_settings.llm.timeout = 30
+            mock_settings.llm.thinking_enabled = True
 
             with patch("src.api.llm.OpenAI"):
                 client = LLMClient()
@@ -105,6 +107,7 @@ class TestMaskApiKey:
             mock_settings.llm.api_key = "test-key"
             mock_settings.llm.model = "test-model"
             mock_settings.llm.timeout = 30
+            mock_settings.llm.thinking_enabled = True
 
             with patch("src.api.llm.OpenAI"):
                 client = LLMClient()
@@ -118,6 +121,7 @@ class TestMaskApiKey:
             mock_settings.llm.api_key = "test-key"
             mock_settings.llm.model = "test-model"
             mock_settings.llm.timeout = 30
+            mock_settings.llm.thinking_enabled = True
 
             with patch("src.api.llm.OpenAI"):
                 client = LLMClient()
@@ -149,6 +153,7 @@ class TestChat:
                 mock_openai.return_value.chat.completions.create.assert_called_once_with(
                     model="test-model",
                     messages=[{"role": "user", "content": "Hello!"}],
+                    extra_body={"thinking": {"type": "enabled"}},
                 )
 
     def test_chat_multiple_messages(

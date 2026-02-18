@@ -84,28 +84,59 @@ class TradeRepository:
 
         try:
             async with get_connection() as conn:
-                cursor = await conn.execute(
-                    """
-                    INSERT INTO trades (
-                        market_id, trade_type, mode, amount, price, shares,
-                        status, llm_prediction_id, position_id, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        trade.market_id,
-                        trade.trade_type.value,
-                        trade.mode.value,
-                        trade.amount,
-                        trade.price,
-                        trade.shares,
-                        trade.status.value,
-                        trade.llm_prediction_id,
-                        trade.position_id,
-                        trade.created_at.isoformat() if trade.created_at else None,
-                    ),
-                )
+                # Check if this is an update or insert
+                if trade.id > 0:
+                    # Update existing trade
+                    await conn.execute(
+                        """
+                        UPDATE trades SET
+                            market_id = ?, trade_type = ?, mode = ?, amount = ?,
+                            price = ?, shares = ?, status = ?, llm_prediction_id = ?,
+                            position_id = ?, polymarket_order_id = ?, created_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            trade.market_id,
+                            trade.trade_type.value,
+                            trade.mode.value,
+                            trade.amount,
+                            trade.price,
+                            trade.shares,
+                            trade.status.value,
+                            trade.llm_prediction_id,
+                            trade.position_id,
+                            trade.polymarket_order_id,
+                            trade.created_at.isoformat() if trade.created_at else None,
+                            trade.id,
+                        ),
+                    )
+                    trade_id = trade.id
+                else:
+                    # Insert new trade
+                    cursor = await conn.execute(
+                        """
+                        INSERT INTO trades (
+                            market_id, trade_type, mode, amount, price, shares,
+                            status, llm_prediction_id, position_id, polymarket_order_id, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            trade.market_id,
+                            trade.trade_type.value,
+                            trade.mode.value,
+                            trade.amount,
+                            trade.price,
+                            trade.shares,
+                            trade.status.value,
+                            trade.llm_prediction_id,
+                            trade.position_id,
+                            trade.polymarket_order_id,
+                            trade.created_at.isoformat() if trade.created_at else None,
+                        ),
+                    )
+                    trade_id = cursor.lastrowid or 0
+
                 await conn.commit()
-                trade_id = cursor.lastrowid or 0
 
             logger.info(f"{OPERATION_EMOJIS['trade']} Trade saved with ID: {trade_id}")
 
@@ -400,6 +431,13 @@ class TradeRepository:
             except ValueError:
                 created_at = None
 
+        # Handle polymarket_order_id (may not exist in older rows)
+        polymarket_order_id = None
+        try:
+            polymarket_order_id = row["polymarket_order_id"]
+        except (KeyError, IndexError):
+            pass
+
         return Trade(
             id=row["id"],
             market_id=row["market_id"],
@@ -411,5 +449,75 @@ class TradeRepository:
             status=TradeStatus(row["status"]),
             llm_prediction_id=row["llm_prediction_id"],
             position_id=row["position_id"],
+            polymarket_order_id=polymarket_order_id,
             created_at=created_at,
         )
+
+    # ==================== Story 5.6: 交易历史同步 ====================
+
+    async def get_by_polymarket_order_id(self, order_id: str) -> Trade | None:
+        """Get a trade by its Polymarket order ID.
+
+        Story 5.6: 交易历史同步
+
+        Args:
+            order_id: Polymarket order ID
+
+        Returns:
+            Trade if found, None otherwise
+
+        Example:
+            >>> trade = await repo.get_by_polymarket_order_id("0x123...")
+        """
+        if not order_id:
+            return None
+
+        try:
+            async with get_connection() as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    "SELECT * FROM trades WHERE polymarket_order_id = ?",
+                    (order_id,),
+                )
+                row = await cursor.fetchone()
+
+            if row is None:
+                return None
+            return self._row_to_trade(row)
+        except aiosqlite.Error as e:
+            logger.error(f"Failed to get trade by order_id {order_id}: {e}")
+            raise DatabaseError(
+                message=f"Failed to get trade by order_id: {order_id}",
+                operation="get_trade_by_polymarket_order_id",
+                original_exception=e,
+            ) from e
+
+    async def count_by_mode(self, mode: TradeMode) -> int:
+        """Count trades by trading mode.
+
+        Story 5.6: 交易历史同步
+
+        Args:
+            mode: Trading mode (PAPER or LIVE)
+
+        Returns:
+            Number of trades in the specified mode
+
+        Example:
+            >>> count = await repo.count_by_mode(TradeMode.LIVE)
+        """
+        try:
+            async with get_connection() as conn:
+                cursor = await conn.execute(
+                    "SELECT COUNT(*) FROM trades WHERE mode = ?",
+                    (mode.value,),
+                )
+                row = await cursor.fetchone()
+                return row[0] if row else 0
+        except aiosqlite.Error as e:
+            logger.error(f"Failed to count trades for mode {mode}: {e}")
+            raise DatabaseError(
+                message=f"Failed to count trades for mode: {mode.value}",
+                operation="count_trades_by_mode",
+                original_exception=e,
+            ) from e

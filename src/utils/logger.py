@@ -159,6 +159,9 @@ def get_logger(
     if logger.handlers:
         return logger
 
+    # Disable propagation to root logger to avoid duplicate logs
+    logger.propagate = False
+
     # Get configuration from environment or defaults
     effective_log_level = log_level if log_level is not None else os.getenv("LOG_LEVEL", "INFO")
     effective_log_dir = log_dir if log_dir is not None else os.getenv("LOG_DIR", "logs")

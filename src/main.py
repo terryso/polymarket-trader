@@ -175,6 +175,77 @@ class Application:
         self._dashboard_task = asyncio.create_task(self._dashboard_server.serve())
         logger.info("Dashboard started on http://0.0.0.0:8000")
 
+        # Give Dashboard time to start serving before blocking operations
+        await asyncio.sleep(0.5)
+
+    async def run_initial_analysis(self) -> None:
+        """Run initial market analysis on startup.
+
+        This method triggers an immediate analysis when the application starts,
+        before the scheduled tasks begin their regular intervals.
+        Uses Gamma API to get active markets with liquidity data.
+        """
+        logger.info("Running initial market analysis on startup...")
+
+        try:
+            from src.analysis.llm_analyzer import LLMAnalyzer
+            from src.analysis.market_filter import MarketFilter
+            from src.api.polymarket import PolymarketClient
+
+            # Fetch active markets using Gamma API (has liquidity data)
+            client = PolymarketClient()
+            gamma_markets = client.get_active_markets(limit=50)
+            logger.info(f"Fetched {len(gamma_markets)} active markets for initial analysis")
+
+            if not gamma_markets:
+                logger.info("No markets found, skipping initial analysis")
+                return
+
+            # Convert GammaMarket to Market model
+            markets = [gm.to_market() for gm in gamma_markets]
+
+            # Filter markets
+            market_filter = MarketFilter()
+            filter_result = market_filter.filter_markets(markets)
+            filtered_markets = filter_result.markets
+
+            logger.info(
+                f"Filtered markets: {len(filtered_markets)}/{len(markets)} "
+                f"(stats: {filter_result.statistics})"
+            )
+
+            if not filtered_markets:
+                logger.info("No markets passed filter, skipping initial analysis")
+                return
+
+            # Analyze filtered markets
+            llm_analyzer = LLMAnalyzer()
+            analyzed_count = 0
+            error_count = 0
+
+            for market in filtered_markets:
+                try:
+                    prediction = await llm_analyzer.analyze_market(market)
+                    analyzed_count += 1
+
+                    logger.info(
+                        f"Initial analysis: {market.id[:8]}... "
+                        f"prediction={prediction.predicted_probability:.2%} "
+                        f"confidence={prediction.confidence:.2%} "
+                        f"recommendation={prediction.recommendation.value}"
+                    )
+                except Exception as e:
+                    error_count += 1
+                    logger.warning(f"Failed to analyze market {market.id}: {e}")
+
+            logger.info(
+                f"Initial analysis complete: {analyzed_count} analyzed, "
+                f"{error_count} errors"
+            )
+
+        except Exception as e:
+            logger.error(f"Initial analysis failed: {e}", exc_info=True)
+
     async def register_scheduled_tasks(self) -> None:
         """Register all scheduled tasks with the scheduler.
 
@@ -311,10 +382,12 @@ class Application:
         2. Initialize components
         3. Write PID file
         4. Start Dashboard
-        5. Register and start scheduler
-        6. Register signal handlers
-        7. Wait for shutdown signal
-        8. Perform graceful shutdown
+        5. Register scheduled tasks
+        6. Run initial market analysis
+        7. Start scheduler
+        8. Register signal handlers
+        9. Wait for shutdown signal
+        10. Perform graceful shutdown
 
         Raises:
             BotError: If another instance is already running.
@@ -340,6 +413,10 @@ class Application:
             if self.scheduler:
                 self.scheduler.start()
                 logger.info("Scheduler started")
+
+            # Run initial analysis in background (non-blocking)
+            asyncio.create_task(self.run_initial_analysis())
+            logger.info("Initial analysis started in background")
 
             # Setup signal handlers
             self._setup_signal_handlers()

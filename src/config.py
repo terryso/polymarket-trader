@@ -39,7 +39,12 @@ class LLMSettings(BaseSettings):
     )
     api_key: str = Field(default="", description="LLM API key")
     model: str = Field(default="glm-4", description="LLM model name")
-    timeout: int = Field(default=30, gt=0, description="API timeout in seconds")
+    timeout: int = Field(default=600, gt=0, description="API timeout in seconds (default 10 min)")
+    thinking_enabled: bool = Field(
+        default=True,
+        alias="THINKING_ENABLED",
+        description="Enable GLM thinking mode for better reasoning (default: True for GLM-5)",
+    )
 
     @field_validator("api_key")
     @classmethod
@@ -70,6 +75,17 @@ class PolymarketSettings(BaseSettings):
         default="", alias="BOT_TRADER_ADDRESS", description="Bot trader address"
     )
 
+    # API Credentials for Level 2 authentication (required for order history sync)
+    api_key: str = Field(
+        default="", alias="POLYMARKET_API_KEY", description="Polymarket API key"
+    )
+    api_secret: str = Field(
+        default="", alias="POLYMARKET_API_SECRET", description="Polymarket API secret"
+    )
+    api_passphrase: str = Field(
+        default="", alias="POLYMARKET_API_PASSPHRASE", description="Polymarket API passphrase"
+    )
+
     @field_validator("pk")
     @classmethod
     def validate_pk(cls, v: str) -> str:
@@ -96,6 +112,11 @@ class PolymarketSettings(BaseSettings):
         if trading_mode == "live" and not v:
             raise ValueError("BOT_TRADER_ADDRESS is required when TRADING_MODE=live")
         return v
+
+    @property
+    def has_api_credentials(self) -> bool:
+        """Check if all API credentials are configured."""
+        return bool(self.api_key and self.api_secret and self.api_passphrase)
 
 
 class TradingSettings(BaseSettings):

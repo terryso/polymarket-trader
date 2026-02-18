@@ -23,7 +23,7 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance"]
+__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance", "OrderHistoryItem", "OrderHistoryResult"]
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -62,6 +62,61 @@ class WalletBalance:
     def is_success(self) -> bool:
         """Check if balance fetch was successful."""
         return self.error is None and self.usdc_balance is not None
+
+
+@dataclass
+class OrderHistoryItem:
+    """Order history item from Polymarket.
+
+    Represents a single order from the user's trading history.
+
+    Attributes:
+        order_id: Unique order identifier
+        market_id: Market condition ID
+        asset_id: Token ID for the outcome
+        side: Order side (BUY/SELL)
+        outcome: Outcome type (YES/NO)
+        price: Order price (0-1)
+        size: Order size in shares
+        original_size: Original order size before fills
+        status: Order status (LIVE/MATCHED/CANCELED)
+        created_at: Order creation timestamp
+        updated_at: Last update timestamp
+    """
+
+    order_id: str
+    market_id: str | None = None
+    asset_id: str | None = None
+    side: str = "BUY"
+    outcome: str = "YES"
+    price: float = 0.0
+    size: float = 0.0
+    original_size: float = 0.0
+    status: str = "LIVE"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class OrderHistoryResult:
+    """Result of fetching order history.
+
+    Attributes:
+        orders: List of order history items
+        next_cursor: Cursor for pagination (None if no more pages)
+        has_more: Whether there are more orders to fetch
+        error: Error message if fetch failed
+    """
+
+    orders: list[OrderHistoryItem] = field(default_factory=list)
+    next_cursor: str | None = None
+    has_more: bool = False
+    error: str | None = None
+
+    @property
+    def is_success(self) -> bool:
+        """Check if order history fetch was successful."""
+        return self.error is None
 
 
 @dataclass
@@ -158,27 +213,49 @@ class PolymarketClient:
         self._chain_id = chain_id
         self._timeout = timeout
         self._http_client: httpx.Client | None = None
+        self._auth_level = 0  # Track authentication level (0, 1, or 2)
 
         # Get credentials from settings
         pk = settings.polymarket.pk
         proxy_wallet = settings.polymarket.proxy_wallet
+        api_key = settings.polymarket.api_key
+        api_secret = settings.polymarket.api_secret
+        api_passphrase = settings.polymarket.api_passphrase
 
-        # Initialize the underlying ClobClient
-        # Note: In read-only mode (no credentials), we can still fetch public data
+        # Initialize the underlying ClobClient with appropriate auth level
+        # Level 2: Full auth with API credentials (can access order history)
+        # Level 1: Private key only (can sign orders)
+        # Level 0: Read-only mode
         if pk and proxy_wallet:
             self._logger.info(
                 f"{OPERATION_EMOJIS['network']} Initializing Polymarket client "
-                f"with proxy wallet: {proxy_wallet[:6]}...{proxy_wallet[-4:]}"
+                f"with Level 2 auth (proxy wallet: {proxy_wallet[:6]}...{proxy_wallet[-4:]})"
             )
-            # TODO: Full proxy wallet authentication requires API credentials
-            # (api_key, api_secret, api_passphrase) which need to be generated
-            # via Polymarket's credential creation process.
-            # For now, use read-only mode with the private key for signing.
-            # See: https://docs.polymarket.com/#creating-api-credentials
-            self._client = ClobClient(host, key=pk, chain_id=chain_id)
+            # For proxy wallet trading, need signature_type=1 and funder
+            self._client = ClobClient(
+                host,
+                key=pk,
+                chain_id=chain_id,
+                signature_type=1,  # Email/Magic wallet signatures
+                funder=proxy_wallet,  # Address that holds funds
+            )
+            self._auth_level = 2
+            self._api_creds_set = False  # Will be set lazily when needed
             self._logger.info(
-                f"{OPERATION_EMOJIS['network']} Running in authenticated mode "
-                "(proxy wallet configured)"
+                f"{OPERATION_EMOJIS['network']} Running with full authentication "
+                "(Level 2 - can access order history)"
+            )
+        elif pk:
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Initializing Polymarket client "
+                f"with Level 1 auth (proxy wallet: {proxy_wallet[:6]}...{proxy_wallet[-4:]})"
+            )
+            self._client = ClobClient(host, key=pk, chain_id=chain_id)
+            self._auth_level = 1
+            self._api_creds_set = False
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Running with basic authentication "
+                "(Level 1 - order history requires API credentials)"
             )
         else:
             self._logger.info(
@@ -186,6 +263,8 @@ class PolymarketClient:
                 "(read-only mode)"
             )
             self._client = ClobClient(host, key=None, chain_id=chain_id)
+            self._auth_level = 0
+            self._api_creds_set = False
 
     def _get_http_client(self) -> httpx.Client:
         """Get or create HTTP client for Gamma API."""
@@ -548,6 +627,152 @@ class PolymarketClient:
                 error=error_msg,
             )
 
+    def get_order_history(
+        self,
+        market_id: str | None = None,
+        asset_id: str | None = None,
+        cursor: str | None = None,
+    ) -> OrderHistoryResult:
+        """Get order history from Polymarket.
+
+        Fetches the user's order history. Requires Level 2 authentication
+        (API credentials must be configured).
+
+        Args:
+            market_id: Filter by market condition ID (optional)
+            asset_id: Filter by asset/token ID (optional)
+            cursor: Pagination cursor for fetching next page (optional)
+
+        Returns:
+            OrderHistoryResult with list of orders and pagination info
+
+        Example:
+            >>> client = PolymarketClient()
+            >>> result = client.get_order_history()
+            >>> if result.is_success:
+            ...     for order in result.orders:
+            ...         print(f"{order.side} {order.size} @ {order.price}")
+            >>> else:
+            ...     print(f"Error: {result.error}")
+        """
+        # Check if we have Level 2 authentication (requires pk + proxy_wallet)
+        if self._auth_level < 2:
+            return OrderHistoryResult(
+                orders=[],
+                error="Order history requires private key and proxy wallet. "
+                "Please configure PK and YOUR_PROXY_WALLET in your .env file.",
+            )
+
+        # Lazily set API credentials (derived from private key)
+        if not self._api_creds_set:
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Deriving API credentials from private key"
+            )
+            derived_creds = self._client.create_or_derive_api_creds()
+            self._client.set_api_creds(derived_creds)
+            self._api_creds_set = True
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} API credentials set "
+                f"(derived key: {derived_creds.api_key[:8]}...)"
+            )
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['network']} Fetching trade history"
+            + (f" for market: {market_id[:10]}..." if market_id else "")
+        )
+
+        try:
+            # Use get_trades() to fetch actual trade history (not orders)
+            # get_orders() returns unfilled/open orders, get_trades() returns executed trades
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['network']} Calling get_trades()"
+            )
+            response = self._client.get_trades()
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['network']} get_trades response type: {type(response)}, count: {len(response) if isinstance(response, list) else 0}"
+            )
+
+            # Parse response
+            orders: list[OrderHistoryItem] = []
+
+            # Response is a list of trade objects
+            if isinstance(response, list):
+                trades_data = response
+            else:
+                trades_data = []
+
+            for trade_data in trades_data:
+                try:
+                    # Skip if market filter doesn't match
+                    if market_id and trade_data.get("market") != market_id:
+                        continue
+                    if asset_id and trade_data.get("asset_id") != asset_id:
+                        continue
+
+                    # Parse trade data - note the different field names from orders
+                    # Trade has: id, market, asset_id, side, size, price, status, match_time, outcome
+                    trade = OrderHistoryItem(
+                        order_id=trade_data.get("id", ""),
+                        market_id=trade_data.get("market", ""),
+                        asset_id=trade_data.get("asset_id", ""),
+                        side=trade_data.get("side", "BUY").upper(),
+                        outcome=trade_data.get("outcome", "YES").upper(),
+                        price=float(trade_data.get("price", 0)),
+                        size=float(trade_data.get("size", 0)),
+                        original_size=float(trade_data.get("size", 0)),  # Trades don't have original_size
+                        status=trade_data.get("status", "CONFIRMED"),
+                        created_at=self._parse_datetime(
+                            trade_data.get("match_time")  # Trades use match_time
+                        ),
+                        updated_at=self._parse_datetime(
+                            trade_data.get("last_update")
+                        ),
+                    )
+                    orders.append(trade)
+                except Exception as e:
+                    self._logger.warning(
+                        f"{OPERATION_EMOJIS['network']} Failed to parse trade: {e}"
+                    )
+                    continue
+
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Fetched {len(orders)} trades"
+            )
+
+            # get_trades() doesn't support pagination, so no has_more
+            return OrderHistoryResult(
+                orders=orders,
+                next_cursor=None,
+                has_more=False,
+                error=None,
+            )
+
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            self._logger.warning(
+                f"{OPERATION_EMOJIS['network']} Failed to fetch order history: {error_msg}"
+            )
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['network']} Exception traceback:\n{traceback.format_exc()}"
+            )
+            return OrderHistoryResult(
+                orders=[],
+                error=error_msg,
+            )
+
+    def _parse_outcome_from_asset_id(self, asset_id: str) -> str:
+        """Parse outcome type from asset ID.
+
+        The asset ID encodes whether it's YES or NO outcome.
+        This is a simplified implementation - actual parsing may vary.
+        """
+        # Polymarket token IDs: last character often indicates outcome
+        # This is a heuristic and may need adjustment
+        if not asset_id:
+            return "UNKNOWN"
+        return "YES"  # Default, actual implementation would need token metadata
+
     def _parse_markets_response(
         self, response: dict[str, Any] | list[dict[str, Any]]
     ) -> list[Market]:
@@ -703,24 +928,39 @@ class PolymarketClient:
 
         return None
 
-    def _parse_datetime(self, date_str: str) -> datetime | None:
+    def _parse_datetime(self, date_str: str | int | None) -> datetime | None:
         """Parse datetime string from API response.
 
         Args:
-            date_str: Date string in various formats
+            date_str: Date string in various formats (ISO, Unix timestamp, etc.)
 
         Returns:
-            Parsed datetime or None
+            Parsed datetime with UTC timezone or None
         """
+        from datetime import timezone
+
         if not date_str:
             return None
+
+        # Handle Unix timestamp (integer or string of digits)
+        if isinstance(date_str, int) or (isinstance(date_str, str) and date_str.isdigit()):
+            try:
+                timestamp = int(date_str)
+                return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            except (ValueError, OSError):
+                pass
 
         # Try ISO format first
         try:
             # Handle 'Z' suffix for UTC timezone
-            if date_str.endswith("Z"):
-                date_str = date_str[:-1] + "+00:00"
-            return datetime.fromisoformat(date_str)
+            if isinstance(date_str, str):
+                if date_str.endswith("Z"):
+                    date_str = date_str[:-1] + "+00:00"
+                dt = datetime.fromisoformat(date_str)
+                # Ensure timezone-aware
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
         except ValueError:
             pass
 
@@ -732,7 +972,9 @@ class PolymarketClient:
         ]
         for fmt in formats:
             try:
-                return datetime.strptime(date_str, fmt)
+                dt = datetime.strptime(date_str, fmt)
+                # Assume UTC for naive datetimes
+                return dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 continue
 

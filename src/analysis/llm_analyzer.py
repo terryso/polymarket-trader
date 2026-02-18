@@ -133,12 +133,15 @@ class LLMAnalyzer:
             # 构建提示词
             user_prompt = build_market_analysis_prompt(market)
 
-            # 调用 LLM API (同步调用在异步函数中)
-            with LLMClient() as client:
-                response = client.chat_with_system(
-                    system_prompt=MARKET_ANALYST_SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                )
+            # 调用 LLM API (使用 to_thread 避免阻塞事件循环)
+            def _call_llm() -> str:
+                with LLMClient() as client:
+                    return client.chat_with_system(
+                        system_prompt=MARKET_ANALYST_SYSTEM_PROMPT,
+                        user_prompt=user_prompt,
+                    )
+
+            response = await asyncio.to_thread(_call_llm)
 
             # 解析响应
             llm_result = parse_llm_analysis_response(response)

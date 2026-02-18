@@ -273,6 +273,23 @@ class DatabaseManager:
                     ON trades(created_at)
                 """)
 
+                # Migration: Add polymarket_order_id column (Story 5.6)
+                # Use try/except to handle case where column already exists
+                try:
+                    await conn.execute(
+                        "ALTER TABLE trades ADD COLUMN polymarket_order_id TEXT"
+                    )
+                    logger.info("📊 Added polymarket_order_id column to trades table")
+                except aiosqlite.OperationalError:
+                    # Column already exists, ignore
+                    pass
+
+                # Create index for polymarket_order_id (Story 5.6)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_trades_polymarket_order_id
+                    ON trades(polymarket_order_id)
+                """)
+
                 # Create statistics table (Story 5.5)
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS statistics (

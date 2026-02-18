@@ -32,13 +32,14 @@ class TestLLMSettings:
             clear=False,
         ):
             # Remove the env vars if they exist
-            for key in ["LLM_API_BASE", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT"]:
+            for key in ["LLM_API_BASE", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT", "THINKING_ENABLED"]:
                 os.environ.pop(key, None)
             settings = LLMSettings()
             assert settings.api_base == "https://open.bigmodel.cn/api/paas/v4"
             assert settings.api_key == ""
             assert settings.model == "glm-4"
-            assert settings.timeout == 30
+            assert settings.timeout == 600
+            assert settings.thinking_enabled is True
 
     def test_custom_values(self) -> None:
         """Test custom values can be set."""

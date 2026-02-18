@@ -122,6 +122,9 @@ class Trade(BaseModel):
         default=None, description="LLM prediction reference"
     )
     position_id: int | None = Field(default=None, description="Position reference")
+    polymarket_order_id: str | None = Field(
+        default=None, description="Polymarket order ID (for synced trades)"
+    )
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
 
     @field_serializer("created_at")
