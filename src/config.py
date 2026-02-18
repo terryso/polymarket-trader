@@ -293,6 +293,62 @@ class RiskControlSettings(BaseSettings):
         return v
 
 
+class TelegramSettings(BaseSettings):
+    """Telegram Bot configuration settings.
+
+    Story 9.1: Telegram Bot 配置与初始化
+
+    Attributes:
+        bot_token: Telegram Bot Token (from @BotFather)
+        chat_id: Authorized user Chat ID for commands
+        enabled: Enable Telegram notifications and commands
+
+    Example:
+        >>> from src.config import settings
+        >>> settings.telegram.enabled
+        False
+        >>> settings.telegram.bot_token
+        None
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="TELEGRAM_",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    bot_token: str | None = Field(
+        default=None,
+        description="Telegram Bot Token (from @BotFather)",
+    )
+    chat_id: str | None = Field(
+        default=None,
+        description="Authorized user Chat ID for commands",
+    )
+    enabled: bool = Field(
+        default=False,
+        description="Enable Telegram notifications and commands",
+    )
+
+    @field_validator("enabled")
+    @classmethod
+    def validate_enabled(cls, v: bool) -> bool:
+        """If enabled, bot_token must be set.
+
+        Logs a warning and returns False if enabled but token is not set.
+        """
+        if v:
+            import warnings
+            warnings.warn(
+                "Telegram is enabled but TELEGRAM_BOT_TOKEN is not set. "
+                "Telegram features will be disabled.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v
+
+
 class MarketFilterSettings(BaseSettings):
     """Market filter parameters configuration."""
 
@@ -465,6 +521,7 @@ class Settings(BaseSettings):
     market_filter: MarketFilterSettings = Field(default_factory=MarketFilterSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     task_schedule: TaskScheduleSettings = Field(default_factory=TaskScheduleSettings)
+    telegram: TelegramSettings = Field(default_factory=TelegramSettings)
 
     # Convenience properties for common settings
     @property

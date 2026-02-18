@@ -27,5 +27,8 @@ httpx[socks]>=0.25.0
 # Scheduling
 apscheduler>=3.10.0
 
+# Telegram Bot (Story 9.1)
+python-telegram-bot>=20.0
+
 # Utilities
 halo>=0.0.31

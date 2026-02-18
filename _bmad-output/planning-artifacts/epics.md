@@ -1406,11 +1406,13 @@ curl http://localhost:8000/api/status
 
 ---
 
-### Story 9.1: Telegram Bot 配置与初始化
+### Story 9.1: Telegram Bot 配置与初始化 (DONE)
 
 **As a** 开发者,
 **I want** 创建 Telegram Bot 配置和客户端初始化,
 **So that** 系统能够与 Telegram API 安全通信.
+
+**Status:** done (2026-02-18)
 
 **Acceptance Criteria:**
 

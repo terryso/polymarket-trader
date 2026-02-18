@@ -113,8 +113,8 @@ development_status:
   epic-8-retrospective: optional
 
   # Epic 9: Telegram 通知与远程控制
-  epic-9: backlog
-  9-1-telegram-bot-config-init: backlog
+  epic-9: in-progress
+  9-1-telegram-bot-config-init: ready-for-dev
   9-2-notification-message-sending: backlog
   9-3-trade-event-notification: backlog
   9-4-llm-analysis-notification: backlog

@@ -1,9 +1,9 @@
-"""External API clients: Polymarket, LLM.
+"""External API clients: Polymarket, LLM, Telegram.
 
 This module provides API client wrappers for external services.
 
 Usage:
-    from src.api import PolymarketClient, GammaMarket, LLMClient
+    from src.api import PolymarketClient, GammaMarket, LLMClient, TelegramClient
 
     # Polymarket client
     client = PolymarketClient()
@@ -17,11 +17,16 @@ Usage:
     # LLM client
     with LLMClient() as llm:
         response = llm.chat([{"role": "user", "content": "Hello!"}])
+
+    # Telegram client (async)
+    async with TelegramClient() as tg:
+        me = await tg.get_me()
 """
 
 from __future__ import annotations
 
 from src.api.llm import LLMClient
 from src.api.polymarket import GammaMarket, PolymarketClient
+from src.api.telegram import TelegramClient
 
-__all__ = ["PolymarketClient", "GammaMarket", "LLMClient"]
+__all__ = ["PolymarketClient", "GammaMarket", "LLMClient", "TelegramClient"]
