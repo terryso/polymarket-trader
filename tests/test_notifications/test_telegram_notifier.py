@@ -2,6 +2,7 @@
 
 Story 9.2: 通知消息发送
 Story 9.3: 交易事件通知集成
+Story 9.12: 消息队列与限流
 """
 
 from __future__ import annotations
@@ -31,10 +32,18 @@ class TestTelegramNotifier:
 
     @pytest.fixture
     def notifier(self, mock_client: MagicMock) -> TelegramNotifier:
-        """Create a TelegramNotifier with mock client."""
+        """Create a TelegramNotifier with mock client (queue disabled for tests)."""
         with patch("src.notifications.telegram_notifier.settings") as mock_settings:
             mock_settings.telegram.enabled = True
-            return TelegramNotifier(mock_client)
+            # Disable queue for most tests to maintain backward compatibility
+            return TelegramNotifier(mock_client, use_queue=False)
+
+    @pytest.fixture
+    def notifier_with_queue(self, mock_client: MagicMock) -> TelegramNotifier:
+        """Create a TelegramNotifier with queue enabled."""
+        with patch("src.notifications.telegram_notifier.settings") as mock_settings:
+            mock_settings.telegram.enabled = True
+            return TelegramNotifier(mock_client, use_queue=True)
 
     @pytest.fixture
     def sample_trade(self) -> Trade:
@@ -151,7 +160,8 @@ class TestTelegramNotifier:
             mock_client.is_enabled = True
             mock_client.authorized_chat_id = None
 
-            notifier = TelegramNotifier(mock_client)
+            # Disable queue for this test
+            notifier = TelegramNotifier(mock_client, use_queue=False)
             result = await notifier.send_message("Test message")
             assert result is False
             mock_client._bot.send_message.assert_not_called()
@@ -178,7 +188,8 @@ class TestTelegramNotifier:
             mock_client.is_enabled = True
             mock_client._bot = None  # Bot not initialized
 
-            notifier = TelegramNotifier(mock_client)
+            # Disable queue for this test
+            notifier = TelegramNotifier(mock_client, use_queue=False)
             result = await notifier.send_message("Test message")
             assert result is False
 
