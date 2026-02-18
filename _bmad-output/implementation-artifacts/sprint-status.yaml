@@ -120,7 +120,7 @@ development_status:
   9-4-llm-analysis-notification: backlog
   9-5-cmd-status-query: done
   9-6-cmd-positions-query: review
-  9-7-cmd-stats-query: backlog
+  9-7-cmd-stats-query: review
   9-8-cmd-markets-query: backlog
   9-9-cmd-history-query: backlog
   9-10-cmd-predict-trigger: backlog

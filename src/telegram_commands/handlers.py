@@ -1,10 +1,11 @@
 """Telegram command handlers for bot interactions.
 
 This module provides command handler functions for the Telegram bot,
-implementing /status, /help, and /positions commands.
+implementing /status, /help, /positions, and /stats commands.
 
 Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
+Story 9.7: Telegram 命令处理 - 统计查询
 
 Usage:
     from src.telegram_commands import setup_command_handlers
@@ -20,19 +21,28 @@ __all__ = [
     "create_status_handler",
     "create_help_handler",
     "create_positions_handler",
+    "create_stats_handler",
 ]
 
 from collections.abc import Awaitable
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, Callable
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 
 from src.config import settings
-from src.storage.repositories import MarketRepository, PositionRepository
+from src.models.trade import TradeMode
+from src.storage.repositories import (
+    MarketRepository,
+    PositionRepository,
+    PredictionRepository,
+    StatisticsRepository,
+)
 from src.telegram_commands.formatters import (
     format_help_message,
     format_positions_message,
+    format_stats_message,
     format_status_message,
     format_unauthorized_message,
 )
@@ -222,6 +232,113 @@ def create_positions_handler(
     return positions_handler
 
 
+def create_stats_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a stats command handler.
+
+    Story 9.7: Telegram 命令处理 - 统计查询
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /stats command
+
+    Example:
+        >>> handler = create_stats_handler("123456789")
+        >>> # Register with: application.add_handler(CommandHandler("stats", handler))
+    """
+
+    async def stats_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /stats command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = update.effective_chat.id
+
+        # Verify authorization
+        if authorized_chat_id and str(chat_id) != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Parse days parameter (default 7)
+        days = 7
+        if context.args and len(context.args) > 0:
+            try:
+                days = int(context.args[0])
+                # Limit to 1-365 days
+                days = max(1, min(365, days))
+            except ValueError:
+                pass  # Keep default
+
+        # Get repositories
+        stats_repo = StatisticsRepository()
+        prediction_repo = PredictionRepository()
+
+        # Determine trading mode
+        mode = TradeMode.PAPER if settings.trading_mode == "paper" else TradeMode.LIVE
+
+        # Calculate date ranges
+        today = date.today()
+        recent_start = today - timedelta(days=days)
+
+        # Get overall statistics (all time)
+        all_stats = await stats_repo.get_latest(mode, limit=365)
+
+        # Calculate overall totals
+        total_trades = sum(s.total_trades for s in all_stats)
+        total_winning = sum(s.winning_trades for s in all_stats)
+        total_losing = sum(s.losing_trades for s in all_stats)
+        total_pnl = sum(s.total_pnl or 0 for s in all_stats)
+        overall_win_rate = (
+            total_winning / total_trades * 100 if total_trades > 0 else 0.0
+        )
+
+        # Get recent statistics
+        recent_stats = await stats_repo.get_by_date_range(recent_start, today, mode)
+
+        # Calculate recent totals
+        recent_trades = sum(s.total_trades for s in recent_stats)
+        recent_winning = sum(s.winning_trades for s in recent_stats)
+        recent_win_rate = (
+            recent_winning / recent_trades * 100 if recent_trades > 0 else 0.0
+        )
+        recent_pnl = sum(s.total_pnl or 0 for s in recent_stats)
+
+        # Get prediction statistics
+        total_predictions = await prediction_repo.count()
+        validated_predictions = await prediction_repo.get_all_validated()
+
+        validated_count = len(validated_predictions)
+        correct_count = sum(1 for p in validated_predictions if p.is_correct)
+        accuracy = correct_count / validated_count * 100 if validated_count > 0 else 0.0
+
+        # Format and send message
+        message = format_stats_message(
+            total_trades=total_trades,
+            total_winning=total_winning,
+            total_losing=total_losing,
+            win_rate=overall_win_rate,
+            total_pnl=total_pnl,
+            recent_trades=recent_trades,
+            recent_win_rate=recent_win_rate,
+            recent_pnl=recent_pnl,
+            days=days,
+            total_predictions=total_predictions,
+            validated_count=validated_count,
+            accuracy=accuracy,
+        )
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Stats command processed for chat_id: {chat_id}")
+
+    return stats_handler
+
+
 def setup_command_handlers(
     application: Application,
     state_manager: "ThreadSafeState",
@@ -246,10 +363,12 @@ def setup_command_handlers(
     status_handler = create_status_handler(state_manager, authorized_chat_id)
     help_handler = create_help_handler(authorized_chat_id)
     positions_handler = create_positions_handler(authorized_chat_id)
+    stats_handler = create_stats_handler(authorized_chat_id)
 
     # Register handlers
     application.add_handler(CommandHandler("status", status_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("help", help_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("positions", positions_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("stats", stats_handler))  # type: ignore[arg-type]
 
-    logger.info("Command handlers registered: /status, /help, /positions")
+    logger.info("Command handlers registered: /status, /help, /positions, /stats")

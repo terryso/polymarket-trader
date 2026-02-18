@@ -1,5 +1,110 @@
 # Test Automation Summary
 
+## Story 9.7: Telegram 命令处理 - 统计查询
+
+**Date**: 2026-02-18
+**Status**: Complete
+**Last Updated**: 2026-02-18 (bmad-bmm-qa-automate)
+
+---
+
+## Generated Tests
+
+### Stats Command Tests (Python Backend)
+
+| File | Tests | Status | Description |
+|------|-------|--------|-------------|
+| `tests/test_telegram_commands/test_handlers.py` | 43 (15 for Story 9.7) | Pass | Complete telegram_commands test suite |
+
+**Total**: 43 tests (38 existing + 5 new for Story 9.7)
+
+### E2E Tests
+
+Not applicable - Story 9.7 is a Telegram command handler with no UI components.
+
+---
+
+## Coverage
+
+| Module | Coverage |
+|--------|----------|
+| `src/telegram_commands/__init__.py` | **100%** |
+| `src/telegram_commands/formatters.py` | **100%** |
+| `src/telegram_commands/handlers.py` | **100%** |
+| **Total** | **100%** |
+
+### Test Coverage for Story 9.7
+
+| Test | Description | Status |
+|------|-------------|--------|
+| `test_format_stats_message_with_data` | Format message with complete data | PASSED |
+| `test_format_stats_message_no_data` | Format message with zero values | PASSED |
+| `test_format_stats_message_negative_pnl` | Format message with negative PnL | PASSED |
+| `test_format_stats_message_custom_days` | Format message with custom days | PASSED |
+| `test_stats_handler_default_days` | Default 7 days period | PASSED |
+| `test_stats_handler_custom_days` | Custom days parameter (`/stats 30`) | PASSED |
+| `test_stats_handler_unauthorized` | Unauthorized user rejection | PASSED |
+| `test_stats_handler_no_restriction` | No chat ID restriction | PASSED |
+| `test_stats_handler_no_effective_chat` | Handle missing effective_chat | PASSED |
+| `test_stats_handler_invalid_days_uses_default` | Invalid days falls back to default | PASSED |
+| `test_stats_handler_days_out_of_range_clamped` | Days > 365 clamped to 365 | PASSED |
+| `test_stats_handler_live_mode` | LIVE trading mode | PASSED |
+| `test_stats_handler_with_predictions` | Prediction accuracy calculation | PASSED |
+| `test_stats_handler_days_below_minimum_clamped` | Days < 1 clamped to 1 | PASSED |
+| `test_stats_handler_negative_days_clamped` | Negative days clamped to 1 | PASSED |
+| `test_stats_handler_aggregates_multiple_stats` | Aggregation of multiple records | PASSED |
+
+### Acceptance Criteria Coverage
+
+| AC | Description | Tests |
+|----|-------------|-------|
+| #1 | `/stats` returns formatted trading statistics | `test_format_stats_message_with_data`, `test_stats_handler_default_days` |
+| #2 | Data from Statistics and Predictions tables | `test_stats_handler_with_predictions`, `test_stats_handler_aggregates_multiple_stats` |
+| #3 | Support `/stats 30` parameter | `test_stats_handler_custom_days`, `test_stats_handler_days_out_of_range_clamped` |
+
+### Edge Cases Tested
+
+1. **Empty data handling**: Zero trades, zero predictions
+2. **Negative values**: Negative PnL display
+3. **Parameter validation**:
+   - Invalid string parameter (uses default)
+   - Days below minimum (< 1, clamped to 1)
+   - Days above maximum (> 365, clamped to 365)
+   - Negative days (clamped to 1)
+4. **Authorization**: Unauthorized user access
+5. **Mode handling**: PAPER vs LIVE mode
+6. **Aggregation**: Multiple statistics records correctly summed
+
+### Tests Added During QA Automation
+
+6 new tests were added:
+
+1. `test_help_handler_no_effective_chat` - Coverage improvement for help handler
+2. `test_stats_handler_with_predictions` - Prediction accuracy calculation
+3. `test_stats_handler_days_below_minimum_clamped` - Edge case for days = 0
+4. `test_stats_handler_negative_days_clamped` - Edge case for negative days
+5. `test_stats_handler_aggregates_multiple_stats` - Multiple records aggregation
+6. Implicit coverage for line 134 (help_handler guard clause)
+
+---
+
+## Test Execution
+
+```bash
+cd /Users/nick/projects/polymarket-trader-story-9.7
+source .venv/bin/activate
+python -m pytest tests/test_telegram_commands/ -v --cov=src/telegram_commands --cov-report=term-missing
+```
+
+### Result
+
+```
+43 passed in 0.61s
+Coverage: 100%
+```
+
+---
+
 ## Story 5.4: 模拟持仓 PnL 计算
 
 **Date**: 2026-02-16

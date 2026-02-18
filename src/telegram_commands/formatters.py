@@ -13,6 +13,7 @@ __all__ = [
     "format_help_message",
     "format_unauthorized_message",
     "format_positions_message",
+    "format_stats_message",
 ]
 
 
@@ -167,5 +168,77 @@ def format_positions_message(
             f"*总盈亏: {total_pnl_sign}${total_pnl:.2f}*",
         ]
     )
+
+    return "\n".join(lines)
+
+
+def format_stats_message(
+    total_trades: int,
+    total_winning: int,
+    total_losing: int,
+    win_rate: float,
+    total_pnl: float,
+    recent_trades: int,
+    recent_win_rate: float,
+    recent_pnl: float,
+    days: int,
+    total_predictions: int,
+    validated_count: int,
+    accuracy: float,
+) -> str:
+    """Format a trading statistics message.
+
+    Story 9.7: Telegram 命令处理 - 统计查询
+
+    Args:
+        total_trades: Total number of trades
+        total_winning: Number of winning trades
+        total_losing: Number of losing trades
+        win_rate: Win rate percentage
+        total_pnl: Total profit/loss
+        recent_trades: Number of recent trades
+        recent_win_rate: Recent win rate percentage
+        recent_pnl: Recent profit/loss
+        days: Number of days for recent period
+        total_predictions: Total predictions count
+        validated_count: Validated predictions count
+        accuracy: Prediction accuracy percentage
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_stats_message(
+        ...     total_trades=25, total_winning=15, total_losing=10,
+        ...     win_rate=60.0, total_pnl=45.20,
+        ...     recent_trades=8, recent_win_rate=75.0, recent_pnl=18.50,
+        ...     days=7, total_predictions=30, validated_count=20, accuracy=70.0
+        ... )
+        >>> "*交易统计*" in msg
+        True
+    """
+    # Format PnL with sign
+    pnl_sign = "+" if total_pnl >= 0 else ""
+    recent_pnl_sign = "+" if recent_pnl >= 0 else ""
+
+    lines = [
+        "\U0001f4c8 *交易统计*",  # chart_increasing emoji
+        "",
+        "*总体表现*",
+        f"总交易: {total_trades}",
+        f"胜: {total_winning} | 负: {total_losing}",
+        f"胜率: {win_rate:.0f}%",
+        f"总盈亏: {pnl_sign}${total_pnl:.2f}",
+        "",
+        f"*近期表现 ({days}天)*",
+        f"交易: {recent_trades}",
+        f"胜率: {recent_win_rate:.0f}%",
+        f"盈亏: {recent_pnl_sign}${recent_pnl:.2f}",
+        "",
+        "*LLM 预测*",
+        f"总预测: {total_predictions}",
+        f"已验证: {validated_count}",
+        f"准确率: {accuracy:.0f}%",
+    ]
 
     return "\n".join(lines)
