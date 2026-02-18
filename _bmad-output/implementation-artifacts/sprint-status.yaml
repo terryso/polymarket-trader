@@ -111,3 +111,19 @@ development_status:
   8-5-error-handling-and-alerting: done
   8-6-run-scripts-and-process-management: done
   epic-8-retrospective: optional
+
+  # Epic 9: Telegram 通知与远程控制
+  epic-9: backlog
+  9-1-telegram-bot-config-init: backlog
+  9-2-notification-message-sending: backlog
+  9-3-trade-event-notification: backlog
+  9-4-llm-analysis-notification: backlog
+  9-5-cmd-status-query: backlog
+  9-6-cmd-positions-query: backlog
+  9-7-cmd-stats-query: backlog
+  9-8-cmd-markets-query: backlog
+  9-9-cmd-history-query: backlog
+  9-10-cmd-predict-trigger: backlog
+  9-11-cmd-remote-control: backlog
+  9-12-message-queue-rate-limiting: backlog
+  epic-9-retrospective: optional

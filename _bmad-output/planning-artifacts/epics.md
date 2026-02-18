@@ -1398,14 +1398,426 @@ curl http://localhost:8000/api/status
 
 ---
 
+## Epic 9: Telegram 通知与远程控制
+
+**目标:** 通过 Telegram 实现系统通知推送和远程命令查询/控制，随时随地了解交易状态。
+
+**用户价值:** 作为用户，我希望通过 Telegram 接收系统通知并能远程查询关键信息、控制系统状态，以便无需打开 Dashboard 也能掌握交易情况。
+
+---
+
+### Story 9.1: Telegram Bot 配置与初始化
+
+**As a** 开发者,
+**I want** 创建 Telegram Bot 配置和客户端初始化,
+**So that** 系统能够与 Telegram API 安全通信.
+
+**Acceptance Criteria:**
+
+**Given** Epic 1 配置系统已完成
+**When** 扩展配置和创建 Telegram 客户端
+**Then** 在 `src/config.py` 添加:
+```python
+# Telegram 配置
+TELEGRAM_BOT_TOKEN: str | None = None
+TELEGRAM_CHAT_ID: str | None = None  # 授权的用户 Chat ID
+TELEGRAM_ENABLED: bool = False
+```
+**And** 添加到 `requirements.txt`:
+```
+python-telegram-bot>=20.0
+```
+**And** 创建 `src/api/telegram.py`:
+- 使用 `python-telegram-bot` 库 (异步)
+- 初始化 Bot 实例和 Application
+- 实现 `get_me()` 验证 Bot 连接
+**And** 更新 `.env.example` 添加 Telegram 配置项
+**And** 配置项缺失时记录警告但不阻止系统启动
+
+---
+
+### Story 9.2: 通知消息发送
+
+**As a** 用户,
+**I want** 系统能够发送 Telegram 通知消息,
+**So that** 我能收到交易执行、分析结果等通知.
+
+**Acceptance Criteria:**
+
+**Given** Telegram Bot 已初始化
+**When** 实现 `src/notifications/telegram_notifier.py`
+**Then** 创建 `TelegramNotifier` 类:
+- `send_message(text: str, parse_mode='Markdown')` - 发送普通消息
+- `send_trade_notification(trade, market)` - 发送交易通知
+- `send_analysis_notification(prediction, market)` - 发送分析结果
+- `send_error_notification(error)` - 发送错误告警
+- `send_system_notification(event, details)` - 发送系统事件通知
+**And** 消息格式使用 Markdown:
+```
+💰 *交易执行*
+市场: Will Trump win 2028?
+方向: BUY YES
+金额: $10.00
+价格: 0.65
+状态: ✅ 成功
+```
+**And** 实现消息队列避免 API 限流
+**And** 发送失败时记录错误日志但不中断主流程
+**And** 支持配置开关控制是否发送通知
+
+---
+
+### Story 9.3: 交易事件通知集成
+
+**As a** 用户,
+**I want** 在每笔交易执行时收到 Telegram 通知,
+**So that** 我能实时了解所有交易状态.
+
+**Acceptance Criteria:**
+
+**Given** 通知发送器和交易执行器已实现
+**When** 在 `src/trading/executor.py` 集成通知
+**Then** 在以下事件触发通知 (每笔交易都通知):
+- 交易下单成功 → 发送交易通知
+- 交易下单失败 → 发送错误通知
+- 持仓平仓 → 发送平仓通知 (含盈亏)
+**And** 通知内容包含:
+- 市场名称
+- 交易方向 (BUY YES/NO)
+- 金额、价格、份额
+- 当前持仓状态
+- 时间戳
+**And** 使用 emoji 增强可读性 (💰 ✅ ❌ 📊)
+
+---
+
+### Story 9.4: LLM 分析结果通知
+
+**As a** 用户,
+**I want** 在 LLM 完成市场分析时收到通知,
+**So that** 我能了解系统的分析决策.
+
+**Acceptance Criteria:**
+
+**Given** 通知发送器和 LLM 分析器已实现
+**When** 在 `src/analysis/llm_analyzer.py` 集成通知
+**Then** 在以下情况发送分析通知:
+- LLM 分析完成且置信度 >= MIN_CONFIDENCE
+- 预测方向与市场价格差距 >= MIN_EDGE
+**And** 通知内容包含:
+- 市场名称
+- 市场价格 vs 预测概率
+- 置信度、Edge
+- 关键假设 (最多 3 条)
+- 交易建议
+```
+🧠 *市场分析*
+市场: Will BTC reach $100k?
+市场价格: YES 0.55
+预测概率: YES 0.75 (±0.10)
+置信度: 85%
+Edge: 20%
+建议: BUY YES
+```
+**And** 可配置是否发送所有分析或仅可交易信号
+
+---
+
+### Story 9.5: Telegram 命令处理 - 状态查询
+
+**As a** 用户,
+**I want** 通过 Telegram 命令查询系统状态,
+**So that** 我能随时随地了解系统运行情况.
+
+**Acceptance Criteria:**
+
+**Given** Telegram Bot 已初始化
+**When** 在 `src/api/telegram.py` 添加命令处理器
+**Then** 实现 `/status` 命令:
+- 返回: 交易模式、当前资金、日盈亏、持仓数、连续亏损
+- 显示交易是否启用
+```
+📊 *系统状态*
+模式: PAPER
+资金: $180.50
+日盈亏: -$5.50 (-2.9%)
+持仓: 2 个
+连续亏损: 1
+交易: ✅ 启用
+```
+**And** 实现 `/help` 命令显示所有可用命令
+**And** 验证发送者 Chat ID 是否匹配授权用户
+**And** 未授权用户发送命令时忽略或返回错误
+
+---
+
+### Story 9.6: Telegram 命令处理 - 持仓查询
+
+**As a** 用户,
+**I want** 通过 Telegram 命令查看当前持仓,
+**So that** 我能了解资金分配和风险敞口.
+
+**Acceptance Criteria:**
+
+**Given** `/status` 命令已实现
+**When** 添加 `/positions` 命令
+**Then** 返回当前所有未平仓位:
+```
+📍 *当前持仓*
+
+1. *Will Trump win 2028?*
+   方向: YES | 份额: 15.38
+   成本: $10.00 | 现值: $12.50
+   盈亏: +$2.50 (+25%)
+
+2. *BTC > $100k by 2025?*
+   方向: NO | 份额: 20.00
+   成本: $8.00 | 现值: $7.20
+   盈亏: -$0.80 (-10%)
+
+*总风险敞口: $18.00*
+*总盈亏: +$1.70*
+```
+**And** 无持仓时返回 "暂无持仓"
+**And** 持仓数据来自 Position 实时计算
+
+---
+
+### Story 9.7: Telegram 命令处理 - 统计查询
+
+**As a** 用户,
+**I want** 通过 Telegram 命令查看交易统计,
+**So that** 我能了解胜率、盈亏等关键指标.
+
+**Acceptance Criteria:**
+
+**Given** `/positions` 命令已实现
+**When** 添加 `/stats` 命令
+**Then** 返回交易统计数据:
+```
+📈 *交易统计*
+
+*总体表现*
+总交易: 25
+胜: 15 | 负: 10
+胜率: 60%
+总盈亏: +$45.20
+
+*近期表现 (7天)*
+交易: 8
+胜率: 75%
+盈亏: +$18.50
+
+*LLM 预测*
+总预测: 30
+已验证: 20
+准确率: 70%
+```
+**And** 数据来自 Statistics 表和 Predictions 表
+**And** 支持参数 `/stats 30` 查看最近 30 天
+
+---
+
+### Story 9.8: Telegram 命令处理 - 市场查询
+
+**As a** 用户,
+**I want** 通过 Telegram 命令查看当前关注的市场,
+**So that** 我能了解系统正在分析哪些市场.
+
+**Acceptance Criteria:**
+
+**Given** 查询命令已实现
+**When** 添加 `/markets` 命令
+**Then** 返回当前活跃市场列表:
+```
+🎯 *活跃市场* (5 个)
+
+1. *Will Trump win 2028?*
+   价格: YES 0.65 | 流动性: $50k
+   截止: 2028-11-07
+
+2. *BTC > $100k by 2025?*
+   价格: YES 0.45 | 流动性: $120k
+   截止: 2025-12-31
+
+3. *Fed rate cut in March?*
+   价格: YES 0.72 | 流动性: $80k
+   截止: 2025-03-15
+```
+**And** 支持参数:
+- `/markets 10` - 显示前 10 个市场
+- `/markets politics` - 按类别筛选
+**And** 数据来自 Markets 表 (已筛选的活跃市场)
+
+---
+
+### Story 9.9: Telegram 命令处理 - 交易历史
+
+**As a** 用户,
+**I want** 通过 Telegram 命令查看最近交易历史,
+**So that** 我能回顾近期的交易活动.
+
+**Acceptance Criteria:**
+
+**Given** `/markets` 命令已实现
+**When** 添加 `/history` 命令
+**Then** 返回最近交易记录:
+```
+📜 *最近交易* (10 笔)
+
+1. *BUY YES* Will Trump win?
+   $10.00 @ 0.65 | 2小时前
+   状态: ✅ 持仓中
+
+2. *SELL NO* BTC > $100k?
+   $8.00 @ 0.55 | 5小时前
+   状态: ✅ 已平仓 +$1.20
+
+3. *BUY YES* Fed rate cut?
+   $5.00 @ 0.72 | 1天前
+   状态: ❌ 已取消
+```
+**And** 支持参数:
+- `/history 20` - 显示最近 20 笔
+- `/history paper` - 只看 Paper Trading
+- `/history live` - 只看 Live Trading
+**And** 数据来自 Trades 表
+
+---
+
+### Story 9.10: Telegram 命令处理 - 手动触发分析
+
+**As a** 用户,
+**I want** 通过 Telegram 命令手动触发市场分析,
+**So that** 我能让系统分析特定的市场.
+
+**Acceptance Criteria:**
+
+**Given** 交易历史命令已实现
+**When** 添加 `/predict` 命令
+**Then** 实现手动分析功能:
+- `/predict` - 返回可选市场列表 (带序号)
+- `/predict 3` - 对第 3 个市场执行 LLM 分析
+- `/predict <market_id>` - 对指定市场 ID 执行分析
+**And** 分析完成后自动发送结果通知
+**And** 命令响应:
+```
+🧠 *分析中...*
+市场: Will Trump win 2028?
+请稍候，LLM 正在分析...
+```
+**And** 如果分析结果符合交易条件，询问是否执行:
+```
+分析完成！建议 BUY YES
+是否执行交易？回复 /confirm 或 /cancel
+```
+**And** 记录手动触发日志
+
+---
+
+### Story 9.11: Telegram 命令处理 - 远程控制
+
+**As a** 用户,
+**I want** 通过 Telegram 命令远程控制系统,
+**So that** 我能远程开启/关闭交易、切换模式.
+
+**Acceptance Criteria:**
+
+**Given** 所有查询命令已实现
+**When** 添加控制命令
+**Then** 实现以下控制命令:
+
+**交易开关:**
+- `/enable` - 启用交易
+- `/disable` - 禁用交易
+- 返回确认消息并记录审计日志
+
+**模式切换:**
+- `/mode` - 显示当前模式
+- `/mode paper` - 切换到 Paper Trading
+- `/mode live` - 切换到 Live Trading (需二次确认)
+
+**安全机制:**
+- 切换到 Live 模式需要二次确认
+- 所有控制命令记录审计日志
+- 发送安全短语确认身份 (可选配置)
+```
+⚠️ *安全确认*
+即将切换到 LIVE 模式
+回复 /confirm live 在 30 秒内确认
+```
+**And** 控制成功后发送通知确认
+**And** 更新 ThreadSafeState 状态
+
+---
+
+### Story 9.12: 消息队列与限流
+
+**As a** 开发者,
+**I want** 实现 Telegram 消息队列和限流,
+**So that** 系统不会因消息过多而被 Telegram API 限流.
+
+**Acceptance Criteria:**
+
+**Given** 通知发送已实现
+**When** 实现消息队列机制
+**Then** 创建 `src/notifications/message_queue.py`:
+- 使用 `asyncio.Queue` 实现消息队列
+- 限制发送频率: 最大 30 条/秒 (Telegram API 限制)
+- 消息优先级: 控制命令响应 > 错误告警 > 交易通知 > 分析通知
+**And** 实现消息批量发送:
+- 相同类型的短消息合并发送
+- 单条消息字符限制: 4096 字符
+- 超长消息自动分割
+**And** 队列满时丢弃最旧的非关键消息
+**And** 记录队列状态日志
+
+---
+
+## Epic 9 总结
+
+### Story 优先级
+
+| Story | 描述 | 优先级 | 依赖 |
+|-------|------|--------|------|
+| 9.1 | Bot 配置与初始化 | P0 | Epic 1 |
+| 9.2 | 通知消息发送 | P0 | 9.1 |
+| 9.3 | 交易事件通知集成 | P0 | 9.2, Epic 5 |
+| 9.4 | LLM 分析结果通知 | P1 | 9.2, Epic 3 |
+| 9.5 | 命令 - 状态查询 `/status` | P0 | 9.1 |
+| 9.6 | 命令 - 持仓查询 `/positions` | P1 | 9.5, Epic 4 |
+| 9.7 | 命令 - 统计查询 `/stats` | P1 | 9.5, Epic 6 |
+| 9.8 | 命令 - 市场查询 `/markets` | P1 | 9.5, Epic 2 |
+| 9.9 | 命令 - 交易历史 `/history` | P1 | 9.5, Epic 5 |
+| 9.10 | 命令 - 手动分析 `/predict` | P2 | 9.5, Epic 3 |
+| 9.11 | 命令 - 远程控制 `/enable` `/disable` `/mode` | P2 | 9.5 |
+| 9.12 | 消息队列与限流 | P1 | 9.2 |
+
+### 可用命令汇总
+
+| 命令 | 描述 | Story |
+|------|------|-------|
+| `/help` | 显示帮助信息 | 9.5 |
+| `/status` | 查看系统状态 | 9.5 |
+| `/positions` | 查看当前持仓 | 9.6 |
+| `/stats [days]` | 查看交易统计 | 9.7 |
+| `/markets [n] [category]` | 查看活跃市场 | 9.8 |
+| `/history [n] [mode]` | 查看交易历史 | 9.9 |
+| `/predict [market_id]` | 手动触发分析 | 9.10 |
+| `/enable` | 启用交易 | 9.11 |
+| `/disable` | 禁用交易 | 9.11 |
+| `/mode [paper/live]` | 查看/切换模式 | 9.11 |
+
+---
+
 ## Summary
 
 ### Statistics
 
 | Metric | Count |
 |--------|-------|
-| **Total Epics** | 8 |
-| **Total Stories** | 44 |
+| **Total Epics** | 9 |
+| **Total Stories** | 56 |
 | **FR Coverage** | 12/12 (100%) |
 | **NFR Coverage** | 10/10 (100%) |
 | **AR Coverage** | 12/12 (100%) |
@@ -1420,5 +1832,6 @@ curl http://localhost:8000/api/status
 | Epic 4: 风险控制与熔断系统 | 5 | FR5, FR6, FR7, FR8 |
 | Epic 5: Paper Trading 模拟交易 | 5 | FR4 |
 | Epic 6: 预测追踪与学习日志 | 5 | FR9, FR10 |
-| Epic 7: Dashboard 后端 API 集成 | 6 | FR11, FR12, AR2, AR10 |
+| Epic 7: Dashboard 后端 API 集成 | 7 | FR11, FR12, AR2, AR10 |
 | Epic 8: 系统调度与自动化运行 | 6 | NFR1, NFR2, NFR10, AR4 |
+| Epic 9: Telegram 通知与远程控制 | 12 | (新增功能) |
