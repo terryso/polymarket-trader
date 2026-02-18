@@ -4,6 +4,7 @@ This module provides a typed interface to the Telegram Bot API,
 using python-telegram-bot library (v20+).
 
 Story 9.1: Telegram Bot 配置与初始化
+Story 9.5: Telegram 命令处理 - 状态查询
 
 Usage:
     from src.api import TelegramClient
@@ -27,7 +28,7 @@ from __future__ import annotations
 
 __all__ = ["TelegramClient"]
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from telegram import Bot, User
 from telegram.error import (
@@ -42,6 +43,9 @@ from telegram.ext import Application
 from src.config import settings
 from src.exceptions import ConfigurationError, NetworkError
 from src.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from src.core.state import ThreadSafeState
 
 # Emoji mappings for Telegram operations
 TELEGRAM_EMOJIS = {
@@ -226,3 +230,60 @@ class TelegramClient:
             # No restriction configured
             return True
         return str(chat_id) == str(self._chat_id)
+
+    async def setup_commands(
+        self,
+        state_manager: "ThreadSafeState",
+    ) -> None:
+        """Setup command handlers for the bot.
+
+        Story 9.5: Telegram 命令处理 - 状态查询
+
+        Args:
+            state_manager: ThreadSafeState instance for system state
+        """
+        if not self.is_enabled or not self._application:
+            self._logger.warning("Cannot setup commands: client not enabled")
+            return
+
+        from src.telegram_commands import setup_command_handlers
+
+        setup_command_handlers(
+            self._application,
+            state_manager,
+            self._chat_id,
+        )
+
+        self._logger.info("Command handlers setup complete")
+
+    async def start_polling(self) -> None:
+        """Start polling for Telegram updates.
+
+        Story 9.5: Telegram 命令处理 - 状态查询
+        """
+        if not self.is_enabled or not self._application:
+            self._logger.warning("Cannot start polling: client not enabled")
+            return
+
+        # In python-telegram-bot v22+, start_polling is on Updater, not Application
+        if self._application.updater is None:
+            self._logger.error("Cannot start polling: updater is not available")
+            return
+
+        await self._application.updater.start_polling()
+        self._logger.info("Started polling for Telegram updates")
+
+    async def stop_polling(self) -> None:
+        """Stop polling for Telegram updates.
+
+        Story 9.5: Telegram 命令处理 - 状态查询
+        """
+        if not self._application or self._application.updater is None:
+            return
+
+        try:
+            # In python-telegram-bot v22+, use Updater.stop() to stop polling
+            await self._application.updater.stop()
+            self._logger.info("Stopped polling for Telegram updates")
+        except Exception as e:
+            self._logger.debug(f"Error stopping polling (may not have been started): {e}")

@@ -118,7 +118,7 @@ development_status:
   9-2-notification-message-sending: done
   9-3-trade-event-notification: review
   9-4-llm-analysis-notification: backlog
-  9-5-cmd-status-query: backlog
+  9-5-cmd-status-query: done
   9-6-cmd-positions-query: backlog
   9-7-cmd-stats-query: backlog
   9-8-cmd-markets-query: backlog
