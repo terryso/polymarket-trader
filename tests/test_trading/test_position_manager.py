@@ -1192,3 +1192,209 @@ class TestPositionManager:
         assert result.positions_count == 2
         assert result.winning_count == 1
         assert result.losing_count == 1
+
+    # ==================== Notification Tests (Story 9.3) ====================
+
+    @pytest.mark.asyncio
+    async def test_init_with_notifier(self, repo: PositionRepository) -> None:
+        """测试初始化时带有 notifier."""
+        state = ThreadSafeState(initial_capital=200.0)
+        mock_notifier = AsyncMock()
+        mock_notifier.send_position_closed_notification = AsyncMock(return_value=True)
+
+        manager = PositionManager(repo, state, notifier=mock_notifier)
+
+        assert manager._notifier is mock_notifier
+
+    @pytest.mark.asyncio
+    async def test_init_without_notifier(self, repo: PositionRepository) -> None:
+        """测试初始化时不带 notifier."""
+        state = ThreadSafeState(initial_capital=200.0)
+
+        manager = PositionManager(repo, state, notifier=None)
+
+        assert manager._notifier is None
+
+    @pytest.mark.asyncio
+    async def test_close_position_sends_notification(
+        self, repo: PositionRepository, sample_position: Position
+    ) -> None:
+        """测试平仓时发送通知."""
+        state = ThreadSafeState(initial_capital=200.0)
+        mock_notifier = AsyncMock()
+        mock_notifier.send_position_closed_notification = AsyncMock(return_value=True)
+
+        manager = PositionManager(repo, state, notifier=mock_notifier)
+
+        # Create sample market
+        from src.models.market import Market
+
+        sample_market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.50,
+        )
+
+        with patch.object(manager._repo, "get_by_id", return_value=sample_position):
+            closed_position = sample_position.model_copy(
+                update={
+                    "status": PositionStatus.CLOSED,
+                    "current_value": 60.0,
+                    "pnl": 15.0,
+                    "closed_at": datetime.now(timezone.utc),
+                }
+            )
+            with patch.object(manager._repo, "update", return_value=closed_position):
+                await manager.close_position(1, 0.60, market=sample_market)
+
+                # Verify notification was sent
+                mock_notifier.send_position_closed_notification.assert_called_once()
+                call_kwargs = mock_notifier.send_position_closed_notification.call_args
+                assert call_kwargs[1]["position"] == closed_position
+                assert call_kwargs[1]["market"] == sample_market
+                assert call_kwargs[1]["pnl"] == pytest.approx(15.0)
+                assert call_kwargs[1]["pnl_pct"] == pytest.approx(15.0 / 45.0)
+
+    @pytest.mark.asyncio
+    async def test_close_position_no_notification_without_market(
+        self, repo: PositionRepository, sample_position: Position
+    ) -> None:
+        """测试平仓时不发送通知（没有 market 参数）."""
+        state = ThreadSafeState(initial_capital=200.0)
+        mock_notifier = AsyncMock()
+        mock_notifier.send_position_closed_notification = AsyncMock(return_value=True)
+
+        manager = PositionManager(repo, state, notifier=mock_notifier)
+
+        with patch.object(manager._repo, "get_by_id", return_value=sample_position):
+            closed_position = sample_position.model_copy(
+                update={
+                    "status": PositionStatus.CLOSED,
+                    "current_value": 60.0,
+                    "pnl": 15.0,
+                    "closed_at": datetime.now(timezone.utc),
+                }
+            )
+            with patch.object(manager._repo, "update", return_value=closed_position):
+                await manager.close_position(1, 0.60, market=None)
+
+                # No notification should be sent without market
+                mock_notifier.send_position_closed_notification.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_close_position_no_notification_when_notifier_is_none(
+        self, repo: PositionRepository, sample_position: Position
+    ) -> None:
+        """测试平仓时不发送通知（notifier 为 None）."""
+        state = ThreadSafeState(initial_capital=200.0)
+
+        manager = PositionManager(repo, state, notifier=None)
+
+        from src.models.market import Market
+
+        sample_market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.50,
+        )
+
+        with patch.object(manager._repo, "get_by_id", return_value=sample_position):
+            closed_position = sample_position.model_copy(
+                update={
+                    "status": PositionStatus.CLOSED,
+                    "current_value": 60.0,
+                    "pnl": 15.0,
+                    "closed_at": datetime.now(timezone.utc),
+                }
+            )
+            with patch.object(manager._repo, "update", return_value=closed_position):
+                # Should not raise exception
+                await manager.close_position(1, 0.60, market=sample_market)
+
+    @pytest.mark.asyncio
+    async def test_close_position_notification_failure_does_not_affect_close(
+        self, repo: PositionRepository, sample_position: Position
+    ) -> None:
+        """测试通知失败不影响平仓."""
+        state = ThreadSafeState(initial_capital=200.0)
+        mock_notifier = AsyncMock()
+        mock_notifier.send_position_closed_notification = AsyncMock(
+            side_effect=Exception("Network error")
+        )
+
+        manager = PositionManager(repo, state, notifier=mock_notifier)
+
+        from src.models.market import Market
+
+        sample_market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.50,
+        )
+
+        with patch.object(manager._repo, "get_by_id", return_value=sample_position):
+            closed_position = sample_position.model_copy(
+                update={
+                    "status": PositionStatus.CLOSED,
+                    "current_value": 60.0,
+                    "pnl": 15.0,
+                    "closed_at": datetime.now(timezone.utc),
+                }
+            )
+            with patch.object(manager._repo, "update", return_value=closed_position):
+                # Should not raise exception
+                result = await manager.close_position(1, 0.60, market=sample_market)
+
+                # Position should still be closed
+                assert result.status == PositionStatus.CLOSED
+                assert result.pnl == 15.0
+
+    @pytest.mark.asyncio
+    async def test_close_position_notification_with_loss(
+        self, repo: PositionRepository
+    ) -> None:
+        """测试平仓亏损时发送通知."""
+        state = ThreadSafeState(initial_capital=200.0)
+        mock_notifier = AsyncMock()
+        mock_notifier.send_position_closed_notification = AsyncMock(return_value=True)
+
+        manager = PositionManager(repo, state, notifier=mock_notifier)
+
+        position = Position(
+            id=1,
+            market_id="loss-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.50,
+            initial_value=50.0,
+            current_value=50.0,
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+            opened_at=datetime.now(timezone.utc),
+            closed_at=None,
+        )
+
+        from src.models.market import Market
+
+        sample_market = Market(
+            id="loss-market",
+            title="Loss Market",
+            yes_price=0.40,
+        )
+
+        with patch.object(manager._repo, "get_by_id", return_value=position):
+            closed_position = position.model_copy(
+                update={
+                    "status": PositionStatus.CLOSED,
+                    "current_value": 40.0,
+                    "pnl": -10.0,
+                    "closed_at": datetime.now(timezone.utc),
+                }
+            )
+            with patch.object(manager._repo, "update", return_value=closed_position):
+                await manager.close_position(1, 0.40, market=sample_market)
+
+                # Verify notification with loss
+                call_kwargs = mock_notifier.send_position_closed_notification.call_args
+                assert call_kwargs[1]["pnl"] == pytest.approx(-10.0)
+                assert call_kwargs[1]["pnl_pct"] == pytest.approx(-10.0 / 50.0)

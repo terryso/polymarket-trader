@@ -116,7 +116,7 @@ development_status:
   epic-9: in-progress
   9-1-telegram-bot-config-init: done
   9-2-notification-message-sending: done
-  9-3-trade-event-notification: backlog
+  9-3-trade-event-notification: review
   9-4-llm-analysis-notification: backlog
   9-5-cmd-status-query: backlog
   9-6-cmd-positions-query: backlog

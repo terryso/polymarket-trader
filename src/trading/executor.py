@@ -4,6 +4,7 @@ This module provides the TradingExecutor class that orchestrates
 the complete trading decision flow from LLM analysis to trade execution.
 
 Story 5.3: 交易决策流程
+Story 9.3: 交易事件通知集成
 
 Example:
     >>> from src.trading.executor import TradingExecutor
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
     from src.models.market import Market
     from src.models.position import Position
     from src.models.prediction import PredictionResult
+    from src.notifications.telegram_notifier import TelegramNotifier
     from src.trading.paper_trading import PaperTradeResult, PaperTradingExecutor
     from src.trading.risk_control import RiskCheckResult, RiskController
 
@@ -86,11 +88,14 @@ class TradingExecutor:
     Coordinates LLM analysis, risk checking, and trade execution to
     automatically process markets and make trading decisions.
 
+    Story 9.3: Added Telegram notification support for trade events.
+
     Attributes:
         _llm_analyzer: LLMAnalyzer for market analysis
         _risk_controller: RiskController for risk checks
         _paper_executor: PaperTradingExecutor for trade execution
         _state: ThreadSafeState for capital tracking
+        _notifier: Optional TelegramNotifier for trade notifications
 
     Example:
         >>> executor = TradingExecutor(
@@ -110,6 +115,7 @@ class TradingExecutor:
         risk_controller: "RiskController",
         paper_executor: "PaperTradingExecutor",
         state: "ThreadSafeState",
+        notifier: "TelegramNotifier | None" = None,
     ) -> None:
         """Initialize trading executor.
 
@@ -118,13 +124,26 @@ class TradingExecutor:
             risk_controller: Risk controller for trade validation
             paper_executor: Paper trading executor for trade execution
             state: Thread-safe state for capital tracking
+            notifier: Optional Telegram notifier for trade notifications
         """
         self._llm_analyzer = llm_analyzer
         self._risk_controller = risk_controller
         self._paper_executor = paper_executor
         self._state = state
+        self._notifier = notifier
         self._logger = get_logger(__name__)
-        self._logger.info(f"TradingExecutor initialized (mode={settings.trading_mode})")
+
+        # Log notification status
+        if self._notifier:
+            self._logger.info(
+                f"TradingExecutor initialized (mode={settings.trading_mode}, "
+                f"notifications=enabled)"
+            )
+        else:
+            self._logger.info(
+                f"TradingExecutor initialized (mode={settings.trading_mode}, "
+                f"notifications=disabled)"
+            )
 
     async def process_market(self, market: "Market") -> TradingDecision:
         """Process a single market and make a trading decision.
@@ -134,6 +153,8 @@ class TradingExecutor:
         2. Risk check -> validate trade allowed
         3. Position sizing -> calculate amount
         4. Trade execution -> execute paper trade
+
+        Story 9.3: Added notification support for trade events.
 
         Args:
             market: Market to process
@@ -199,6 +220,13 @@ class TradingExecutor:
                     f"Trade execution failed for market {market.id}: "
                     f"{result.error_message}"
                 )
+
+                # Story 9.3: Send failure notification
+                await self._notify_trade_failed(
+                    market=market,
+                    error_message=result.error_message or "Unknown error",
+                )
+
                 return TradingDecision(
                     market_id=market.id,
                     success=False,
@@ -216,6 +244,9 @@ class TradingExecutor:
                 f"= ${amount:.2f}"
             )
 
+            # Story 9.3: Send success notification
+            await self._notify_trade_success(trade=trade, market=market)
+
             return TradingDecision(
                 market_id=market.id,
                 success=True,
@@ -227,6 +258,13 @@ class TradingExecutor:
 
         except Exception as e:
             self._logger.error(f"Unexpected error processing market {market.id}: {e}")
+
+            # Story 9.3: Send error notification
+            await self._notify_trade_failed(
+                market=market,
+                error_message=f"Unexpected error: {e}",
+            )
+
             return TradingDecision(
                 market_id=market.id,
                 success=False,
@@ -314,3 +352,58 @@ class TradingExecutor:
             )
 
         return amount
+
+    async def _notify_trade_success(
+        self,
+        trade: Trade,
+        market: "Market",
+    ) -> None:
+        """Send trade success notification.
+
+        Story 9.3: 交易事件通知集成
+
+        Args:
+            trade: The executed trade
+            market: The market for the trade
+        """
+        if not self._notifier:
+            return
+
+        try:
+            success = await self._notifier.send_trade_notification(trade, market)
+            if success:
+                self._logger.debug(f"Trade notification sent for trade {trade.id}")
+            else:
+                self._logger.warning(
+                    f"Failed to send trade notification for trade {trade.id}"
+                )
+        except Exception as e:
+            # Don't let notification failure affect main flow
+            self._logger.error(f"Error sending trade notification: {e}")
+
+    async def _notify_trade_failed(
+        self,
+        market: "Market",
+        error_message: str,
+    ) -> None:
+        """Send trade failure notification.
+
+        Story 9.3: 交易事件通知集成
+
+        Args:
+            market: The market that failed
+            error_message: The error message
+        """
+        if not self._notifier:
+            return
+
+        try:
+            error_msg = f"Trade failed for {market.title}: {error_message}"
+            success = await self._notifier.send_error_notification(error_msg)
+            if success:
+                self._logger.debug("Trade failure notification sent")
+            else:
+                self._logger.warning("Failed to send trade failure notification")
+        except Exception as e:
+            # Don't let notification failure affect main flow
+            self._logger.error(f"Error sending trade failure notification: {e}")

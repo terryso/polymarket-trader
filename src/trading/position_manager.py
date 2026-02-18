@@ -6,6 +6,7 @@ Also provides PnL calculation functionality for simulated positions.
 
 Story 4.5: 持仓管理
 Story 5.4: 模拟持仓 PnL 计算
+Story 9.3: 交易事件通知集成
 
 Example:
     >>> from src.trading.position_manager import PositionManager
@@ -43,6 +44,8 @@ from src.utils.logger import get_logger
 
 if TYPE_CHECKING:
     from src.core.state import ThreadSafeState
+    from src.models.market import Market
+    from src.notifications.telegram_notifier import TelegramNotifier
     from src.storage.repositories.position_repo import PositionRepository
 
 
@@ -90,9 +93,12 @@ class PositionManager:
     - Closing positions
     - Tracking total exposure
 
+    Story 9.3: Added Telegram notification support for position events.
+
     Attributes:
         _repo: PositionRepository for database operations
         _state: ThreadSafeState for system state tracking
+        _notifier: Optional TelegramNotifier for position notifications
 
     Example:
         >>> manager = PositionManager(repo, state)
@@ -106,17 +112,25 @@ class PositionManager:
         self,
         repository: "PositionRepository",
         state: "ThreadSafeState",
+        notifier: "TelegramNotifier | None" = None,
     ) -> None:
         """Initialize position manager.
 
         Args:
             repository: PositionRepository for database operations
             state: ThreadSafeState for system state tracking
+            notifier: Optional Telegram notifier for position notifications
         """
         self._repo = repository
         self._state = state
+        self._notifier = notifier
         self._logger = get_logger(__name__)
-        self._logger.info("PositionManager initialized")
+
+        # Log notification status
+        if self._notifier:
+            self._logger.info("PositionManager initialized (notifications=enabled)")
+        else:
+            self._logger.info("PositionManager initialized (notifications=disabled)")
 
     async def open_position(
         self,
@@ -249,12 +263,16 @@ class PositionManager:
         self,
         position_id: int,
         final_price: float,
+        market: "Market | None" = None,
     ) -> Position:
         """Close an open position.
+
+        Story 9.3: Added optional market parameter and notification support.
 
         Args:
             position_id: Position identifier
             final_price: Final market price at close (0-1)
+            market: Optional market for notification (includes market title)
 
         Returns:
             Closed Position with final PnL
@@ -284,6 +302,13 @@ class PositionManager:
         final_value = position.shares * final_price
         pnl = final_value - (position.initial_value or 0)
 
+        # Calculate PnL percentage
+        initial_value = position.initial_value or 0
+        if initial_value > 0:
+            pnl_pct = pnl / initial_value
+        else:
+            pnl_pct = 0.0
+
         # Update position
         now = datetime.now(timezone.utc)
         position.status = PositionStatus.CLOSED
@@ -305,7 +330,55 @@ class PositionManager:
             f"final_value=${final_value:.2f}, pnl=${pnl:.2f}"
         )
 
+        # Story 9.3: Send position closed notification
+        if self._notifier and market:
+            await self._notify_position_closed(
+                position=updated_position,
+                market=market,
+                pnl=pnl,
+                pnl_pct=pnl_pct,
+            )
+
         return updated_position
+
+    async def _notify_position_closed(
+        self,
+        position: Position,
+        market: "Market",
+        pnl: float,
+        pnl_pct: float,
+    ) -> None:
+        """Send position closed notification.
+
+        Story 9.3: 交易事件通知集成
+
+        Args:
+            position: The closed position
+            market: The market for the position
+            pnl: Profit/loss amount in USD
+            pnl_pct: Profit/loss percentage
+        """
+        if not self._notifier:
+            return
+
+        try:
+            success = await self._notifier.send_position_closed_notification(
+                position=position,
+                market=market,
+                pnl=pnl,
+                pnl_pct=pnl_pct,
+            )
+            if success:
+                self._logger.debug(
+                    f"Position closed notification sent for position {position.id}"
+                )
+            else:
+                self._logger.warning(
+                    f"Failed to send position closed notification for position {position.id}"
+                )
+        except Exception as e:
+            # Don't let notification failure affect main flow
+            self._logger.error(f"Error sending position closed notification: {e}")
 
     async def get_open_positions(self) -> list[Position]:
         """Get all open positions.

@@ -1,6 +1,7 @@
 """Tests for TelegramNotifier.
 
 Story 9.2: 通知消息发送
+Story 9.3: 交易事件通知集成
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.models.market import Market
+from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.prediction import PredictionResult, Recommendation
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.notifications.telegram_notifier import TelegramNotifier
@@ -530,3 +532,224 @@ class TestTelegramNotifier:
         assert "*系统事件*" in message
         assert "事件: test" in message
         assert "*详情:*" not in message  # Empty dict should not show details section
+
+    # ========== Position Closed Notification Tests (Story 9.3) ==========
+
+    @pytest.fixture
+    def sample_position(self) -> Position:
+        """Create a sample position for testing."""
+        return Position(
+            id=1,
+            market_id="market-1",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=55.0,
+            pnl=10.0,
+            status=PositionStatus.CLOSED,
+        )
+
+    @pytest.mark.asyncio
+    async def test_send_position_closed_notification_profit(
+        self,
+        notifier: TelegramNotifier,
+        mock_client: MagicMock,
+        sample_position: Position,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed notification with profit."""
+        result = await notifier.send_position_closed_notification(
+            position=sample_position,
+            market=sample_market,
+            pnl=10.0,
+            pnl_pct=0.2222,
+        )
+        assert result is True
+
+        # Verify message format
+        call_args = mock_client._bot.send_message.call_args
+        message = call_args.kwargs["text"]
+        assert "*持仓平仓*" in message
+        assert "Will Trump win 2028?" in message
+        assert "YES" in message
+        assert "100.00" in message  # shares
+        assert "$45.00" in message  # cost
+        assert "$55.00" in message  # revenue
+        assert "+$10.00" in message  # profit
+        assert "+22.2%" in message  # profit percentage
+
+    @pytest.mark.asyncio
+    async def test_send_position_closed_notification_loss(
+        self,
+        notifier: TelegramNotifier,
+        mock_client: MagicMock,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed notification with loss."""
+        position = Position(
+            id=1,
+            market_id="market-1",
+            outcome=PositionOutcome.NO,
+            shares=100.0,
+            avg_price=0.60,
+            initial_value=60.0,
+            current_value=45.0,
+            pnl=-15.0,
+            status=PositionStatus.CLOSED,
+        )
+
+        result = await notifier.send_position_closed_notification(
+            position=position,
+            market=sample_market,
+            pnl=-15.0,
+            pnl_pct=-0.25,
+        )
+        assert result is True
+
+        # Verify message format
+        call_args = mock_client._bot.send_message.call_args
+        message = call_args.kwargs["text"]
+        assert "*持仓平仓*" in message
+        assert "NO" in message
+        assert "$-15.00" in message  # loss (negative sign is part of the number)
+        assert "-25.0%" in message  # loss percentage
+
+    def test_format_position_closed_message_profit(
+        self,
+        notifier: TelegramNotifier,
+        sample_position: Position,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed message formatting with profit."""
+        message = notifier._format_position_closed_message(
+            position=sample_position,
+            market=sample_market,
+            pnl=10.0,
+            pnl_pct=0.2222,
+        )
+
+        assert "*持仓平仓*" in message
+        assert "Will Trump win 2028?" in message
+        assert "方向: YES" in message
+        assert "份额: 100.00" in message
+        assert "成本: $45.00" in message
+        assert "收益: $55.00" in message
+        assert "+$10.00" in message
+        assert "+22.2%" in message
+        assert "时间:" in message
+
+    def test_format_position_closed_message_loss(
+        self,
+        notifier: TelegramNotifier,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed message formatting with loss."""
+        position = Position(
+            id=1,
+            market_id="market-1",
+            outcome=PositionOutcome.NO,
+            shares=50.0,
+            avg_price=0.70,
+            initial_value=35.0,
+            current_value=25.0,
+            pnl=-10.0,
+            status=PositionStatus.CLOSED,
+        )
+
+        message = notifier._format_position_closed_message(
+            position=position,
+            market=sample_market,
+            pnl=-10.0,
+            pnl_pct=-0.2857,
+        )
+
+        assert "*持仓平仓*" in message
+        assert "方向: NO" in message
+        assert "$-10.00" in message  # loss (negative sign is part of the number)
+        assert "-28.6%" in message
+
+    def test_format_position_closed_message_zero_pnl(
+        self,
+        notifier: TelegramNotifier,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed message formatting with zero PnL."""
+        position = Position(
+            id=1,
+            market_id="market-1",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.50,
+            initial_value=50.0,
+            current_value=50.0,
+            pnl=0.0,
+            status=PositionStatus.CLOSED,
+        )
+
+        message = notifier._format_position_closed_message(
+            position=position,
+            market=sample_market,
+            pnl=0.0,
+            pnl_pct=0.0,
+        )
+
+        assert "*持仓平仓*" in message
+        assert "+$0.00" in message  # Zero should show as positive
+        assert "+0.0%" in message
+
+    def test_format_position_closed_message_without_initial_value(
+        self,
+        notifier: TelegramNotifier,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed message formatting without initial value."""
+        position = Position(
+            id=1,
+            market_id="market-1",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.50,
+            initial_value=None,
+            current_value=50.0,
+            pnl=0.0,
+            status=PositionStatus.CLOSED,
+        )
+
+        message = notifier._format_position_closed_message(
+            position=position,
+            market=sample_market,
+            pnl=0.0,
+            pnl_pct=0.0,
+        )
+
+        assert "*持仓平仓*" in message
+        assert "成本: N/A" in message  # Should handle None initial_value
+
+    def test_format_position_closed_message_without_current_value(
+        self,
+        notifier: TelegramNotifier,
+        sample_market: Market,
+    ) -> None:
+        """Test position closed message formatting without current value."""
+        position = Position(
+            id=1,
+            market_id="market-1",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.50,
+            initial_value=50.0,
+            current_value=None,
+            pnl=0.0,
+            status=PositionStatus.CLOSED,
+        )
+
+        message = notifier._format_position_closed_message(
+            position=position,
+            market=sample_market,
+            pnl=0.0,
+            pnl_pct=0.0,
+        )
+
+        assert "*持仓平仓*" in message
+        assert "收益: N/A" in message  # Should handle None current_value

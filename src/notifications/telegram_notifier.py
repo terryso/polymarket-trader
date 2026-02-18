@@ -4,6 +4,7 @@ This module provides the TelegramNotifier class for sending
 formatted notifications to Telegram.
 
 Story 9.2: 通知消息发送
+Story 9.3: 交易事件通知集成
 
 Usage:
     from src.notifications import TelegramNotifier
@@ -33,6 +34,7 @@ from src.utils.logger import get_logger
 if TYPE_CHECKING:
     from src.api.telegram import TelegramClient
     from src.models.market import Market
+    from src.models.position import Position
     from src.models.prediction import PredictionResult
     from src.models.trade import Trade
 
@@ -178,6 +180,29 @@ class TelegramNotifier:
         message = self._format_system_message(event, details)
         return await self.send_message(message)
 
+    async def send_position_closed_notification(
+        self,
+        position: "Position",
+        market: "Market",
+        pnl: float,
+        pnl_pct: float,
+    ) -> bool:
+        """Send a position closed notification.
+
+        Story 9.3: 交易事件通知集成
+
+        Args:
+            position: The closed position
+            market: The market for the position
+            pnl: Profit/loss amount in USD
+            pnl_pct: Profit/loss percentage
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        message = self._format_position_closed_message(position, market, pnl, pnl_pct)
+        return await self.send_message(message)
+
     def _format_trade_message(
         self,
         trade: "Trade",
@@ -297,5 +322,49 @@ class TelegramNotifier:
             lines.append("*详情:*")
             for key, value in details.items():
                 lines.append(f"- {key}: {value}")
+
+        return "\n".join(lines)
+
+    def _format_position_closed_message(
+        self,
+        position: "Position",
+        market: "Market",
+        pnl: float,
+        pnl_pct: float,
+    ) -> str:
+        """Format a position closed notification message.
+
+        Story 9.3: 交易事件通知集成
+
+        Args:
+            position: The closed position
+            market: The market for the position
+            pnl: Profit/loss amount in USD
+            pnl_pct: Profit/loss percentage
+
+        Returns:
+            Formatted Markdown message
+        """
+        pnl_emoji = "\U0001f4c8" if pnl >= 0 else "\U0001f4c9"  # chart_up / chart_down
+        pnl_sign = "+" if pnl >= 0 else ""
+
+        lines = [
+            "\U0001f4ca *持仓平仓*",
+            f"市场: {market.title}",
+            f"方向: {position.outcome.value}",
+            f"份额: {position.shares:.2f}",
+            (
+                f"成本: ${position.initial_value:.2f}"
+                if position.initial_value
+                else "成本: N/A"
+            ),
+            (
+                f"收益: ${position.current_value:.2f}"
+                if position.current_value
+                else "收益: N/A"
+            ),
+            f"盈亏: {pnl_emoji} {pnl_sign}${pnl:.2f} ({pnl_sign}{pnl_pct:.1%})",
+            f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        ]
 
         return "\n".join(lines)
