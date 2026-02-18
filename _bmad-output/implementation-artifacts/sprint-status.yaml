@@ -79,6 +79,7 @@ development_status:
   5-4-simulated-position-pnl-calculation: done
   5-5-statistics-data-recording: done
   5-6-trade-history-sync: done
+  5-7-position-sync: done
   epic-5-retrospective: optional
 
   # Epic 6: 预测追踪与学习日志
