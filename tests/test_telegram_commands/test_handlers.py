@@ -3,21 +3,23 @@
 Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
+Story 9.8: Telegram 命令处理 - 市场查询
 """
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.models.market import Market
+from src.models.market import Market, MarketCategory
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.statistics import Statistics
 from src.models.trade import TradeMode
 from src.telegram_commands.formatters import (
     format_help_message,
+    format_markets_message,
     format_positions_message,
     format_stats_message,
     format_status_message,
@@ -25,6 +27,7 @@ from src.telegram_commands.formatters import (
 )
 from src.telegram_commands.handlers import (
     create_help_handler,
+    create_markets_handler,
     create_positions_handler,
     create_stats_handler,
     create_status_handler,
@@ -276,8 +279,8 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add four handlers: status, help, positions, and stats
-        assert mock_app.add_handler.call_count == 4
+        # Should add five handlers: status, help, positions, stats, and markets
+        assert mock_app.add_handler.call_count == 5
 
     def test_setup_registers_handlers_no_auth(self) -> None:
         """Test that handlers are registered without auth."""
@@ -286,8 +289,8 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, None)
 
-        # Should add four handlers: status, help, positions, and stats
-        assert mock_app.add_handler.call_count == 4
+        # Should add five handlers: status, help, positions, stats, and markets
+        assert mock_app.add_handler.call_count == 5
 
 
 class TestPositionsFormatter:
@@ -1150,3 +1153,423 @@ class TestStatsHandler:
             assert "胜: 5 | 负: 3" in call_args.args[0]
             # 10+15=25 total pnl
             assert "+$25.00" in call_args.args[0]
+
+
+class TestMarketsFormatter:
+    """Tests for markets message formatter.
+
+    Story 9.8: Telegram 命令处理 - 市场查询
+    """
+
+    def test_format_markets_message_with_data(self) -> None:
+        """Test markets message with data."""
+        markets = [
+            Market(
+                id="market-1",
+                title="Will Trump win 2028?",
+                category=MarketCategory.POLITICS,
+                yes_price=0.65,
+                no_price=0.35,
+                liquidity=50000.0,
+                deadline=datetime(2028, 11, 7),
+            ),
+            Market(
+                id="market-2",
+                title="BTC > $100k by 2025?",
+                category=MarketCategory.CRYPTO,
+                yes_price=0.45,
+                no_price=0.55,
+                liquidity=120000.0,
+                deadline=datetime(2025, 12, 31),
+            ),
+        ]
+        message = format_markets_message(markets)
+
+        assert "*活跃市场*" in message
+        assert "(2 个)" in message
+        assert "Will Trump win 2028?" in message
+        assert "YES 0.65" in message
+        assert "$50k" in message
+        assert "2028-11-07" in message
+        assert "BTC > $100k by 2025?" in message
+
+    def test_format_markets_message_no_markets(self) -> None:
+        """Test markets message with no markets."""
+        message = format_markets_message([])
+
+        assert "*活跃市场*" in message
+        assert "暂无活跃市场" in message
+
+    def test_format_markets_message_with_category(self) -> None:
+        """Test markets message with category filter."""
+        message = format_markets_message([], category=MarketCategory.CRYPTO)
+
+        assert "*活跃市场* (crypto)" in message
+
+    def test_format_markets_message_truncates_long_title(self) -> None:
+        """Test that long titles are truncated."""
+        long_title = "A" * 100
+        markets = [
+            Market(
+                id="market-1",
+                title=long_title,
+                yes_price=0.5,
+                liquidity=1000.0,
+            )
+        ]
+        message = format_markets_message(markets)
+
+        # Should truncate to 50 chars + "..."
+        assert "..." in message
+        assert len([line for line in message.split("\n") if "AAAA" in line][0]) < 60
+
+    def test_format_markets_message_liquidity_formatting(self) -> None:
+        """Test liquidity formatting in K format."""
+        markets = [
+            Market(
+                id="market-1",
+                title="Test",
+                yes_price=0.5,
+                liquidity=1500.0,  # Should show as $2k
+            ),
+            Market(
+                id="market-2",
+                title="Test 2",
+                yes_price=0.5,
+                liquidity=500.0,  # Should show as $500
+            ),
+        ]
+        message = format_markets_message(markets)
+
+        assert "$2k" in message
+        assert "$500" in message
+
+    def test_format_markets_message_null_values(self) -> None:
+        """Test markets message with null values."""
+        markets = [
+            Market(
+                id="market-1",
+                title="Test Market",
+                yes_price=None,
+                liquidity=None,
+                deadline=None,
+            )
+        ]
+        message = format_markets_message(markets)
+
+        assert "*活跃市场*" in message
+        assert "Test Market" in message
+        assert "N/A" in message
+
+
+class TestMarketsHandler:
+    """Tests for markets command handler.
+
+    Story 9.8: Telegram 命令处理 - 市场查询
+    """
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self) -> MagicMock:
+        """Create a mock callback context."""
+        context = MagicMock()
+        context.args = []
+        return context
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_default_limit(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test markets handler with default 5 limit."""
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            # Setup mock market repo
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(
+                return_value=[
+                    Market(
+                        id=f"market-{i}",
+                        title=f"Test Market {i}",
+                        category=MarketCategory.POLITICS,
+                        yes_price=0.5 + i * 0.05,
+                        no_price=0.5 - i * 0.05,
+                        liquidity=10000.0 + i * 1000,
+                        deadline=datetime(2026, 12, 31),
+                    )
+                    for i in range(10)
+                ]
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            assert "*活跃市场*" in call_args.args[0]
+            assert call_args.kwargs.get("parse_mode") == "Markdown"
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_custom_limit(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test markets handler with custom limit parameter."""
+        mock_context = MagicMock()
+        mock_context.args = ["10"]
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(return_value=[])
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_category_filter(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test markets handler with category filter."""
+        mock_context = MagicMock()
+        mock_context.args = ["politics"]
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_markets_by_category = AsyncMock(return_value=[])
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_market_repo.get_markets_by_category.assert_called_once_with(
+                MarketCategory.POLITICS
+            )
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_no_markets(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test markets handler with no active markets."""
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(return_value=[])
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            assert "暂无活跃市场" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_unauthorized(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test markets handler with unauthorized user."""
+        handler = create_markets_handler("999888777")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "*未授权访问*" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_no_restriction(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test markets handler with no chat ID restriction."""
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(return_value=[])
+            MockMarketRepo.return_value = mock_market_repo
+
+            # None means no restriction
+            handler = create_markets_handler(None)
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            assert "*活跃市场*" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_no_effective_chat(self) -> None:
+        """Test markets handler when update has no effective_chat."""
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+
+        handler = create_markets_handler("123456789")
+        await handler(mock_update, MagicMock())
+
+        # Should not call reply_text
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_limit_out_of_range_clamped(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test markets handler clamps limit to valid range."""
+        mock_context = MagicMock()
+        mock_context.args = ["100"]  # Over 20
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(return_value=[])
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_invalid_limit_uses_default(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test markets handler with invalid limit parameter uses default."""
+        mock_context = MagicMock()
+        mock_context.args = ["invalid"]
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(return_value=[])
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_filters_resolved_markets(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test markets handler filters out resolved markets when category is set."""
+        mock_context = MagicMock()
+        mock_context.args = ["politics"]
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            # Return mix of active and resolved markets
+            mock_market_repo.get_markets_by_category = AsyncMock(
+                return_value=[
+                    Market(
+                        id="market-1",
+                        title="Active Market",
+                        category=MarketCategory.POLITICS,
+                        yes_price=0.5,
+                        liquidity=10000.0,
+                        resolution_status=None,
+                    ),
+                    Market(
+                        id="market-2",
+                        title="Resolved Market",
+                        category=MarketCategory.POLITICS,
+                        yes_price=0.5,
+                        liquidity=10000.0,
+                        resolution_status="RESOLVED",
+                    ),
+                ]
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            # Should only show 1 active market
+            assert "(1 个)" in call_args.args[0]
+            assert "Active Market" in call_args.args[0]
+            assert "Resolved Market" not in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_markets_handler_sorts_by_liquidity(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test markets handler sorts markets by liquidity (highest first)."""
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(
+                return_value=[
+                    Market(
+                        id="market-1",
+                        title="Low Liquidity",
+                        yes_price=0.5,
+                        liquidity=1000.0,
+                    ),
+                    Market(
+                        id="market-2",
+                        title="High Liquidity",
+                        yes_price=0.5,
+                        liquidity=100000.0,
+                    ),
+                    Market(
+                        id="market-3",
+                        title="Medium Liquidity",
+                        yes_price=0.5,
+                        liquidity=10000.0,
+                    ),
+                ]
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_markets_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args
+            message = call_args.args[0]
+            # High liquidity should be first
+            lines = message.split("\n")
+            # Find index of each market title
+            high_idx = next(i for i, l in enumerate(lines) if "High Liquidity" in l)
+            medium_idx = next(i for i, l in enumerate(lines) if "Medium Liquidity" in l)
+            low_idx = next(i for i, l in enumerate(lines) if "Low Liquidity" in l)
+            # Verify order
+            assert high_idx < medium_idx < low_idx
+
+
+class TestSetupCommandHandlersWithMarkets:
+    """Tests for setup_command_handlers with markets handler.
+
+    Story 9.8: Telegram 命令处理 - 市场查询
+    """
+
+    def test_setup_registers_five_handlers(self) -> None:
+        """Test that five handlers are registered including markets."""
+        mock_app = MagicMock()
+        mock_state = MagicMock()
+
+        setup_command_handlers(mock_app, mock_state, "123456789")
+
+        # Should add five handlers: status, help, positions, stats, and markets
+        assert mock_app.add_handler.call_count == 5

@@ -4,9 +4,16 @@ This module provides formatting functions for Telegram command responses.
 
 Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
+Story 9.7: Telegram 命令处理 - 统计查询
+Story 9.8: Telegram 命令处理 - 市场查询
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.models import Market, MarketCategory
 
 __all__ = [
     "format_status_message",
@@ -14,6 +21,7 @@ __all__ = [
     "format_unauthorized_message",
     "format_positions_message",
     "format_stats_message",
+    "format_markets_message",
 ]
 
 
@@ -240,5 +248,75 @@ def format_stats_message(
         f"已验证: {validated_count}",
         f"准确率: {accuracy:.0f}%",
     ]
+
+    return "\n".join(lines)
+
+
+def format_markets_message(
+    markets: list["Market"],
+    category: "MarketCategory | None" = None,
+) -> str:
+    """Format an active markets message.
+
+    Story 9.8: Telegram 命令处理 - 市场查询
+
+    Args:
+        markets: List of Market models to display
+        category: Optional category filter that was applied
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Market, MarketCategory
+        >>> markets = [Market(id="1", title="Test", yes_price=0.5, liquidity=1000)]
+        >>> msg = format_markets_message(markets)
+        >>> "*活跃市场*" in msg
+        True
+    """
+    if not markets:
+        category_text = f" ({category.value})" if category else ""
+        return f"\U0001f3af *活跃市场*{category_text}\n\n暂无活跃市场"
+
+    # Header
+    category_text = f" ({category.value})" if category else ""
+    lines = [
+        f"\U0001f3af *活跃市场*{category_text} ({len(markets)} 个)",
+        "",
+    ]
+
+    # Format each market
+    for i, market in enumerate(markets, 1):
+        # Truncate long titles (max 50 chars)
+        title = market.title[:50] + "..." if len(market.title) > 50 else market.title
+
+        # Format price
+        price_str = (
+            f"YES {market.yes_price:.2f}" if market.yes_price is not None else "N/A"
+        )
+
+        # Format liquidity (convert to K format for readability)
+        if market.liquidity is not None:
+            if market.liquidity >= 1000:
+                liquidity_str = f"${market.liquidity / 1000:.0f}k"
+            else:
+                liquidity_str = f"${market.liquidity:.0f}"
+        else:
+            liquidity_str = "N/A"
+
+        # Format deadline
+        if market.deadline:
+            deadline_str = market.deadline.strftime("%Y-%m-%d")
+        else:
+            deadline_str = "N/A"
+
+        lines.extend(
+            [
+                f"{i}. *{title}*",
+                f"   价格: {price_str} | 流动性: {liquidity_str}",
+                f"   截止: {deadline_str}",
+                "",
+            ]
+        )
 
     return "\n".join(lines)

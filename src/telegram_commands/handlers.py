@@ -1,11 +1,12 @@
 """Telegram command handlers for bot interactions.
 
 This module provides command handler functions for the Telegram bot,
-implementing /status, /help, /positions, and /stats commands.
+implementing /status, /help, /positions, /stats, and /markets commands.
 
 Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
+Story 9.8: Telegram 命令处理 - 市场查询
 
 Usage:
     from src.telegram_commands import setup_command_handlers
@@ -22,6 +23,7 @@ __all__ = [
     "create_help_handler",
     "create_positions_handler",
     "create_stats_handler",
+    "create_markets_handler",
 ]
 
 from collections.abc import Awaitable
@@ -32,6 +34,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler
 
 from src.config import settings
+from src.models.market import MarketCategory
 from src.models.trade import TradeMode
 from src.storage.repositories import (
     MarketRepository,
@@ -41,6 +44,7 @@ from src.storage.repositories import (
 )
 from src.telegram_commands.formatters import (
     format_help_message,
+    format_markets_message,
     format_positions_message,
     format_stats_message,
     format_status_message,
@@ -339,6 +343,88 @@ def create_stats_handler(
     return stats_handler
 
 
+def create_markets_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a markets command handler.
+
+    Story 9.8: Telegram 命令处理 - 市场查询
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /markets command
+
+    Example:
+        >>> handler = create_markets_handler("123456789")
+        >>> # Register with: application.add_handler(CommandHandler("markets", handler))
+    """
+
+    async def markets_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /markets command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = update.effective_chat.id
+
+        # Verify authorization
+        if authorized_chat_id and str(chat_id) != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Parse parameters
+        limit = 5  # Default limit
+        category: MarketCategory | None = None
+
+        if context.args:
+            for arg in context.args:
+                # Try to parse as number (limit)
+                try:
+                    limit = int(arg)
+                    # Limit range: 1-20
+                    limit = max(1, min(20, limit))
+                    continue
+                except ValueError:
+                    pass
+
+                # Try to parse as category
+                try:
+                    category = MarketCategory(arg.lower())
+                    continue
+                except ValueError:
+                    pass
+
+        # Get repositories
+        market_repo = MarketRepository()
+
+        # Get active markets
+        if category:
+            markets = await market_repo.get_markets_by_category(category)
+            # Filter to active only
+            markets = [m for m in markets if m.resolution_status is None]
+        else:
+            markets = await market_repo.get_active_markets()
+
+        # Sort by liquidity (highest first) and limit
+        markets = sorted(
+            markets,
+            key=lambda m: m.liquidity or 0,
+            reverse=True,
+        )[:limit]
+
+        # Format and send message
+        message = format_markets_message(markets, category)
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Markets command processed for chat_id: {chat_id}")
+
+    return markets_handler
+
+
 def setup_command_handlers(
     application: Application,
     state_manager: "ThreadSafeState",
@@ -364,11 +450,15 @@ def setup_command_handlers(
     help_handler = create_help_handler(authorized_chat_id)
     positions_handler = create_positions_handler(authorized_chat_id)
     stats_handler = create_stats_handler(authorized_chat_id)
+    markets_handler = create_markets_handler(authorized_chat_id)
 
     # Register handlers
     application.add_handler(CommandHandler("status", status_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("help", help_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("positions", positions_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("stats", stats_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("markets", markets_handler))  # type: ignore[arg-type]
 
-    logger.info("Command handlers registered: /status, /help, /positions, /stats")
+    logger.info(
+        "Command handlers registered: /status, /help, /positions, /stats, /markets"
+    )
