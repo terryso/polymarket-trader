@@ -1,6 +1,6 @@
 # Story 7.7: 最近活动 API 与前端集成
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
