@@ -19,3 +19,5 @@ export { marketsApi, fetchMarkets, fetchMarket } from './markets';
 export { positionsApi, fetchPositions, fetchPosition } from './positions';
 export { tradesApi, fetchTrades, fetchTrade } from './trades';
 export { predictionsApi, fetchPredictions, fetchPrediction, fetchAccuracy } from './predictions';
+export { activitiesApi, fetchActivities } from './activities';
+export type { ActivityItem, ActivityType, ActivityListResponse, ActivityQueryParams } from './activities';

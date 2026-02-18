@@ -1191,6 +1191,33 @@ So that **我能够看到实时数据而非 Mock 数据**.
 
 ---
 
+### Story 7.7: 最近活动 API 与前端集成
+
+As a **用户**,
+I want **Dashboard 首页显示真实的最近活动记录**,
+So that **我能够实时了解系统的交易、预测和系统事件**.
+
+**Acceptance Criteria:**
+
+**Given** Epic 1-6 已完成，Story 7.1-7.6 已实现
+**When** 实现最近活动功能
+**Then** 后端实现活动记录 API:
+- `GET /api/activities` - 获取最近活动列表
+- 返回活动类型: trade (交易), prediction (预测), system (系统事件)
+- 每条记录包含: id, type, description, time, amount (可选)
+- 支持分页和限制返回数量 (默认 10 条)
+**And** 前端更新 `RecentActivity.tsx`:
+- 调用真实 API 替换 mockData
+- 处理加载和空数据状态
+- 保持现有 UI 样式和交互
+**And** 数据来源:
+- trade: 来自 trades 表的最近交易记录
+- prediction: 来自 predictions 表的最近预测记录
+- system: 来自 system_state 表的系统事件 (启动、停止等)
+**And** 使用统一响应格式
+
+---
+
 ## Epic 8: 系统调度与自动化运行
 
 **目标:** 实现 24/7 自动运行并自动恢复，真正无人值守交易。

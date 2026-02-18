@@ -46,6 +46,7 @@ from src.models.trade_response import (
     TradeListQueryParams,
     TradeResponse,
 )
+from src.models.activity import ActivityItem, ActivityType, ActivityListResponse
 
 __all__ = [
     # API Response
@@ -99,4 +100,8 @@ __all__ = [
     # System Status (API models)
     "SystemStatus",
     "SanitizedSettings",
+    # Activity (API models)
+    "ActivityItem",
+    "ActivityType",
+    "ActivityListResponse",
 ]

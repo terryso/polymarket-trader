@@ -418,6 +418,7 @@ def _register_routers(app: FastAPI) -> None:
         app: FastAPI application instance
     """
     from src.dashboard.routes import (
+        activities,
         markets,
         positions,
         predictions,
@@ -435,6 +436,9 @@ def _register_routers(app: FastAPI) -> None:
     )
     app.include_router(
         statistics.router, prefix="/api/statistics", tags=["statistics"]
+    )
+    app.include_router(
+        activities.router, prefix="/api/activities", tags=["activities"]
     )
 
 
