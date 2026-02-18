@@ -1,6 +1,6 @@
 # Story 9.3: 交易事件通知集成
 
-Status: review
+Status: done
 
 ## Story
 

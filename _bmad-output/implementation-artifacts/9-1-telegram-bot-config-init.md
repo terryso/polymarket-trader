@@ -1,6 +1,6 @@
 # Story 9.1: Telegram Bot 配置与初始化
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

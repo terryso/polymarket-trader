@@ -113,17 +113,17 @@ development_status:
   epic-8-retrospective: optional
 
   # Epic 9: Telegram 通知与远程控制
-  epic-9: in-progress
+  epic-9: done
   9-1-telegram-bot-config-init: done
   9-2-notification-message-sending: done
-  9-3-trade-event-notification: review
-  9-4-llm-analysis-notification: backlog
+  9-3-trade-event-notification: done
+  9-4-llm-analysis-notification: done
   9-5-cmd-status-query: done
-  9-6-cmd-positions-query: review
-  9-7-cmd-stats-query: review
-  9-8-cmd-markets-query: review
-  9-9-cmd-history-query: ready-for-dev
-  9-10-cmd-predict-trigger: ready-for-dev
-  9-11-cmd-remote-control: ready-for-dev
-  9-12-message-queue-rate-limiting: ready-for-dev
+  9-6-cmd-positions-query: done
+  9-7-cmd-stats-query: done
+  9-8-cmd-markets-query: done
+  9-9-cmd-history-query: done
+  9-10-cmd-predict-trigger: done
+  9-11-cmd-remote-control: done
+  9-12-message-queue-rate-limiting: done
   epic-9-retrospective: optional
