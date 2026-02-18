@@ -613,46 +613,67 @@ class PolymarketClient:
         try:
             # USDC contract address on Polygon (Polymarket uses this)
             USDC_CONTRACT = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-            POLYGON_RPC = "https://polygon-rpc.com"
+            # List of reliable Polygon RPC endpoints (ordered by preference)
+            POLYGON_RPCS = [
+                "https://rpc.ankr.com/polygon",  # Ankr public RPC
+                "https://polygon-mainnet.g.alchemy.com/v2/demo",  # Alchemy demo
+                "https://polygon-bor-rpc.publicnode.com",  # PublicNode
+                "https://polygon-rpc.com",  # Official (may require auth)
+            ]
 
             # balanceOf(address) function selector
             # keccak256("balanceOf(address)") first 4 bytes = 0x70a08231
             data = "0x70a08231" + wallet[2:].lower().zfill(64)
 
             client = self._get_http_client()
-            response = client.post(
-                POLYGON_RPC,
-                json={
-                    "jsonrpc": "2.0",
-                    "method": "eth_call",
-                    "params": [{"to": USDC_CONTRACT, "data": data}, "latest"],
-                    "id": 1,
-                },
-                timeout=10.0,
-            )
-            response.raise_for_status()
 
-            result = response.json()
-            if "result" not in result:
-                return WalletBalance(
-                    usdc_balance=None,
-                    last_updated=datetime.now(),
-                    error=f"RPC error: {result.get('error', 'Unknown error')}",
-                )
+            # Try each RPC endpoint until one works
+            last_error = None
+            for rpc_url in POLYGON_RPCS:
+                try:
+                    response = client.post(
+                        rpc_url,
+                        json={
+                            "jsonrpc": "2.0",
+                            "method": "eth_call",
+                            "params": [{"to": USDC_CONTRACT, "data": data}, "latest"],
+                            "id": 1,
+                        },
+                        timeout=10.0,
+                    )
+                    response.raise_for_status()
 
-            # Parse balance from hex
-            balance_hex = result["result"]
-            balance_wei = int(balance_hex, 16)
-            usdc_balance = balance_wei / 1_000_000  # USDC has 6 decimals
+                    result = response.json()
+                    if "result" not in result:
+                        last_error = f"RPC error from {rpc_url}: {result.get('error', 'Unknown error')}"
+                        continue
 
-            self._logger.info(
-                f"{OPERATION_EMOJIS['network']} Wallet balance: ${usdc_balance:.2f} USDC"
-            )
+                    # Parse balance from hex
+                    balance_hex = result["result"]
+                    balance_wei = int(balance_hex, 16)
+                    usdc_balance = balance_wei / 1_000_000  # USDC has 6 decimals
 
+                    self._logger.info(
+                        f"{OPERATION_EMOJIS['network']} Wallet balance: ${usdc_balance:.2f} USDC (via {rpc_url})"
+                    )
+
+                    return WalletBalance(
+                        usdc_balance=usdc_balance,
+                        last_updated=datetime.now(),
+                        error=None,
+                    )
+                except Exception as rpc_error:
+                    last_error = str(rpc_error)
+                    self._logger.debug(
+                        f"{OPERATION_EMOJIS['network']} RPC {rpc_url} failed: {rpc_error}"
+                    )
+                    continue
+
+            # All RPCs failed
             return WalletBalance(
-                usdc_balance=usdc_balance,
+                usdc_balance=None,
                 last_updated=datetime.now(),
-                error=None,
+                error=f"All Polygon RPCs failed. Last error: {last_error}",
             )
 
         except Exception as e:
