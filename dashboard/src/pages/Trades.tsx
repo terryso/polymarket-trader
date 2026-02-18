@@ -304,7 +304,7 @@ const Trades = () => {
                         {t.shares ? t.shares.toFixed(2) : "-"}
                       </TableCell>
                       <TableCell className="text-center hidden sm:table-cell">
-                        {t.status === "filled" ? "✅" : (t.status === "cancelled" || t.status === "failed") ? "❌" : "⏳"}
+                        {t.status === "FILLED" ? "✅" : (t.status === "CANCELLED" || t.status === "FAILED") ? "❌" : "⏳"}
                       </TableCell>
                     </TableRow>
                   ))}

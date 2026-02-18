@@ -57,7 +57,7 @@ const mockTrades: TradeListItem[] = [
     amount: 10.0,
     price: 0.55,
     shares: 18.18,
-    status: "filled",
+    status: "FILLED",
     created_at: "2026-02-17T10:00:00Z",
   },
   {
@@ -68,7 +68,7 @@ const mockTrades: TradeListItem[] = [
     amount: 5.0,
     price: 0.70,
     shares: 7.14,
-    status: "filled",
+    status: "FILLED",
     created_at: "2026-02-17T11:00:00Z",
   },
   {
@@ -79,7 +79,7 @@ const mockTrades: TradeListItem[] = [
     amount: 20.0,
     price: 0.30,
     shares: 66.67,
-    status: "pending",
+    status: "PENDING",
     created_at: "2026-02-17T12:00:00Z",
   },
 ];
@@ -394,7 +394,7 @@ describe("Trades Page", () => {
         amount: 10.0,
         price: 0.50,
         shares: 20.0,
-        status: "filled" as const,
+        status: "FILLED" as const,
         created_at: `2026-02-17T${10 + i}:00:00Z`,
       }));
 
@@ -424,7 +424,7 @@ describe("Trades Page", () => {
           amount: 10.0,
           price: 0.55,
           shares: 18.18,
-          status: "filled",
+          status: "FILLED",
           created_at: null,
         },
       ];
@@ -453,7 +453,7 @@ describe("Trades Page", () => {
           amount: 10.0,
           price: 0.55,
           shares: null,
-          status: "filled",
+          status: "FILLED",
           created_at: "2026-02-17T10:00:00Z",
         },
       ];
@@ -482,7 +482,7 @@ describe("Trades Page", () => {
           amount: 10.0,
           price: 0.55,
           shares: 18.18,
-          status: "failed",
+          status: "FAILED",
           created_at: "2026-02-17T10:00:00Z",
         },
       ];

@@ -170,7 +170,7 @@ export interface PositionResponse {
 
 export type TradeType = 'BUY_YES' | 'BUY_NO' | 'SELL_YES' | 'SELL_NO';
 export type TradeMode = 'PAPER' | 'LIVE';
-export type TradeStatus = 'pending' | 'filled' | 'failed' | 'cancelled';
+export type TradeStatus = 'PENDING' | 'FILLED' | 'FAILED' | 'CANCELLED';
 
 export interface TradeListItem {
   id: number;
