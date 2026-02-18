@@ -287,9 +287,12 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add nine handlers: status, help, positions, stats, markets, history,
-        # predict, confirm, cancel
-        assert mock_app.add_handler.call_count == 9
+        # Should add fourteen handlers:
+        # status, help, positions, stats, markets, history,
+        # predict, confirm, cancel,
+        # confirm (mode), cancel (mode),
+        # enable, disable, mode
+        assert mock_app.add_handler.call_count == 14
 
     def test_setup_registers_handlers_no_auth(self) -> None:
         """Test that handlers are registered without auth."""
@@ -298,9 +301,12 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, None)
 
-        # Should add nine handlers: status, help, positions, stats, markets, history,
-        # predict, confirm, cancel
-        assert mock_app.add_handler.call_count == 9
+        # Should add fourteen handlers:
+        # status, help, positions, stats, markets, history,
+        # predict, confirm, cancel,
+        # confirm (mode), cancel (mode),
+        # enable, disable, mode
+        assert mock_app.add_handler.call_count == 14
 
 
 class TestPositionsFormatter:
@@ -2218,16 +2224,19 @@ class TestSetupCommandHandlersWithMarkets:
     Story 9.8: Telegram 命令处理 - 市场查询
     """
 
-    def test_setup_registers_nine_handlers_legacy(self) -> None:
-        """Test that nine handlers are registered including history."""
+    def test_setup_registers_fourteen_handlers_with_markets(self) -> None:
+        """Test that fourteen handlers are registered including markets."""
         mock_app = MagicMock()
         mock_state = MagicMock()
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add nine handlers: status, help, positions, stats, markets, history,
-        # predict, confirm, cancel
-        assert mock_app.add_handler.call_count == 9
+        # Should add fourteen handlers:
+        # status, help, positions, stats, markets, history,
+        # predict, confirm, cancel,
+        # confirm (mode), cancel (mode),
+        # enable, disable, mode
+        assert mock_app.add_handler.call_count == 14
 
 
 # =============================================================================
@@ -2982,13 +2991,935 @@ class TestSetupCommandHandlersWithPredict:
     Story 9.10: Telegram 命令处理 - 手动触发分析
     """
 
-    def test_setup_registers_nine_handlers(self) -> None:
-        """Test that nine handlers are registered including predict/confirm/cancel."""
+    def test_setup_registers_fourteen_handlers_with_predict(self) -> None:
+        """Test that fourteen handlers are registered including predict/confirm/cancel."""
         mock_app = MagicMock()
         mock_state = MagicMock()
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add nine handlers: status, help, positions, stats, markets, history,
-        # predict, confirm, cancel
-        assert mock_app.add_handler.call_count == 9
+        # Should add fourteen handlers:
+        # status, help, positions, stats, markets, history,
+        # predict, confirm, cancel,
+        # confirm (mode), cancel (mode),
+        # enable, disable, mode
+        assert mock_app.add_handler.call_count == 14
+
+
+# =============================================================================
+# Story 9.11: Telegram 命令处理 - 远程控制
+# =============================================================================
+
+
+class TestEnableDisableHandlers:
+    """Tests for enable/disable command handlers.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_state_manager(self) -> MagicMock:
+        """Create a mock state manager."""
+        manager = MagicMock()
+        manager.set_trading_enabled = AsyncMock()
+        manager.get_state = AsyncMock(return_value=MagicMock(
+            trading_enabled=True,
+        ))
+        return manager
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self) -> MagicMock:
+        """Create a mock callback context."""
+        return MagicMock(args=[])
+
+    @pytest.mark.asyncio
+    async def test_enable_handler_success(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+        mock_context: MagicMock,
+    ) -> None:
+        """Test enable handler success."""
+        from src.telegram_commands.handlers import create_enable_handler
+
+        handler = create_enable_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_trading_enabled.assert_called_once_with(True)
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*交易已启用*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_disable_handler_success(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+        mock_context: MagicMock,
+    ) -> None:
+        """Test disable handler success."""
+        from src.telegram_commands.handlers import create_disable_handler
+
+        handler = create_disable_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_trading_enabled.assert_called_once_with(False)
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*交易已禁用*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_enable_handler_unauthorized(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+        mock_context: MagicMock,
+    ) -> None:
+        """Test enable handler with unauthorized user."""
+        from src.telegram_commands.handlers import create_enable_handler
+
+        handler = create_enable_handler("999888777", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_trading_enabled.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+
+class TestModeHandler:
+    """Tests for mode command handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_state_manager(self) -> MagicMock:
+        """Create a mock state manager."""
+        manager = MagicMock()
+        manager.set_mode = AsyncMock()
+        manager.get_state = AsyncMock(return_value=MagicMock(
+            trading_enabled=True,
+        ))
+        return manager
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_no_args(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test mode handler without args shows current mode."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_context = MagicMock(args=[])
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading_mode = "paper"
+
+            handler = create_mode_handler("123456789", mock_state_manager)
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "*当前模式*" in call_args
+            assert "PAPER" in call_args
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_switch_to_paper(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test mode handler switch to paper."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_context = MagicMock(args=["paper"])
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading_mode = "live"  # Currently LIVE
+
+            handler = create_mode_handler("123456789", mock_state_manager)
+            await handler(mock_update, mock_context)
+
+            mock_state_manager.set_mode.assert_called_once_with(paper_trading=True)
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "*模式已切换*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_switch_to_live_requires_confirm(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test mode handler switch to live requires confirmation."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import create_mode_handler
+
+        # Clear any existing pending requests
+        handlers._pending_mode_changes.clear()
+
+        mock_context = MagicMock(args=["live"])
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading_mode = "paper"  # Currently PAPER
+
+            handler = create_mode_handler("123456789", mock_state_manager)
+            await handler(mock_update, mock_context)
+
+            # Should NOT switch immediately
+            mock_state_manager.set_mode.assert_not_called()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "*安全确认*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_invalid_mode(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test mode handler with invalid mode."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_context = MagicMock(args=["invalid"])
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading_mode = "paper"
+
+            handler = create_mode_handler("123456789", mock_state_manager)
+            await handler(mock_update, mock_context)
+
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "无效的模式" in call_args
+
+
+class TestConfirmModeHandler:
+    """Tests for confirm mode change handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_state_manager(self) -> MagicMock:
+        """Create a mock state manager."""
+        manager = MagicMock()
+        manager.set_mode = AsyncMock()
+        return manager
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_no_pending(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test confirm mode without pending request."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import create_confirm_mode_handler
+
+        # Clear any pending requests
+        handlers._pending_mode_changes.clear()
+
+        mock_context = MagicMock(args=["live"])
+
+        handler = create_confirm_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not reply when no pending mode change (let trade confirm handler deal with it)
+        # In this case, there's also no pending trade confirmation, so nothing happens
+        # The handler returns early
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_success(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test confirm mode success."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_confirm_mode_handler,
+        )
+
+        mock_context = MagicMock(args=["live"])
+
+        # Setup pending request
+        handlers._pending_mode_changes["123456789"] = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+
+        handler = create_confirm_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_mode.assert_called_once_with(paper_trading=False)
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*模式已切换*" in call_args
+
+        # Verify pending was removed
+        assert "123456789" not in handlers._pending_mode_changes
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_expired(
+        self,
+        mock_state_manager: MagicMock,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test confirm mode with expired request."""
+        from datetime import datetime, timedelta
+
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_confirm_mode_handler,
+        )
+
+        mock_context = MagicMock(args=["live"])
+
+        # Setup expired pending request
+        pending = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+        pending.expires_at = datetime.now() - timedelta(seconds=1)
+        handlers._pending_mode_changes["123456789"] = pending
+
+        handler = create_confirm_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not switch mode
+        mock_state_manager.set_mode.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "超时" in call_args
+
+
+class TestPendingModeChange:
+    """Tests for PendingModeChange class.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    def test_pending_mode_change_not_expired_initially(self) -> None:
+        """Test that new mode change is not expired."""
+        from src.telegram_commands.handlers import PendingModeChange
+
+        pending = PendingModeChange("123456", "live")
+
+        assert not pending.is_expired()
+
+    def test_pending_mode_change_expired_after_30_seconds(self) -> None:
+        """Test that mode change expires after 30 seconds."""
+        from datetime import datetime, timedelta
+
+        from src.telegram_commands.handlers import PendingModeChange
+
+        pending = PendingModeChange("123456", "live")
+
+        # Simulate time passing
+        pending.expires_at = datetime.now() - timedelta(seconds=1)
+
+        assert pending.is_expired()
+
+
+class TestControlFormatters:
+    """Tests for control message formatters.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    def test_format_enable_message(self) -> None:
+        """Test enable message formatting."""
+        from src.telegram_commands.formatters import format_enable_message
+
+        message = format_enable_message()
+        assert "*交易已启用*" in message
+        assert "操作时间:" in message
+
+    def test_format_disable_message(self) -> None:
+        """Test disable message formatting."""
+        from src.telegram_commands.formatters import format_disable_message
+
+        message = format_disable_message()
+        assert "*交易已禁用*" in message
+        assert "操作时间:" in message
+
+    def test_format_mode_status_message_paper(self) -> None:
+        """Test mode status message for paper mode."""
+        from src.telegram_commands.formatters import format_mode_status_message
+
+        message = format_mode_status_message("PAPER", True)
+        assert "*当前模式*" in message
+        assert "PAPER" in message
+        assert "启用" in message
+
+    def test_format_mode_status_message_live(self) -> None:
+        """Test mode status message for live mode."""
+        from src.telegram_commands.formatters import format_mode_status_message
+
+        message = format_mode_status_message("LIVE", False)
+        assert "*当前模式*" in message
+        assert "LIVE" in message
+        assert "禁用" in message
+
+    def test_format_mode_change_confirmation(self) -> None:
+        """Test mode change confirmation message."""
+        from src.telegram_commands.formatters import format_mode_change_confirmation
+
+        message = format_mode_change_confirmation()
+        assert "*安全确认*" in message
+        assert "LIVE 模式" in message
+        assert "/confirm live" in message
+
+    def test_format_mode_changed_message_to_live(self) -> None:
+        """Test mode changed message to live."""
+        from src.telegram_commands.formatters import format_mode_changed_message
+
+        message = format_mode_changed_message("PAPER", "LIVE")
+        assert "*模式已切换*" in message
+        assert "PAPER" in message
+        assert "LIVE" in message
+        assert "真实资金" in message
+
+    def test_format_mode_changed_message_to_paper(self) -> None:
+        """Test mode changed message to paper."""
+        from src.telegram_commands.formatters import format_mode_changed_message
+
+        message = format_mode_changed_message("LIVE", "PAPER")
+        assert "*模式已切换*" in message
+        assert "LIVE" in message
+        assert "PAPER" in message
+        assert "模拟资金" in message
+
+    def test_format_mode_change_cancelled(self) -> None:
+        """Test mode change cancelled message."""
+        from src.telegram_commands.formatters import format_mode_change_cancelled
+
+        message = format_mode_change_cancelled()
+        assert "*模式切换已取消*" in message
+
+
+class TestAuditLog:
+    """Tests for audit logging.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    def test_log_audit_event_without_details(self) -> None:
+        """Test audit logging without details."""
+        from src.telegram_commands.audit import AuditEventType, log_audit_event
+
+        # This test verifies the function runs without error
+        # The actual log output goes to stderr with rich formatting
+        log_audit_event(AuditEventType.ENABLE_TRADING, "123456789")
+        # No exception = success
+
+    def test_log_audit_event_with_details(self) -> None:
+        """Test audit logging with details."""
+        from src.telegram_commands.audit import AuditEventType, log_audit_event
+
+        # This test verifies the function runs without error
+        log_audit_event(
+            AuditEventType.MODE_CHANGE,
+            "123456789",
+            {"from": "LIVE", "to": "PAPER"},
+        )
+        # No exception = success
+
+    def test_audit_event_types(self) -> None:
+        """Test audit event type enum values."""
+        from src.telegram_commands.audit import AuditEventType
+
+        assert AuditEventType.ENABLE_TRADING.value == "enable_trading"
+        assert AuditEventType.DISABLE_TRADING.value == "disable_trading"
+        assert AuditEventType.MODE_CHANGE.value == "mode_change"
+        assert AuditEventType.CONFIRM_MODE_CHANGE.value == "confirm_mode_change"
+        assert AuditEventType.CANCEL_MODE_CHANGE.value == "cancel_mode_change"
+
+
+class TestSetupCommandHandlersWithControl:
+    """Tests for setup_command_handlers with control handlers.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    def test_setup_registers_fourteen_handlers(self) -> None:
+        """Test that fourteen handlers are registered including control handlers."""
+        mock_app = MagicMock()
+        mock_state = MagicMock()
+
+        setup_command_handlers(mock_app, mock_state, "123456789")
+
+        # Should add fourteen handlers:
+        # status, help, positions, stats, markets, history,
+        # predict, confirm, cancel,
+        # confirm (mode), cancel (mode),
+        # enable, disable, mode
+        assert mock_app.add_handler.call_count == 14
+
+
+class TestEnableDisableHandlerEdgeCases:
+    """Edge case tests for enable/disable handlers.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_state_manager(self) -> MagicMock:
+        """Create a mock state manager."""
+        manager = MagicMock()
+        manager.set_trading_enabled = AsyncMock()
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_enable_handler_no_effective_chat(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test enable handler with no effective_chat."""
+        from src.telegram_commands.handlers import create_enable_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=[])
+
+        handler = create_enable_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not call anything
+        mock_state_manager.set_trading_enabled.assert_not_called()
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_enable_handler_no_message(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test enable handler with no message."""
+        from src.telegram_commands.handlers import create_enable_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = None
+        mock_context = MagicMock(args=[])
+
+        handler = create_enable_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not call anything
+        mock_state_manager.set_trading_enabled.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_disable_handler_no_effective_chat(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test disable handler with no effective_chat."""
+        from src.telegram_commands.handlers import create_disable_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=[])
+
+        handler = create_disable_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not call anything
+        mock_state_manager.set_trading_enabled.assert_not_called()
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_disable_handler_unauthorized(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test disable handler with unauthorized user."""
+        from src.telegram_commands.handlers import create_disable_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=[])
+
+        handler = create_disable_handler("999888777", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_trading_enabled.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+
+class TestModeHandlerEdgeCases:
+    """Edge case tests for mode handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_state_manager(self) -> MagicMock:
+        """Create a mock state manager."""
+        manager = MagicMock()
+        manager.set_mode = AsyncMock()
+        manager.get_state = AsyncMock(return_value=MagicMock(
+            trading_enabled=True,
+        ))
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_no_effective_chat(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test mode handler with no effective_chat."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=[])
+
+        handler = create_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not call anything
+        mock_state_manager.set_mode.assert_not_called()
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_unauthorized(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test mode handler with unauthorized user."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=[])
+
+        handler = create_mode_handler("999888777", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_mode.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_already_paper(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test mode handler when already in PAPER mode."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=["paper"])
+
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading_mode = "paper"  # Already PAPER
+
+            handler = create_mode_handler("123456789", mock_state_manager)
+            await handler(mock_update, mock_context)
+
+            # Should not switch mode
+            mock_state_manager.set_mode.assert_not_called()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "当前已经是 PAPER 模式" in call_args
+
+    @pytest.mark.asyncio
+    async def test_mode_handler_already_live(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test mode handler when already in LIVE mode."""
+        from src.telegram_commands.handlers import create_mode_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=["live"])
+
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading_mode = "live"  # Already LIVE
+
+            handler = create_mode_handler("123456789", mock_state_manager)
+            await handler(mock_update, mock_context)
+
+            # Should not switch mode
+            mock_state_manager.set_mode.assert_not_called()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "当前已经是 LIVE 模式" in call_args
+
+
+class TestConfirmModeHandlerEdgeCases:
+    """Edge case tests for confirm mode handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_state_manager(self) -> MagicMock:
+        """Create a mock state manager."""
+        manager = MagicMock()
+        manager.set_mode = AsyncMock()
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_handler_no_effective_chat(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test confirm mode handler with no effective_chat."""
+        from src.telegram_commands.handlers import create_confirm_mode_handler
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=["live"])
+
+        handler = create_confirm_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not call anything
+        mock_state_manager.set_mode.assert_not_called()
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_handler_unauthorized(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test confirm mode handler with unauthorized user."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_confirm_mode_handler,
+        )
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=["live"])
+
+        # Setup pending request
+        handlers._pending_mode_changes["123456789"] = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+
+        handler = create_confirm_mode_handler("999888777", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        mock_state_manager.set_mode.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+        # Cleanup
+        handlers._pending_mode_changes.clear()
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_handler_wrong_confirmation(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test confirm mode handler with wrong confirmation phrase."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_confirm_mode_handler,
+        )
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=["wrong"])  # Wrong confirmation
+
+        # Setup pending request
+        handlers._pending_mode_changes["123456789"] = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+
+        handler = create_confirm_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not switch mode
+        mock_state_manager.set_mode.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "/confirm live" in call_args
+
+        # Cleanup
+        handlers._pending_mode_changes.clear()
+
+    @pytest.mark.asyncio
+    async def test_confirm_mode_handler_no_args(
+        self,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test confirm mode handler with no args."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_confirm_mode_handler,
+        )
+
+        mock_update = MagicMock()
+        mock_update.effective_chat = MagicMock()
+        mock_update.effective_chat.id = 123456789
+        mock_update.message = AsyncMock()
+        mock_context = MagicMock(args=[])  # No args
+
+        # Setup pending request
+        handlers._pending_mode_changes["123456789"] = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+
+        handler = create_confirm_mode_handler("123456789", mock_state_manager)
+        await handler(mock_update, mock_context)
+
+        # Should not switch mode
+        mock_state_manager.set_mode.assert_not_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "/confirm live" in call_args
+
+        # Cleanup
+        handlers._pending_mode_changes.clear()
+
+
+class TestCancelModeHandler:
+    """Tests for cancel mode handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+    """
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.mark.asyncio
+    async def test_cancel_mode_handler_success(self, mock_update: MagicMock) -> None:
+        """Test cancel mode handler with pending request."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_cancel_mode_handler,
+        )
+
+        # Setup pending request
+        handlers._pending_mode_changes["123456789"] = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+
+        mock_context = MagicMock(args=[])
+        handler = create_cancel_mode_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        # Verify cancelled
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*模式切换已取消*" in call_args
+        assert "123456789" not in handlers._pending_mode_changes
+
+    @pytest.mark.asyncio
+    async def test_cancel_mode_handler_no_pending(
+        self,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test cancel mode handler without pending request."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import create_cancel_mode_handler
+
+        # Clear any pending requests
+        handlers._pending_mode_changes.clear()
+
+        mock_context = MagicMock(args=[])
+        handler = create_cancel_mode_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        # Should not reply (let trade cancel handler deal with it)
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancel_mode_handler_no_effective_chat(
+        self,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test cancel mode handler with no effective_chat."""
+        from src.telegram_commands.handlers import create_cancel_mode_handler
+
+        mock_update.effective_chat = None
+        mock_context = MagicMock(args=[])
+
+        handler = create_cancel_mode_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        # Should not call anything
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancel_mode_handler_unauthorized(
+        self,
+        mock_update: MagicMock,
+    ) -> None:
+        """Test cancel mode handler with unauthorized user."""
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import (
+            PendingModeChange,
+            create_cancel_mode_handler,
+        )
+
+        # Setup pending request
+        handlers._pending_mode_changes["123456789"] = PendingModeChange(
+            chat_id="123456789",
+            target_mode="live",
+        )
+
+        mock_context = MagicMock(args=[])
+        handler = create_cancel_mode_handler("999888777")
+        await handler(mock_update, mock_context)
+
+        # Verify unauthorized message
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+        # Cleanup
+        handlers._pending_mode_changes.clear()

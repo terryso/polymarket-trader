@@ -251,6 +251,23 @@ class ThreadSafeState:
             status = "enabled" if enabled else "DISABLED"
             logger.info(f"Trading {status}")
 
+    async def set_mode(self, paper_trading: bool) -> None:
+        """Set trading mode.
+
+        Story 9.11: Telegram 命令处理 - 远程控制
+
+        Args:
+            paper_trading: True for Paper Trading, False for Live Trading
+
+        Example:
+            >>> await state.set_mode(paper_trading=True)  # Switch to Paper
+        """
+        async with self._lock:
+            # Update settings (runtime)
+            settings.trading_mode = "paper" if paper_trading else "live"
+            mode = "PAPER" if paper_trading else "LIVE"
+            logger.info(f"Trading mode set to {mode}")
+
     async def set_reduced_mode(self, reduced: bool) -> None:
         """Set reduced mode flag.
 

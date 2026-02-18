@@ -35,6 +35,13 @@ __all__ = [
     "format_predict_result_no_trade",
     "format_trade_suggestion",
     "format_trade_cancelled",
+    # Story 9.11: 远程控制
+    "format_enable_message",
+    "format_disable_message",
+    "format_mode_status_message",
+    "format_mode_change_confirmation",
+    "format_mode_changed_message",
+    "format_mode_change_cancelled",
 ]
 
 
@@ -110,8 +117,11 @@ def format_help_message() -> str:
         "/markets [n] [category] - 查看活跃市场",
         "/history [n] [paper|live] - 查看交易历史",
         "/predict [序号|市场ID] - 手动触发市场分析",
-        "/confirm - 确认交易建议",
-        "/cancel - 取消交易建议",
+        "/enable - 启用交易",
+        "/disable - 禁用交易",
+        "/mode [paper|live] - 查看/切换交易模式",
+        "/confirm - 确认交易建议/模式切换",
+        "/cancel - 取消交易建议/模式切换",
         "/help - 显示帮助信息",
     ]
 
@@ -775,3 +785,175 @@ def format_trade_cancelled() -> str:
         True
     """
     return "\U0000274c *交易已取消*"
+
+
+# =============================================================================
+# Story 9.11: Telegram 命令处理 - 远程控制
+# =============================================================================
+
+
+def format_enable_message() -> str:
+    """Format enable trading message.
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_enable_message()
+        >>> "*交易已启用*" in msg
+        True
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return "\n".join(
+        [
+            "\u2705 *交易已启用*",
+            "",
+            "系统现在可以执行交易操作。",
+            "",
+            f"操作时间: {timestamp}",
+        ]
+    )
+
+
+def format_disable_message() -> str:
+    """Format disable trading message.
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_disable_message()
+        >>> "*交易已禁用*" in msg
+        True
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return "\n".join(
+        [
+            "\u274c *交易已禁用*",
+            "",
+            "系统现在不会执行任何交易操作。",
+            "",
+            f"操作时间: {timestamp}",
+        ]
+    )
+
+
+def format_mode_status_message(
+    current_mode: str,
+    trading_enabled: bool,
+) -> str:
+    """Format mode status message.
+
+    Args:
+        current_mode: Current trading mode (PAPER/LIVE)
+        trading_enabled: Whether trading is enabled
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_mode_status_message("PAPER", True)
+        >>> "*当前模式*" in msg
+        True
+    """
+    trading_emoji = "\u2705" if trading_enabled else "\u274c"
+    trading_status = "启用" if trading_enabled else "禁用"
+
+    mode_emoji = (
+        "\U0001f4d3" if current_mode == "PAPER" else "\U0001f534"
+    )  # notebook / red circles
+
+    return "\n".join(
+        [
+            "\U0001f4ca *当前模式*",
+            "",
+            f"模式: {mode_emoji} {current_mode}",
+            f"交易: {trading_emoji} {trading_status}",
+            "",
+            "使用 `/mode paper` 切换到 Paper Trading",
+            "使用 `/mode live` 切换到 Live Trading",
+        ]
+    )
+
+
+def format_mode_change_confirmation() -> str:
+    """Format mode change confirmation request.
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_mode_change_confirmation()
+        >>> "*安全确认*" in msg
+        True
+    """
+    return "\n".join(
+        [
+            "\u26a0\ufe0f *安全确认*",
+            "",
+            "即将切换到 LIVE 模式",
+            "",
+            "_这意味着系统将使用真实资金执行交易！_",
+            "",
+            "请在 30 秒内回复:",
+            "/confirm live",
+            "",
+            "或回复 /cancel 取消",
+        ]
+    )
+
+
+def format_mode_changed_message(from_mode: str, to_mode: str) -> str:
+    """Format mode changed message.
+
+    Args:
+        from_mode: Previous mode
+        to_mode: New mode
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_mode_changed_message("PAPER", "LIVE")
+        >>> "*模式已切换*" in msg
+        True
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if to_mode == "LIVE":
+        warning = "\n\n\u26a0\ufe0f *系统现在将使用真实资金执行交易！*"
+        emoji = "\U0001f534"  # Red circle
+    else:
+        warning = "\n\n所有交易将使用模拟资金执行。"
+        emoji = "\U0001f4d3"  # Notebook
+
+    return "\n".join(
+        [
+            f"{emoji} *模式已切换*",
+            "",
+            f"从 {from_mode} \u2192 {to_mode}",
+            warning,
+            "",
+            f"操作时间: {timestamp}",
+        ]
+    )
+
+
+def format_mode_change_cancelled() -> str:
+    """Format mode change cancelled message.
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_mode_change_cancelled()
+        >>> "*模式切换已取消*" in msg
+        True
+    """
+    return "\n".join(
+        [
+            "\u274c *模式切换已取消*",
+            "",
+            "当前模式未改变。",
+        ]
+    )

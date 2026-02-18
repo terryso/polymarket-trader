@@ -124,6 +124,6 @@ development_status:
   9-8-cmd-markets-query: review
   9-9-cmd-history-query: ready-for-dev
   9-10-cmd-predict-trigger: ready-for-dev
-  9-11-cmd-remote-control: backlog
+  9-11-cmd-remote-control: ready-for-dev
   9-12-message-queue-rate-limiting: backlog
   epic-9-retrospective: optional

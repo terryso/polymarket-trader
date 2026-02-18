@@ -31,6 +31,13 @@ __all__ = [
     "create_confirm_handler",
     "create_cancel_handler",
     "PendingConfirmation",
+    # Story 9.11: 远程控制
+    "create_enable_handler",
+    "create_disable_handler",
+    "create_mode_handler",
+    "create_confirm_mode_handler",
+    "create_cancel_mode_handler",
+    "PendingModeChange",
 ]
 
 from collections.abc import Awaitable
@@ -52,11 +59,18 @@ from src.storage.repositories import (
     StatisticsRepository,
     TradeRepository,
 )
+from src.telegram_commands.audit import AuditEventType, log_audit_event
 from src.telegram_commands.formatters import (
     format_analyzing_message,
+    format_disable_message,
+    format_enable_message,
     format_help_message,
     format_history_message,
     format_markets_message,
+    format_mode_change_cancelled,
+    format_mode_change_confirmation,
+    format_mode_changed_message,
+    format_mode_status_message,
     format_positions_message,
     format_predict_market_list,
     format_predict_result_no_trade,
@@ -826,6 +840,384 @@ def create_cancel_handler(
     return cancel_handler
 
 
+# =============================================================================
+# Story 9.11: Telegram 命令处理 - 远程控制
+# =============================================================================
+
+# Module-level storage for pending mode changes
+# In production, consider using Redis or database for persistence
+_pending_mode_changes: dict[str, "PendingModeChange"] = {}
+
+
+class PendingModeChange:
+    """待确认的模式切换请求.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+
+    Stores the state for a mode change request that is awaiting
+    user confirmation via /confirm live command.
+
+    Attributes:
+        chat_id: Chat ID where the confirmation was requested
+        target_mode: The target mode to switch to (live or paper)
+        created_at: When the confirmation was created
+        expires_at: When the confirmation expires (30 seconds)
+
+    Example:
+        >>> pending = PendingModeChange("123456", "live")
+        >>> pending.is_expired()
+        False
+    """
+
+    def __init__(self, chat_id: str, target_mode: str) -> None:
+        """Initialize pending mode change.
+
+        Args:
+            chat_id: Chat ID where the confirmation was requested
+            target_mode: The target mode to switch to (live or paper)
+        """
+        self.chat_id = chat_id
+        self.target_mode = target_mode  # "live" or "paper"
+        self.created_at = datetime.now()
+        self.expires_at = self.created_at + timedelta(seconds=30)
+
+    def is_expired(self) -> bool:
+        """Check if the confirmation has expired.
+
+        Returns:
+            True if expired (30 seconds have passed), False otherwise
+        """
+        return datetime.now() > self.expires_at
+
+
+def create_enable_handler(
+    authorized_chat_id: str | None,
+    state_manager: "ThreadSafeState",
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create an enable trading command handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+        state_manager: ThreadSafeState instance for system state
+
+    Returns:
+        Async function that handles /enable command
+
+    Example:
+        >>> handler = create_enable_handler("123456789", state_manager)
+        >>> # Register with: application.add_handler(CommandHandler("enable", handler))
+    """
+
+    async def enable_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /enable command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Enable trading
+        await state_manager.set_trading_enabled(True)
+
+        # Log audit event
+        log_audit_event(
+            AuditEventType.ENABLE_TRADING,
+            chat_id,
+        )
+
+        # Send confirmation
+        message = format_enable_message()
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Trading enabled by chat_id: {chat_id}")
+
+    return enable_handler
+
+
+def create_disable_handler(
+    authorized_chat_id: str | None,
+    state_manager: "ThreadSafeState",
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a disable trading command handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+        state_manager: ThreadSafeState instance for system state
+
+    Returns:
+        Async function that handles /disable command
+
+    Example:
+        >>> handler = create_disable_handler("123456789", state_manager)
+        >>> # Register with: application.add_handler(CommandHandler("disable", handler))
+    """
+
+    async def disable_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /disable command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Disable trading
+        await state_manager.set_trading_enabled(False)
+
+        # Log audit event
+        log_audit_event(
+            AuditEventType.DISABLE_TRADING,
+            chat_id,
+        )
+
+        # Send confirmation
+        message = format_disable_message()
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Trading disabled by chat_id: {chat_id}")
+
+    return disable_handler
+
+
+def create_mode_handler(
+    authorized_chat_id: str | None,
+    state_manager: "ThreadSafeState",
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a mode command handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+        state_manager: ThreadSafeState instance for system state
+
+    Returns:
+        Async function that handles /mode command
+
+    Example:
+        >>> handler = create_mode_handler("123456789", state_manager)
+        >>> # Register with: application.add_handler(CommandHandler("mode", handler))
+    """
+
+    async def mode_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /mode command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Get current mode
+        current_mode = "PAPER" if settings.trading_mode == "paper" else "LIVE"
+
+        # No args - show current mode
+        if not context.args or len(context.args) == 0:
+            snapshot = await state_manager.get_state()
+            message = format_mode_status_message(
+                current_mode=current_mode,
+                trading_enabled=snapshot.trading_enabled,
+            )
+            await update.message.reply_text(message, parse_mode="Markdown")
+            return
+
+        # Parse target mode
+        target_mode = context.args[0].lower()
+
+        if target_mode not in ("paper", "live"):
+            await update.message.reply_text(
+                "❌ 无效的模式。请使用 `paper` 或 `live`。",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Switch to Paper mode - direct
+        if target_mode == "paper":
+            if current_mode == "PAPER":
+                await update.message.reply_text(
+                    "当前已经是 PAPER 模式。",
+                    parse_mode="Markdown",
+                )
+                return
+
+            await state_manager.set_mode(paper_trading=True)
+            log_audit_event(
+                AuditEventType.MODE_CHANGE,
+                chat_id,
+                {"from": current_mode, "to": "PAPER"},
+            )
+            message = format_mode_changed_message("LIVE", "PAPER")
+            await update.message.reply_text(message, parse_mode="Markdown")
+            logger.info(f"Mode changed: LIVE -> PAPER by chat_id: {chat_id}")
+            return
+
+        # Switch to Live mode - requires confirmation
+        if current_mode == "LIVE":
+            await update.message.reply_text(
+                "当前已经是 LIVE 模式。",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Store pending mode change
+        _pending_mode_changes[chat_id] = PendingModeChange(
+            chat_id=chat_id,
+            target_mode="live",
+        )
+
+        message = format_mode_change_confirmation()
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Mode change to LIVE requested by chat_id: {chat_id}")
+
+    return mode_handler
+
+
+def create_confirm_mode_handler(
+    authorized_chat_id: str | None,
+    state_manager: "ThreadSafeState",
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a confirm mode change command handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+        state_manager: ThreadSafeState instance for system state
+
+    Returns:
+        Async function that handles /confirm command for mode change
+
+    Example:
+        >>> handler = create_confirm_mode_handler("123456789", state_manager)
+        >>> # Register with: application.add_handler(CommandHandler("confirm", handler))
+    """
+
+    async def confirm_mode_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /confirm command for mode change."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Check for pending mode change
+        pending = _pending_mode_changes.get(chat_id)
+        if not pending:
+            # Not for mode change - let trade confirmation handler deal with it
+            return
+
+        if pending.is_expired():
+            del _pending_mode_changes[chat_id]
+            await update.message.reply_text(
+                "❌ 确认已超时 (30秒)。请重新执行 /mode live。",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Verify confirmation phrase
+        if (
+            not context.args
+            or len(context.args) == 0
+            or context.args[0].lower() != "live"
+        ):
+            await update.message.reply_text(
+                "❌ 请输入 /confirm live 确认切换到 LIVE 模式。",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Execute mode change
+        await state_manager.set_mode(paper_trading=False)
+        del _pending_mode_changes[chat_id]
+
+        log_audit_event(
+            AuditEventType.CONFIRM_MODE_CHANGE,
+            chat_id,
+            {"from": "PAPER", "to": "LIVE"},
+        )
+
+        message = format_mode_changed_message("PAPER", "LIVE")
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Mode change confirmed: PAPER -> LIVE by chat_id: {chat_id}")
+
+    return confirm_mode_handler
+
+
+def create_cancel_mode_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a cancel mode change command handler.
+
+    Story 9.11: Telegram 命令处理 - 远程控制
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /cancel command for mode change
+    """
+
+    async def cancel_mode_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /cancel command for mode change."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Check for pending mode change
+        if chat_id in _pending_mode_changes:
+            del _pending_mode_changes[chat_id]
+            log_audit_event(
+                AuditEventType.CANCEL_MODE_CHANGE,
+                chat_id,
+            )
+            message = format_mode_change_cancelled()
+            await update.message.reply_text(message, parse_mode="Markdown")
+            logger.info(f"Mode change cancelled by chat_id: {chat_id}")
+        # If no pending mode change, let trade cancel handler deal with it
+
+    return cancel_mode_handler
+
+
 def setup_command_handlers(
     application: Application,
     state_manager: "ThreadSafeState",
@@ -857,6 +1249,15 @@ def setup_command_handlers(
     confirm_handler = create_confirm_handler(authorized_chat_id)
     cancel_handler = create_cancel_handler(authorized_chat_id)
 
+    # Story 9.11: Remote control handlers
+    enable_handler = create_enable_handler(authorized_chat_id, state_manager)
+    disable_handler = create_disable_handler(authorized_chat_id, state_manager)
+    mode_handler = create_mode_handler(authorized_chat_id, state_manager)
+    confirm_mode_handler = create_confirm_mode_handler(
+        authorized_chat_id, state_manager
+    )
+    cancel_mode_handler = create_cancel_mode_handler(authorized_chat_id)
+
     # Register handlers
     application.add_handler(CommandHandler("status", status_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("help", help_handler))  # type: ignore[arg-type]
@@ -867,8 +1268,16 @@ def setup_command_handlers(
     application.add_handler(CommandHandler("predict", predict_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("confirm", confirm_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("cancel", cancel_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("confirm", confirm_mode_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("cancel", cancel_mode_handler))  # type: ignore[arg-type]
+
+    # Story 9.11: Control handlers
+    application.add_handler(CommandHandler("enable", enable_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("disable", disable_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("mode", mode_handler))  # type: ignore[arg-type]
 
     logger.info(
         "Command handlers registered: /status, /help, /positions, /stats, "
-        "/markets, /history, /predict, /confirm, /cancel"
+        "/markets, /history, /predict, /confirm, /cancel, "
+        "/enable, /disable, /mode"
     )
