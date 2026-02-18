@@ -3,6 +3,7 @@
 This module provides formatting functions for Telegram command responses.
 
 Story 9.5: Telegram 命令处理 - 状态查询
+Story 9.6: Telegram 命令处理 - 持仓查询
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ __all__ = [
     "format_status_message",
     "format_help_message",
     "format_unauthorized_message",
+    "format_positions_message",
 ]
 
 
@@ -81,7 +83,7 @@ def format_help_message() -> str:
         "\U0001f4cb *可用命令*",
         "",
         "/status - 查看系统状态",
-        "/positions - 查看当前持仓 (Story 9.6)",
+        "/positions - 查看当前持仓",
         "/stats - 查看交易统计 (Story 9.7)",
         "/markets - 查看活跃市场 (Story 9.8)",
         "/history - 查看交易历史 (Story 9.9)",
@@ -107,3 +109,63 @@ def format_unauthorized_message() -> str:
         True
     """
     return "\u26a0\ufe0f *未授权访问*\n\n您没有权限使用此机器人。"
+
+
+def format_positions_message(
+    position_data: list[dict],
+    total_exposure: float,
+    total_pnl: float,
+) -> str:
+    """Format a positions message.
+
+    Args:
+        position_data: List of dicts with market_title, outcome, shares,
+                       cost, current_value, pnl
+        total_exposure: Total initial value of all positions
+        total_pnl: Total PnL of all positions
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_positions_message(
+        ...     [{"market_title": "Test", "outcome": "YES", "shares": 100.0,
+        ...       "cost": 50.0, "current_value": 60.0, "pnl": 10.0}],
+        ...     50.0,
+        ...     10.0
+        ... )
+        >>> "*当前持仓*" in msg
+        True
+    """
+    if not position_data:
+        return "\U0001f4cd *当前持仓*\n\n暂无持仓"
+
+    lines = ["\U0001f4cd *当前持仓*"]
+
+    for i, pos in enumerate(position_data, 1):
+        # Format PnL with sign
+        pnl = pos["pnl"]
+        pnl_sign = "+" if pnl >= 0 else ""
+        pnl_pct = (pnl / pos["cost"] * 100) if pos["cost"] > 0 else 0.0
+
+        lines.extend(
+            [
+                "",
+                f"{i}. *{pos['market_title']}*",
+                f"   方向: {pos['outcome']} | 份额: {pos['shares']:.2f}",
+                f"   成本: ${pos['cost']:.2f} | 现值: ${pos['current_value']:.2f}",
+                f"   盈亏: {pnl_sign}${pnl:.2f} ({pnl_sign}{pnl_pct:.0f}%)",
+            ]
+        )
+
+    # Format totals
+    total_pnl_sign = "+" if total_pnl >= 0 else ""
+    lines.extend(
+        [
+            "",
+            f"*总风险敞口: ${total_exposure:.2f}*",
+            f"*总盈亏: {total_pnl_sign}${total_pnl:.2f}*",
+        ]
+    )
+
+    return "\n".join(lines)
