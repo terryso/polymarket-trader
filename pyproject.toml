@@ -68,4 +68,7 @@ markers = [
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
+    # Ignore warnings about unawaited coroutines in mock tests
+    # This happens when mocking asyncio.run() since async_main() is created but not awaited
+    "ignore:coroutine 'async_main' was never awaited:RuntimeWarning",
 ]
