@@ -1,13 +1,14 @@
 """Telegram command handlers for bot interactions.
 
 This module provides command handler functions for the Telegram bot,
-implementing /status, /help, /positions, /stats, /markets, and /history commands.
+implementing /status, /help, /positions, /stats, /markets, /history, /predict, /confirm, and /cancel commands.
 
 Story 9.5: Telegram 命令处理 - 状态查询
 Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
 Story 9.8: Telegram 命令处理 - 市场查询
 Story 9.9: Telegram 命令处理 - 交易历史
+Story 9.10: Telegram 命令处理 - 手动触发分析
 
 Usage:
     from src.telegram_commands import setup_command_handlers
@@ -26,17 +27,23 @@ __all__ = [
     "create_stats_handler",
     "create_markets_handler",
     "create_history_handler",
+    "create_predict_handler",
+    "create_confirm_handler",
+    "create_cancel_handler",
+    "PendingConfirmation",
 ]
 
 from collections.abc import Awaitable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Callable
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 
+from src.analysis import AnalysisError, LLMAnalyzer
 from src.config import settings
-from src.models.market import MarketCategory
+from src.models.market import Market, MarketCategory
+from src.models.prediction import PredictionResult, Recommendation
 from src.models.trade import TradeMode
 from src.storage.repositories import (
     MarketRepository,
@@ -46,12 +53,18 @@ from src.storage.repositories import (
     TradeRepository,
 )
 from src.telegram_commands.formatters import (
+    format_analyzing_message,
     format_help_message,
     format_history_message,
     format_markets_message,
     format_positions_message,
+    format_predict_market_list,
+    format_predict_result_no_trade,
+    format_predict_result_with_confirm,
     format_stats_message,
     format_status_message,
+    format_trade_cancelled,
+    format_trade_suggestion,
     format_unauthorized_message,
 )
 from src.utils.logger import get_logger
@@ -526,6 +539,293 @@ def create_history_handler(
     return history_handler
 
 
+# =============================================================================
+# Story 9.10: Telegram 命令处理 - 手动触发分析
+# =============================================================================
+
+# Module-level storage for pending confirmations
+# In production, consider using Redis or database for persistence
+_pending_confirmations: dict[str, "PendingConfirmation"] = {}
+
+
+class PendingConfirmation:
+    """Pending trade confirmation data.
+
+    Stores the state for a trade confirmation request that is awaiting
+    user response via /confirm or /cancel commands.
+
+    Attributes:
+        chat_id: Chat ID where the confirmation was requested
+        market: The market to be traded
+        prediction: The LLM prediction result
+        created_at: When the confirmation was created
+        expires_at: When the confirmation expires (30 seconds)
+
+    Example:
+        >>> from src.models import Market
+        >>> from src.models.prediction import PredictionResult, Recommendation
+        >>> market = Market(id="1", title="Test", yes_price=0.5)
+        >>> pred = PredictionResult(
+        ...     predicted_probability=0.8,
+        ...     confidence=0.85,
+        ...     reasoning="Test",
+        ...     key_assumptions=[],
+        ...     recommendation=Recommendation.BUY_YES,
+        ... )
+        >>> pending = PendingConfirmation("123456", market, pred)
+        >>> pending.is_expired()
+        False
+    """
+
+    def __init__(
+        self,
+        chat_id: str,
+        market: Market,
+        prediction: PredictionResult,
+    ) -> None:
+        """Initialize pending confirmation.
+
+        Args:
+            chat_id: Chat ID where the confirmation was requested
+            market: The market to be traded
+            prediction: The LLM prediction result
+        """
+        self.chat_id = chat_id
+        self.market = market
+        self.prediction = prediction
+        self.created_at = datetime.now()
+        self.expires_at = self.created_at + timedelta(seconds=30)
+
+    def is_expired(self) -> bool:
+        """Check if the confirmation has expired.
+
+        Returns:
+            True if expired (30 seconds have passed), False otherwise
+        """
+        return datetime.now() > self.expires_at
+
+
+def create_predict_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a predict command handler.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /predict command
+
+    Example:
+        >>> handler = create_predict_handler("123456789")
+        >>> # Register with: application.add_handler(CommandHandler("predict", handler))
+    """
+
+    async def predict_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /predict command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = update.effective_chat.id
+        chat_id_str = str(chat_id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id_str != str(authorized_chat_id):
+            logger.warning(f"Unauthorized access attempt from chat_id: {chat_id}")
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        market_repo = MarketRepository()
+
+        # Parse parameters - no args shows market list
+        if not context.args or len(context.args) == 0:
+            markets = await market_repo.get_active_markets()
+            # Limit to first 10 markets
+            markets = markets[:10]
+            message = format_predict_market_list(markets)
+            await update.message.reply_text(message, parse_mode="Markdown")
+            return
+
+        # Get market by index or ID
+        market: Market | None = None
+        arg = context.args[0]
+
+        # Try to parse as index (number)
+        try:
+            index = int(arg) - 1  # Convert to 0-based index
+            if index < 0:
+                await update.message.reply_text(
+                    "❌ 无效的市场序号，请使用正整数",
+                    parse_mode="Markdown",
+                )
+                return
+            markets = await market_repo.get_active_markets()
+            if index >= len(markets):
+                await update.message.reply_text(
+                    f"❌ 市场序号 {index + 1} 不存在",
+                    parse_mode="Markdown",
+                )
+                return
+            market = markets[index]
+        except ValueError:
+            # Not a number, try as market ID
+            market = await market_repo.get_market(arg)
+            if not market:
+                await update.message.reply_text(
+                    f"❌ 市场不存在: {arg}",
+                    parse_mode="Markdown",
+                )
+                return
+
+        # Send analyzing message
+        analyzing_msg = format_analyzing_message(market)
+        await update.message.reply_text(analyzing_msg, parse_mode="Markdown")
+
+        # Execute analysis
+        analyzer = LLMAnalyzer()
+        try:
+            result = await analyzer.analyze_market(market)
+
+            # Check if tradeable
+            is_tradeable = result.confidence >= settings.risk.min_confidence
+            if result.edge is not None:
+                is_tradeable = is_tradeable and result.edge >= settings.risk.min_edge
+            is_tradeable = (
+                is_tradeable and result.recommendation != Recommendation.NO_TRADE
+            )
+
+            if is_tradeable:
+                # Store pending confirmation
+                _pending_confirmations[chat_id_str] = PendingConfirmation(
+                    chat_id=chat_id_str,
+                    market=market,
+                    prediction=result,
+                )
+                message = format_predict_result_with_confirm(market, result)
+            else:
+                message = format_predict_result_no_trade(market, result)
+
+            await update.message.reply_text(message, parse_mode="Markdown")
+            logger.info(
+                f"Predict command completed for chat_id: {chat_id}, market: {market.id}"
+            )
+
+        except AnalysisError as e:
+            logger.error(f"Analysis error for market {market.id}: {e}")
+            await update.message.reply_text(
+                f"❌ 分析失败: {e.message}",
+                parse_mode="Markdown",
+            )
+
+    return predict_handler
+
+
+def create_confirm_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a confirm command handler for trade confirmation.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /confirm command
+    """
+
+    async def confirm_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /confirm command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Check for pending confirmation
+        pending = _pending_confirmations.get(chat_id)
+        if not pending:
+            await update.message.reply_text(
+                "❌ 没有待确认的交易。请先使用 /predict 分析市场。",
+                parse_mode="Markdown",
+            )
+            return
+
+        if pending.is_expired():
+            del _pending_confirmations[chat_id]
+            await update.message.reply_text(
+                "❌ 确认已超时 (30秒)。请重新执行 /predict 分析。",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Calculate suggested amount
+        amount = settings.trading.initial_capital * settings.risk.max_single_ratio
+
+        # Generate trade suggestion (NOT executing actual trade)
+        message = format_trade_suggestion(pending.market, pending.prediction, amount)
+        del _pending_confirmations[chat_id]
+
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Trade confirmed for chat_id: {chat_id}")
+
+    return confirm_handler
+
+
+def create_cancel_handler(
+    authorized_chat_id: str | None,
+) -> "Callable[[Update, CallbackContext], Awaitable[None]]":
+    """Create a cancel command handler.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+
+    Args:
+        authorized_chat_id: Authorized chat ID for access control
+
+    Returns:
+        Async function that handles /cancel command
+    """
+
+    async def cancel_handler(update: Update, context: "CallbackContext") -> None:
+        """Handle /cancel command."""
+        if not update.effective_chat or not update.message:
+            return
+
+        chat_id = str(update.effective_chat.id)
+
+        # Verify authorization
+        if authorized_chat_id and chat_id != str(authorized_chat_id):
+            await update.message.reply_text(
+                format_unauthorized_message(),
+                parse_mode="Markdown",
+            )
+            return
+
+        # Check for pending confirmation
+        if chat_id in _pending_confirmations:
+            del _pending_confirmations[chat_id]
+            message = format_trade_cancelled()
+        else:
+            message = "没有待取消的交易。"
+
+        await update.message.reply_text(message, parse_mode="Markdown")
+        logger.info(f"Trade cancelled for chat_id: {chat_id}")
+
+    return cancel_handler
+
+
 def setup_command_handlers(
     application: Application,
     state_manager: "ThreadSafeState",
@@ -553,6 +853,9 @@ def setup_command_handlers(
     stats_handler = create_stats_handler(authorized_chat_id)
     markets_handler = create_markets_handler(authorized_chat_id)
     history_handler = create_history_handler(authorized_chat_id)
+    predict_handler = create_predict_handler(authorized_chat_id)
+    confirm_handler = create_confirm_handler(authorized_chat_id)
+    cancel_handler = create_cancel_handler(authorized_chat_id)
 
     # Register handlers
     application.add_handler(CommandHandler("status", status_handler))  # type: ignore[arg-type]
@@ -561,7 +864,11 @@ def setup_command_handlers(
     application.add_handler(CommandHandler("stats", stats_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("markets", markets_handler))  # type: ignore[arg-type]
     application.add_handler(CommandHandler("history", history_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("predict", predict_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("confirm", confirm_handler))  # type: ignore[arg-type]
+    application.add_handler(CommandHandler("cancel", cancel_handler))  # type: ignore[arg-type]
 
     logger.info(
-        "Command handlers registered: /status, /help, /positions, /stats, /markets, /history"
+        "Command handlers registered: /status, /help, /positions, /stats, "
+        "/markets, /history, /predict, /confirm, /cancel"
     )

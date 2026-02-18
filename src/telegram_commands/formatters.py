@@ -7,6 +7,7 @@ Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
 Story 9.8: Telegram 命令处理 - 市场查询
 Story 9.9: Telegram 命令处理 - 交易历史
+Story 9.10: Telegram 命令处理 - 手动触发分析
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.models import Market, MarketCategory, Trade, TradeMode
+    from src.models.prediction import PredictionResult
 
 __all__ = [
     "format_status_message",
@@ -26,6 +28,13 @@ __all__ = [
     "format_markets_message",
     "format_history_message",
     "_format_relative_time",
+    # Story 9.10: 手动触发分析
+    "format_predict_market_list",
+    "format_analyzing_message",
+    "format_predict_result_with_confirm",
+    "format_predict_result_no_trade",
+    "format_trade_suggestion",
+    "format_trade_cancelled",
 ]
 
 
@@ -100,6 +109,9 @@ def format_help_message() -> str:
         "/stats [days] - 查看交易统计",
         "/markets [n] [category] - 查看活跃市场",
         "/history [n] [paper|live] - 查看交易历史",
+        "/predict [序号|市场ID] - 手动触发市场分析",
+        "/confirm - 确认交易建议",
+        "/cancel - 取消交易建议",
         "/help - 显示帮助信息",
     ]
 
@@ -481,3 +493,285 @@ def format_history_message(
         )
 
     return "\n".join(lines)
+
+
+# =============================================================================
+# Story 9.10: Telegram 命令处理 - 手动触发分析
+# =============================================================================
+
+
+def format_predict_market_list(markets: list["Market"]) -> str:
+    """Format a market list for predict command.
+
+    Args:
+        markets: List of Market models to display
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Market
+        >>> markets = [Market(id="1", title="Test", yes_price=0.5, liquidity=1000)]
+        >>> msg = format_predict_market_list(markets)
+        >>> "*选择市场分析*" in msg
+        True
+    """
+    if not markets:
+        return "\U0001f9e0 *选择市场分析*\n\n暂无活跃市场"
+
+    lines = [
+        "\U0001f9e0 *选择市场分析*",
+        "",
+    ]
+
+    for i, market in enumerate(markets, 1):
+        # Format price
+        price_str = ""
+        if market.yes_price is not None:
+            price_str = f"YES: {market.yes_price:.2f}"
+        elif market.no_price is not None:
+            price_str = f"NO: {market.no_price:.2f}"
+
+        # Format liquidity
+        liquidity_str = ""
+        if market.liquidity is not None:
+            if market.liquidity >= 1000:
+                liquidity_str = f"${market.liquidity / 1000:.0f}k"
+            else:
+                liquidity_str = f"${market.liquidity:.0f}"
+
+        # Truncate long titles
+        title = market.title[:50] + "..." if len(market.title) > 50 else market.title
+
+        lines.extend(
+            [
+                f"{i}. *{title}*",
+                f"   {price_str} | 流动性: {liquidity_str}",
+                "",
+            ]
+        )
+
+    lines.append("回复 `/predict <序号>` 或 `/predict <市场ID>` 开始分析")
+
+    return "\n".join(lines)
+
+
+def format_analyzing_message(market: "Market") -> str:
+    """Format analyzing in progress message.
+
+    Args:
+        market: Market being analyzed
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Market
+        >>> market = Market(id="1", title="Test", yes_price=0.5)
+        >>> msg = format_analyzing_message(market)
+        >>> "*分析中...*" in msg
+        True
+    """
+    return "\n".join(
+        [
+            "\U0001f9e0 *分析中...*",
+            f"市场: {market.title}",
+            "请稍候，LLM 正在分析...",
+        ]
+    )
+
+
+def format_predict_result_with_confirm(
+    market: "Market",
+    prediction: "PredictionResult",
+) -> str:
+    """Format prediction result with trade confirmation.
+
+    Args:
+        market: Analyzed market
+        prediction: LLM prediction result
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Market
+        >>> from src.models.prediction import PredictionResult, Recommendation
+        >>> market = Market(id="1", title="Test", yes_price=0.5)
+        >>> pred = PredictionResult(
+        ...     predicted_probability=0.8,
+        ...     confidence=0.85,
+        ...     reasoning="Test",
+        ...     key_assumptions=[],
+        ...     recommendation=Recommendation.BUY_YES,
+        ...     edge=0.15
+        ... )
+        >>> msg = format_predict_result_with_confirm(market, pred)
+        >>> "*市场分析完成*" in msg
+        True
+    """
+    # Format recommendation
+    from src.models.prediction import Recommendation
+
+    if prediction.recommendation == Recommendation.BUY_YES:
+        rec_emoji = "\U0001f7e2"  # Green circle
+        rec_text = "BUY YES"
+    elif prediction.recommendation == Recommendation.BUY_NO:
+        rec_emoji = "\U0001f534"  # Red circle
+        rec_text = "BUY NO"
+    else:
+        rec_emoji = "\U000023f9"  # Stop button
+        rec_text = "NO_TRADE"
+
+    # Format price
+    price_str = f"YES {market.yes_price:.2f}" if market.yes_price else "N/A"
+
+    lines = [
+        "\U0001f9e0 *市场分析完成*",
+        "",
+        f"市场: {market.title}",
+        f"市场价格: {price_str}",
+        f"预测概率: {prediction.predicted_probability:.0%}",
+        f"置信度: {prediction.confidence:.0%}",
+    ]
+
+    if prediction.edge is not None:
+        lines.append(f"Edge: {prediction.edge:.0%}")
+
+    lines.extend(
+        [
+            "",
+            f"建议: {rec_emoji} *{rec_text}*",
+            "",
+            "是否执行交易？",
+            "回复 /confirm 确认 或 /cancel 取消",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def format_predict_result_no_trade(
+    market: "Market",
+    prediction: "PredictionResult",
+) -> str:
+    """Format prediction result when not tradeable.
+
+    Args:
+        market: Analyzed market
+        prediction: LLM prediction result
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Market
+        >>> from src.models.prediction import PredictionResult, Recommendation
+        >>> market = Market(id="1", title="Test", yes_price=0.5)
+        >>> pred = PredictionResult(
+        ...     predicted_probability=0.5,
+        ...     confidence=0.6,
+        ...     reasoning="Test",
+        ...     key_assumptions=[],
+        ...     recommendation=Recommendation.NO_TRADE,
+        ...     edge=0.05
+        ... )
+        >>> msg = format_predict_result_no_trade(market, pred)
+        >>> "NO_TRADE" in msg
+        True
+    """
+    lines = [
+        "\U0001f9e0 *市场分析完成*",
+        "",
+        f"市场: {market.title}",
+        f"预测概率: {prediction.predicted_probability:.0%}",
+        f"置信度: {prediction.confidence:.0%}",
+    ]
+
+    if prediction.edge is not None:
+        lines.append(f"Edge: {prediction.edge:.0%}")
+
+    lines.extend(
+        [
+            "",
+            "建议: NO_TRADE",
+            "",
+            "_(置信度或 Edge 未达到交易门槛)_",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def format_trade_suggestion(
+    market: "Market",
+    prediction: "PredictionResult",
+    amount: float,
+) -> str:
+    """Format trade suggestion after confirmation.
+
+    Note: This only shows the suggestion, does NOT execute actual trade.
+
+    Args:
+        market: Market to trade
+        prediction: LLM prediction result
+        amount: Suggested trade amount in USD
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> from src.models import Market
+        >>> from src.models.prediction import PredictionResult, Recommendation
+        >>> market = Market(id="1", title="Test", yes_price=0.65)
+        >>> pred = PredictionResult(
+        ...     predicted_probability=0.8,
+        ...     confidence=0.85,
+        ...     reasoning="Test",
+        ...     key_assumptions=[],
+        ...     recommendation=Recommendation.BUY_YES,
+        ...     edge=0.15
+        ... )
+        >>> msg = format_trade_suggestion(market, pred, 40.0)
+        >>> "*交易建议*" in msg
+        True
+    """
+    from src.models.prediction import Recommendation
+
+    if prediction.recommendation == Recommendation.BUY_YES:
+        direction = "BUY YES"
+        price = market.yes_price or 0.5
+    else:
+        direction = "BUY NO"
+        price = market.no_price or (1 - (market.yes_price or 0.5))
+
+    shares = amount / price if price > 0 else 0
+
+    lines = [
+        "\U0001f4b0 *交易建议*",
+        "",
+        f"市场: {market.title}",
+        f"方向: {direction}",
+        f"建议金额: ${amount:.2f}",
+        f"价格: {price:.2f}",
+        f"份额: {shares:.2f}",
+        "",
+        "_注意: 这是手动触发的分析建议。_",
+        "_实际交易需要 Paper Trading 或 Live 模式启用。_",
+    ]
+
+    return "\n".join(lines)
+
+
+def format_trade_cancelled() -> str:
+    """Format trade cancelled message.
+
+    Returns:
+        Formatted Markdown message
+
+    Example:
+        >>> msg = format_trade_cancelled()
+        >>> "*交易已取消*" in msg
+        True
+    """
+    return "\U0000274c *交易已取消*"

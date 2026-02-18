@@ -5,6 +5,7 @@ Story 9.6: Telegram 命令处理 - 持仓查询
 Story 9.7: Telegram 命令处理 - 统计查询
 Story 9.8: Telegram 命令处理 - 市场查询
 Story 9.9: Telegram 命令处理 - 交易历史
+Story 9.10: Telegram 命令处理 - 手动触发分析
 """
 
 from __future__ import annotations
@@ -29,10 +30,13 @@ from src.telegram_commands.formatters import (
     format_unauthorized_message,
 )
 from src.telegram_commands.handlers import (
+    create_cancel_handler,
+    create_confirm_handler,
     create_help_handler,
     create_history_handler,
     create_markets_handler,
     create_positions_handler,
+    create_predict_handler,
     create_stats_handler,
     create_status_handler,
     setup_command_handlers,
@@ -283,8 +287,9 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add six handlers: status, help, positions, stats, markets, and history
-        assert mock_app.add_handler.call_count == 6
+        # Should add nine handlers: status, help, positions, stats, markets, history,
+        # predict, confirm, cancel
+        assert mock_app.add_handler.call_count == 9
 
     def test_setup_registers_handlers_no_auth(self) -> None:
         """Test that handlers are registered without auth."""
@@ -293,8 +298,9 @@ class TestSetupCommandHandlers:
 
         setup_command_handlers(mock_app, mock_state, None)
 
-        # Should add six handlers: status, help, positions, stats, markets, and history
-        assert mock_app.add_handler.call_count == 6
+        # Should add nine handlers: status, help, positions, stats, markets, history,
+        # predict, confirm, cancel
+        assert mock_app.add_handler.call_count == 9
 
 
 class TestPositionsFormatter:
@@ -1718,6 +1724,82 @@ class TestHistoryFormatter:
 
         assert "BUY NO" in message
 
+    def test_format_history_message_with_null_trade_type(self) -> None:
+        """Test history message with null trade_type (line 441-442)."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Test Market",
+                "trade_type": None,
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.5,
+                "status": TradeStatus.FILLED,
+                "created_at": datetime.now(),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "TRADE" in message
+
+    def test_format_history_message_with_dict_trade_type(self) -> None:
+        """Test history message with dict trade_type (line 455-456)."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Test Market",
+                "trade_type": "CUSTOM_TYPE",  # Not an enum, just a string
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.5,
+                "status": TradeStatus.FILLED,
+                "created_at": datetime.now(),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "CUSTOM_TYPE" in message
+
+    def test_format_history_message_with_null_status(self) -> None:
+        """Test history message with null status (line 461)."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Test Market",
+                "trade_type": TradeType.BUY_YES,
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.5,
+                "status": None,
+                "created_at": datetime.now(),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "处理中" in message
+
+    def test_format_history_message_with_dict_status(self) -> None:
+        """Test history message with dict status (line 471)."""
+        trade_data = [
+            {
+                "id": 1,
+                "market_id": "market-1",
+                "market_title": "Test Market",
+                "trade_type": TradeType.BUY_YES,
+                "mode": TradeMode.PAPER,
+                "amount": 10.0,
+                "price": 0.5,
+                "status": "CUSTOM_STATUS",  # Not an enum, just a string
+                "created_at": datetime.now(),
+            },
+        ]
+        message = format_history_message([], trade_data=trade_data)
+
+        assert "CUSTOM_STATUS" in message
+
 
 class TestHistoryHandler:
     """Tests for history command handler.
@@ -2136,12 +2218,777 @@ class TestSetupCommandHandlersWithMarkets:
     Story 9.8: Telegram 命令处理 - 市场查询
     """
 
-    def test_setup_registers_six_handlers(self) -> None:
-        """Test that six handlers are registered including history."""
+    def test_setup_registers_nine_handlers_legacy(self) -> None:
+        """Test that nine handlers are registered including history."""
         mock_app = MagicMock()
         mock_state = MagicMock()
 
         setup_command_handlers(mock_app, mock_state, "123456789")
 
-        # Should add six handlers: status, help, positions, stats, markets, and history
-        assert mock_app.add_handler.call_count == 6
+        # Should add nine handlers: status, help, positions, stats, markets, history,
+        # predict, confirm, cancel
+        assert mock_app.add_handler.call_count == 9
+
+
+# =============================================================================
+# Story 9.10: Telegram 命令处理 - 手动触发分析
+# =============================================================================
+
+
+class TestPredictFormatters:
+    """Tests for predict message formatters.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+    """
+
+    def test_format_predict_market_list_with_data(self) -> None:
+        """Test market list formatting with data."""
+        from src.telegram_commands.formatters import format_predict_market_list
+
+        markets = [
+            Market(id="m1", title="Test Market 1", yes_price=0.65, liquidity=50000),
+            Market(id="m2", title="Test Market 2", yes_price=0.45, liquidity=120000),
+        ]
+        message = format_predict_market_list(markets)
+
+        assert "*选择市场分析*" in message
+        assert "Test Market 1" in message
+        assert "YES: 0.65" in message
+        assert "$50k" in message
+
+    def test_format_predict_market_list_no_markets(self) -> None:
+        """Test market list formatting with no markets."""
+        from src.telegram_commands.formatters import format_predict_market_list
+
+        message = format_predict_market_list([])
+
+        assert "*选择市场分析*" in message
+        assert "暂无活跃市场" in message
+
+    def test_format_analyzing_message(self) -> None:
+        """Test analyzing message formatting."""
+        from src.telegram_commands.formatters import format_analyzing_message
+
+        market = Market(id="m1", title="Test Market", yes_price=0.5)
+        message = format_analyzing_message(market)
+
+        assert "*分析中...*" in message
+        assert "Test Market" in message
+        assert "LLM 正在分析" in message
+
+    def test_format_trade_cancelled(self) -> None:
+        """Test trade cancelled message."""
+        from src.telegram_commands.formatters import format_trade_cancelled
+
+        message = format_trade_cancelled()
+        assert "*交易已取消*" in message
+
+    def test_format_predict_result_with_confirm_buy_yes(self) -> None:
+        """Test prediction result with confirm for BUY_YES."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.formatters import format_predict_result_with_confirm
+
+        market = Market(id="m1", title="Test Market", yes_price=0.65)
+        prediction = PredictionResult(
+            predicted_probability=0.80,
+            confidence=0.85,
+            reasoning="Strong signal",
+            key_assumptions=["Assumption 1"],
+            recommendation=Recommendation.BUY_YES,
+            edge=0.15,
+        )
+        message = format_predict_result_with_confirm(market, prediction)
+
+        assert "*市场分析完成*" in message
+        assert "Test Market" in message
+        assert "BUY YES" in message
+        assert "80%" in message
+        assert "85%" in message
+        assert "15%" in message
+        assert "/confirm" in message
+        assert "/cancel" in message
+
+    def test_format_predict_result_with_confirm_buy_no(self) -> None:
+        """Test prediction result with confirm for BUY_NO."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.formatters import format_predict_result_with_confirm
+
+        market = Market(id="m1", title="Test Market", yes_price=0.35)
+        prediction = PredictionResult(
+            predicted_probability=0.30,
+            confidence=0.80,
+            reasoning="Sell signal",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_NO,
+            edge=0.20,
+        )
+        message = format_predict_result_with_confirm(market, prediction)
+
+        assert "BUY NO" in message
+
+    def test_format_predict_result_no_trade(self) -> None:
+        """Test prediction result when not tradeable."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.formatters import format_predict_result_no_trade
+
+        market = Market(id="m1", title="Test Market", yes_price=0.5)
+        prediction = PredictionResult(
+            predicted_probability=0.55,
+            confidence=0.60,
+            reasoning="Weak signal",
+            key_assumptions=[],
+            recommendation=Recommendation.NO_TRADE,
+            edge=0.05,
+        )
+        message = format_predict_result_no_trade(market, prediction)
+
+        assert "*市场分析完成*" in message
+        assert "NO_TRADE" in message
+        assert "未达到交易门槛" in message
+
+    def test_format_trade_suggestion_buy_yes(self) -> None:
+        """Test trade suggestion for BUY_YES."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.formatters import format_trade_suggestion
+
+        market = Market(id="m1", title="Test Market", yes_price=0.65)
+        prediction = PredictionResult(
+            predicted_probability=0.80,
+            confidence=0.85,
+            reasoning="Strong signal",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_YES,
+            edge=0.15,
+        )
+        message = format_trade_suggestion(market, prediction, 40.0)
+
+        assert "*交易建议*" in message
+        assert "Test Market" in message
+        assert "BUY YES" in message
+        assert "$40.00" in message
+        assert "0.65" in message
+        assert "手动触发" in message
+
+    def test_format_trade_suggestion_buy_no(self) -> None:
+        """Test trade suggestion for BUY_NO."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.formatters import format_trade_suggestion
+
+        market = Market(id="m1", title="Test Market", yes_price=0.65)
+        prediction = PredictionResult(
+            predicted_probability=0.30,
+            confidence=0.80,
+            reasoning="Sell signal",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_NO,
+            edge=0.20,
+        )
+        message = format_trade_suggestion(market, prediction, 40.0)
+
+        assert "BUY NO" in message
+        # Price for NO should be 1 - 0.65 = 0.35
+        assert "0.35" in message
+
+    def test_format_predict_market_list_with_no_price(self) -> None:
+        """Test market list with market that has no yes_price but has no_price."""
+        from src.telegram_commands.formatters import format_predict_market_list
+
+        markets = [
+            Market(id="m1", title="Test Market", no_price=0.35, liquidity=500),
+        ]
+        message = format_predict_market_list(markets)
+
+        assert "*选择市场分析*" in message
+        assert "NO: 0.35" in message
+        assert "$500" in message  # liquidity < 1000
+
+    def test_format_predict_market_list_with_small_liquidity(self) -> None:
+        """Test market list with small liquidity (less than 1000)."""
+        from src.telegram_commands.formatters import format_predict_market_list
+
+        markets = [
+            Market(id="m1", title="Test Market", yes_price=0.5, liquidity=500),
+        ]
+        message = format_predict_market_list(markets)
+
+        assert "$500" in message  # No 'k' suffix for small liquidity
+
+    def test_format_predict_result_with_confirm_no_trade(self) -> None:
+        """Test prediction result with confirm for NO_TRADE recommendation."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.formatters import format_predict_result_with_confirm
+
+        market = Market(id="m1", title="Test Market", yes_price=0.5)
+        prediction = PredictionResult(
+            predicted_probability=0.5,
+            confidence=0.5,
+            reasoning="Uncertain",
+            key_assumptions=[],
+            recommendation=Recommendation.NO_TRADE,
+            edge=0.0,
+        )
+        message = format_predict_result_with_confirm(market, prediction)
+
+        # Should still format the message even with NO_TRADE
+        assert "*市场分析完成*" in message
+        assert "NO_TRADE" in message
+
+
+class TestPredictHandler:
+    """Tests for predict command handler.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+    """
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self) -> MagicMock:
+        """Create a mock callback context."""
+        context = MagicMock()
+        context.args = []
+        return context
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_no_args_shows_list(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test predict handler without args shows market list."""
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(
+                return_value=[
+                    Market(
+                        id=f"market-{i}",
+                        title=f"Test Market {i}",
+                        yes_price=0.5 + i * 0.1,
+                        liquidity=10000.0 + i * 1000,
+                    )
+                    for i in range(5)
+                ]
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_predict_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "*选择市场分析*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_with_index(self, mock_update: MagicMock) -> None:
+        """Test predict handler with index parameter."""
+        from src.models.prediction import PredictionResult, Recommendation
+
+        mock_context = MagicMock()
+        mock_context.args = ["2"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.LLMAnalyzer") as MockAnalyzer,
+            patch("src.telegram_commands.handlers.settings") as mock_settings,
+        ):
+            # Setup mock settings
+            mock_settings.risk.min_confidence = 0.75
+            mock_settings.risk.min_edge = 0.10
+
+            # Setup mock market repo
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(
+                return_value=[
+                    Market(id="market-1", title="Test Market 1", yes_price=0.5),
+                    Market(id="market-2", title="Test Market 2", yes_price=0.6),
+                ]
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            # Setup mock analyzer
+            mock_analyzer = MagicMock()
+            mock_analyzer.analyze_market = AsyncMock(
+                return_value=PredictionResult(
+                    predicted_probability=0.8,
+                    confidence=0.85,
+                    reasoning="Test reasoning",
+                    key_assumptions=["Assumption 1"],
+                    recommendation=Recommendation.BUY_YES,
+                    edge=0.15,
+                )
+            )
+            MockAnalyzer.return_value = mock_analyzer
+
+            handler = create_predict_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify analyze was called with second market (index 1)
+            mock_analyzer.analyze_market.assert_called_once()
+            called_market = mock_analyzer.analyze_market.call_args.args[0]
+            assert called_market.id == "market-2"
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_with_market_id(self, mock_update: MagicMock) -> None:
+        """Test predict handler with market ID parameter."""
+        from src.models.prediction import PredictionResult, Recommendation
+
+        mock_context = MagicMock()
+        mock_context.args = ["market-abc123"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.LLMAnalyzer") as MockAnalyzer,
+            patch("src.telegram_commands.handlers.settings") as mock_settings,
+        ):
+            # Setup mock settings
+            mock_settings.risk.min_confidence = 0.75
+            mock_settings.risk.min_edge = 0.10
+
+            # Setup mock market repo
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_market = AsyncMock(
+                return_value=Market(
+                    id="market-abc123",
+                    title="Test Market",
+                    yes_price=0.6,
+                )
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            # Setup mock analyzer
+            mock_analyzer = MagicMock()
+            mock_analyzer.analyze_market = AsyncMock(
+                return_value=PredictionResult(
+                    predicted_probability=0.5,
+                    confidence=0.6,
+                    reasoning="Test",
+                    key_assumptions=[],
+                    recommendation=Recommendation.NO_TRADE,
+                    edge=0.05,
+                )
+            )
+            MockAnalyzer.return_value = mock_analyzer
+
+            handler = create_predict_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            # Verify get_market was called with correct ID
+            mock_market_repo.get_market.assert_called_once_with("market-abc123")
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_market_not_found(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test predict handler with non-existent market ID."""
+        mock_context = MagicMock()
+        mock_context.args = ["nonexistent"]
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_market = AsyncMock(return_value=None)
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_predict_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "市场不存在" in call_args
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_invalid_index(self, mock_update: MagicMock) -> None:
+        """Test predict handler with invalid (negative) index."""
+        mock_context = MagicMock()
+        mock_context.args = ["0"]  # Will become -1 after conversion
+
+        handler = create_predict_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "无效的市场序号" in call_args
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_index_out_of_range(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test predict handler with index out of range."""
+        mock_context = MagicMock()
+        mock_context.args = ["100"]
+
+        with patch(
+            "src.telegram_commands.handlers.MarketRepository"
+        ) as MockMarketRepo:
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_active_markets = AsyncMock(
+                return_value=[
+                    Market(id="market-1", title="Test Market 1", yes_price=0.5),
+                ]
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            handler = create_predict_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "不存在" in call_args
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_unauthorized(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test predict handler with unauthorized user."""
+        handler = create_predict_handler("999888777")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_analysis_error(
+        self, mock_update: MagicMock
+    ) -> None:
+        """Test predict handler when analysis fails."""
+        from src.analysis import AnalysisError
+
+        mock_context = MagicMock()
+        mock_context.args = ["market-1"]
+
+        with (
+            patch(
+                "src.telegram_commands.handlers.MarketRepository"
+            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.LLMAnalyzer") as MockAnalyzer,
+        ):
+            # Setup mock market repo
+            mock_market_repo = MagicMock()
+            mock_market_repo.get_market = AsyncMock(
+                return_value=Market(
+                    id="market-1",
+                    title="Test Market",
+                    yes_price=0.5,
+                )
+            )
+            MockMarketRepo.return_value = mock_market_repo
+
+            # Setup mock analyzer to raise error
+            mock_analyzer = MagicMock()
+            mock_analyzer.analyze_market = AsyncMock(
+                side_effect=AnalysisError("LLM API failed")
+            )
+            MockAnalyzer.return_value = mock_analyzer
+
+            handler = create_predict_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called()
+            # Last call should be error message
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "分析失败" in call_args
+
+    @pytest.mark.asyncio
+    async def test_predict_handler_no_effective_chat(self) -> None:
+        """Test predict handler when update has no effective_chat."""
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+
+        handler = create_predict_handler("123456789")
+        await handler(mock_update, MagicMock())
+
+        # Should not call reply_text
+        mock_update.message.reply_text.assert_not_called()
+
+
+class TestConfirmCancelHandlers:
+    """Tests for confirm and cancel command handlers.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+    """
+
+    @pytest.fixture
+    def mock_update(self) -> MagicMock:
+        """Create a mock Telegram update."""
+        update = MagicMock()
+        update.effective_chat = MagicMock()
+        update.effective_chat.id = 123456789
+        update.message = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self) -> MagicMock:
+        """Create a mock callback context."""
+        return MagicMock(args=[])
+
+    @pytest.mark.asyncio
+    async def test_confirm_handler_no_effective_chat(self) -> None:
+        """Test confirm handler when update has no effective_chat."""
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+
+        handler = create_confirm_handler("123456789")
+        await handler(mock_update, MagicMock())
+
+        # Should not call reply_text
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_confirm_handler_expired_confirmation(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test confirm handler with expired pending confirmation."""
+        from datetime import datetime, timedelta
+
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import PendingConfirmation
+
+        # Setup expired pending confirmation
+        market = Market(id="m1", title="Test Market", yes_price=0.5)
+        prediction = PredictionResult(
+            predicted_probability=0.8,
+            confidence=0.85,
+            reasoning="Test",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_YES,
+            edge=0.15,
+        )
+        pending = PendingConfirmation("123456789", market, prediction)
+        # Set as expired
+        pending.expires_at = datetime.now() - timedelta(seconds=1)
+        handlers._pending_confirmations["123456789"] = pending
+
+        handler = create_confirm_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "超时" in call_args
+
+        # Verify expired confirmation was removed
+        assert "123456789" not in handlers._pending_confirmations
+
+    @pytest.mark.asyncio
+    async def test_cancel_handler_no_effective_chat(self) -> None:
+        """Test cancel handler when update has no effective_chat."""
+        mock_update = MagicMock()
+        mock_update.effective_chat = None
+        mock_update.message = AsyncMock()
+
+        handler = create_cancel_handler("123456789")
+        await handler(mock_update, MagicMock())
+
+        # Should not call reply_text
+        mock_update.message.reply_text.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_confirm_handler_no_pending(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test confirm handler with no pending confirmation."""
+        # Clear any pending confirmations
+        from src.telegram_commands import handlers
+
+        handlers._pending_confirmations.clear()
+
+        handler = create_confirm_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "没有待确认的交易" in call_args
+
+    @pytest.mark.asyncio
+    async def test_cancel_handler_no_pending(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test cancel handler with no pending confirmation."""
+        # Clear any pending confirmations
+        from src.telegram_commands import handlers
+
+        handlers._pending_confirmations.clear()
+
+        handler = create_cancel_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "没有待取消的交易" in call_args
+
+    @pytest.mark.asyncio
+    async def test_cancel_handler_with_pending(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test cancel handler with pending confirmation."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import PendingConfirmation
+
+        # Setup pending confirmation
+        market = Market(id="m1", title="Test Market", yes_price=0.5)
+        prediction = PredictionResult(
+            predicted_probability=0.8,
+            confidence=0.85,
+            reasoning="Test",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_YES,
+            edge=0.15,
+        )
+        handlers._pending_confirmations["123456789"] = PendingConfirmation(
+            chat_id="123456789",
+            market=market,
+            prediction=prediction,
+        )
+
+        handler = create_cancel_handler("123456789")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*交易已取消*" in call_args
+
+        # Verify pending confirmation was removed
+        assert "123456789" not in handlers._pending_confirmations
+
+    @pytest.mark.asyncio
+    async def test_confirm_handler_unauthorized(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test confirm handler with unauthorized user."""
+        handler = create_confirm_handler("999888777")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_cancel_handler_unauthorized(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test cancel handler with unauthorized user."""
+        handler = create_cancel_handler("999888777")
+        await handler(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args.args[0]
+        assert "*未授权访问*" in call_args
+
+    @pytest.mark.asyncio
+    async def test_confirm_handler_with_pending(
+        self, mock_update: MagicMock, mock_context: MagicMock
+    ) -> None:
+        """Test confirm handler with valid pending confirmation."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands import handlers
+        from src.telegram_commands.handlers import PendingConfirmation
+
+        # Setup pending confirmation
+        market = Market(id="m1", title="Test Market", yes_price=0.65)
+        prediction = PredictionResult(
+            predicted_probability=0.8,
+            confidence=0.85,
+            reasoning="Test",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_YES,
+            edge=0.15,
+        )
+        handlers._pending_confirmations["123456789"] = PendingConfirmation(
+            chat_id="123456789",
+            market=market,
+            prediction=prediction,
+        )
+
+        with patch("src.telegram_commands.handlers.settings") as mock_settings:
+            mock_settings.trading.initial_capital = 200.0
+            mock_settings.risk.max_single_ratio = 0.20
+
+            handler = create_confirm_handler("123456789")
+            await handler(mock_update, mock_context)
+
+            mock_update.message.reply_text.assert_called_once()
+            call_args = mock_update.message.reply_text.call_args.args[0]
+            assert "*交易建议*" in call_args
+
+        # Verify pending confirmation was removed
+        assert "123456789" not in handlers._pending_confirmations
+
+
+class TestPendingConfirmation:
+    """Tests for PendingConfirmation class.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+    """
+
+    def test_pending_confirmation_not_expired_initially(self) -> None:
+        """Test that new confirmation is not expired."""
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.handlers import PendingConfirmation
+
+        market = Market(id="m1", title="Test", yes_price=0.5)
+        prediction = PredictionResult(
+            predicted_probability=0.8,
+            confidence=0.85,
+            reasoning="Test",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_YES,
+        )
+        pending = PendingConfirmation("123456", market, prediction)
+
+        assert not pending.is_expired()
+
+    def test_pending_confirmation_expired_after_30_seconds(self) -> None:
+        """Test that confirmation expires after 30 seconds."""
+        from datetime import datetime, timedelta
+
+        from src.models.prediction import PredictionResult, Recommendation
+        from src.telegram_commands.handlers import PendingConfirmation
+
+        market = Market(id="m1", title="Test", yes_price=0.5)
+        prediction = PredictionResult(
+            predicted_probability=0.8,
+            confidence=0.85,
+            reasoning="Test",
+            key_assumptions=[],
+            recommendation=Recommendation.BUY_YES,
+        )
+        pending = PendingConfirmation("123456", market, prediction)
+
+        # Simulate time passing
+        pending.expires_at = datetime.now() - timedelta(seconds=1)
+
+        assert pending.is_expired()
+
+
+class TestSetupCommandHandlersWithPredict:
+    """Tests for setup_command_handlers with predict handler.
+
+    Story 9.10: Telegram 命令处理 - 手动触发分析
+    """
+
+    def test_setup_registers_nine_handlers(self) -> None:
+        """Test that nine handlers are registered including predict/confirm/cancel."""
+        mock_app = MagicMock()
+        mock_state = MagicMock()
+
+        setup_command_handlers(mock_app, mock_state, "123456789")
+
+        # Should add nine handlers: status, help, positions, stats, markets, history,
+        # predict, confirm, cancel
+        assert mock_app.add_handler.call_count == 9
