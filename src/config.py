@@ -39,7 +39,9 @@ class LLMSettings(BaseSettings):
     )
     api_key: str = Field(default="", description="LLM API key")
     model: str = Field(default="glm-4", description="LLM model name")
-    timeout: int = Field(default=600, gt=0, description="API timeout in seconds (default 10 min)")
+    timeout: int = Field(
+        default=600, gt=0, description="API timeout in seconds (default 10 min)"
+    )
     thinking_enabled: bool = Field(
         default=True,
         alias="THINKING_ENABLED",
@@ -83,7 +85,9 @@ class PolymarketSettings(BaseSettings):
         default="", alias="POLYMARKET_API_SECRET", description="Polymarket API secret"
     )
     api_passphrase: str = Field(
-        default="", alias="POLYMARKET_API_PASSPHRASE", description="Polymarket API passphrase"
+        default="",
+        alias="POLYMARKET_API_PASSPHRASE",
+        description="Polymarket API passphrase",
     )
 
     @field_validator("pk")
@@ -297,11 +301,13 @@ class TelegramSettings(BaseSettings):
     """Telegram Bot configuration settings.
 
     Story 9.1: Telegram Bot 配置与初始化
+    Story 9.4: LLM 分析结果通知 - 添加 notify_all_analyses 配置
 
     Attributes:
         bot_token: Telegram Bot Token (from @BotFather)
         chat_id: Authorized user Chat ID for commands
         enabled: Enable Telegram notifications and commands
+        notify_all_analyses: Notify all analyses (not just tradeable signals)
 
     Example:
         >>> from src.config import settings
@@ -330,6 +336,10 @@ class TelegramSettings(BaseSettings):
         default=False,
         description="Enable Telegram notifications and commands",
     )
+    notify_all_analyses: bool = Field(
+        default=False,
+        description="Notify all analyses (not just tradeable signals)",
+    )
 
     @field_validator("enabled")
     @classmethod
@@ -340,6 +350,7 @@ class TelegramSettings(BaseSettings):
         """
         if v:
             import warnings
+
             warnings.warn(
                 "Telegram is enabled but TELEGRAM_BOT_TOKEN is not set. "
                 "Telegram features will be disabled.",

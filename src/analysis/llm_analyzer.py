@@ -12,6 +12,10 @@ Usage:
 
     if result.is_tradeable:
         print(f"Recommendation: {result.recommendation}")
+
+Story 9.4: LLM 分析结果通知
+    - Added optional TelegramNotifier integration
+    - Analysis notifications sent when conditions are met
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from __future__ import annotations
 __all__ = ["LLMAnalyzer", "AnalysisError"]
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from src.analysis.prompts import (
     MARKET_ANALYST_SYSTEM_PROMPT,
@@ -32,6 +37,9 @@ from src.exceptions import NetworkError, RequestTimeoutError
 from src.models.market import Market
 from src.models.prediction import PredictionResult
 from src.utils.logger import OPERATION_EMOJIS, get_logger
+
+if TYPE_CHECKING:
+    from src.notifications.telegram_notifier import TelegramNotifier
 
 
 class AnalysisError(Exception):
@@ -80,10 +88,13 @@ class LLMAnalyzer:
 
     使用 LLM 分析预测市场并生成概率估算和交易建议。
 
+    Story 9.4: Added Telegram notification support for analysis results.
+
     Attributes:
         _min_confidence: 最小置信度阈值
         _min_edge: 最小 Edge 阈值
         _logger: 日志器
+        _notifier: Optional TelegramNotifier for analysis notifications
 
     Example:
         >>> analyzer = LLMAnalyzer()
@@ -92,16 +103,28 @@ class LLMAnalyzer:
         0.75
     """
 
-    def __init__(self) -> None:
-        """初始化 LLM 分析器."""
+    def __init__(
+        self,
+        notifier: "TelegramNotifier | None" = None,
+    ) -> None:
+        """初始化 LLM 分析器.
+
+        Story 9.4: Added optional notifier parameter for analysis notifications.
+
+        Args:
+            notifier: Optional Telegram notifier for analysis notifications
+        """
         self._logger = get_logger(__name__)
         self._min_confidence = settings.risk.min_confidence
         self._min_edge = settings.risk.min_edge
+        self._notifier = notifier
 
+        notification_status = "enabled" if self._notifier else "disabled"
         self._logger.info(
             f"{OPERATION_EMOJIS['analysis']} Initializing LLMAnalyzer "
             f"(min_confidence={self._min_confidence}, "
-            f"min_edge={self._min_edge})"
+            f"min_edge={self._min_edge}, "
+            f"notifications={notification_status})"
         )
 
     async def analyze_market(self, market: Market) -> PredictionResult:
@@ -186,6 +209,9 @@ class LLMAnalyzer:
                 f"recommendation={result.recommendation.value}, "
                 f"is_tradeable={is_tradeable}"
             )
+
+            # Story 9.4: Send analysis notification
+            await self._notify_analysis_result(result, market)
 
             return result
 
@@ -310,6 +336,77 @@ class LLMAnalyzer:
             return (1 - result.predicted_probability) - (1 - market_yes_price)
         else:
             return 0.0
+
+    async def _notify_analysis_result(
+        self,
+        prediction: PredictionResult,
+        market: Market,
+    ) -> None:
+        """Send analysis result notification if conditions are met.
+
+        Story 9.4: LLM 分析结果通知
+
+        Args:
+            prediction: The LLM prediction result
+            market: The analyzed market
+        """
+        if not self._notifier:
+            return
+
+        try:
+            # Check if we should send notification
+            should_notify = self._should_notify_analysis(prediction)
+
+            if not should_notify:
+                self._logger.debug(
+                    f"Skipping notification for {market.id}: " f"not a tradeable signal"
+                )
+                return
+
+            # Send notification
+            success = await self._notifier.send_analysis_notification(
+                prediction, market
+            )
+            if success:
+                self._logger.debug(f"Analysis notification sent for {market.id}")
+            else:
+                self._logger.warning(
+                    f"Failed to send analysis notification for {market.id}"
+                )
+
+        except Exception as e:
+            # Don't let notification failure affect main flow
+            self._logger.error(f"Error sending analysis notification: {e}")
+
+    def _should_notify_analysis(self, prediction: PredictionResult) -> bool:
+        """Determine if analysis result should trigger notification.
+
+        Args:
+            prediction: The LLM prediction result
+
+        Returns:
+            True if notification should be sent
+        """
+        # If configured to notify all analyses, always return True
+        if settings.telegram.notify_all_analyses:
+            return True
+
+        # Otherwise, only notify for tradeable signals
+        # Check confidence threshold
+        if prediction.confidence < self._min_confidence:
+            return False
+
+        # Check edge threshold
+        if prediction.edge is not None and prediction.edge < self._min_edge:
+            return False
+
+        # Check recommendation is not NO_TRADE
+        from src.models.prediction import Recommendation as PredRecommendation
+
+        if prediction.recommendation == PredRecommendation.NO_TRADE:
+            return False
+
+        return True
 
     async def analyze_markets(
         self,
