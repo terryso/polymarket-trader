@@ -578,7 +578,7 @@ class PredictionRepository:
             async with get_connection() as conn:
                 conn.row_factory = aiosqlite.Row
                 cursor = await conn.execute("""
-                    SELECT p.*, m.id as market_id_col, m.title, m.description,
+                    SELECT p.*, m.id as market_id_col, m.title, m.slug, m.description,
                            m.category, m.yes_price, m.no_price, m.liquidity,
                            m.deadline, m.resolution_status, m.resolution_outcome,
                            m.created_at as market_created_at,
@@ -651,9 +651,15 @@ class PredictionRepository:
             except ValueError:
                 market_updated_at = None
 
+        # Parse slug (may not exist in older data)
+        slug: str | None = None
+        if "slug" in row.keys():
+            slug = row["slug"]
+
         return Market(
             id=row["market_id_col"],
             title=row["title"],
+            slug=slug,
             description=row["description"],
             category=category,
             yes_price=row["yes_price"],
@@ -950,7 +956,7 @@ class PredictionRepository:
                 # Get paginated results with market info
                 offset = (pagination.page - 1) * pagination.per_page
                 query_sql = f"""
-                    SELECT p.*, m.id as market_id_col, m.title, m.description,
+                    SELECT p.*, m.id as market_id_col, m.title, m.slug, m.description,
                            m.category, m.yes_price, m.no_price, m.liquidity,
                            m.deadline, m.resolution_status, m.resolution_outcome,
                            m.created_at as market_created_at,

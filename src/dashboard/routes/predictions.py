@@ -24,7 +24,12 @@ from src.models.prediction_response import (
     PredictionListItem,
     PredictionResponse,
 )
-from src.storage.repositories.prediction_repo import PredictionRepository
+from src.storage.repositories.prediction_repo import (
+    PaginationParams,
+    PredictionOutcomeStatus,
+    PredictionRepository,
+    SortParams,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,40 +63,64 @@ async def list_predictions(
         repo: PredictionRepository dependency
 
     Returns:
-        Paginated list of predictions
+        Paginated list of predictions with market info
     """
     logger.info(
         f"📊 Listing predictions: page={page}, per_page={per_page}, validated={validated}"
     )
 
-    # Get predictions based on filter
+    # Determine status filter
     if validated is True:
-        predictions = await repo.get_validated_predictions()
-    elif validated is False:
-        predictions = await repo.get_unvalidated_predictions()
+        # Use get_validated_with_market for validated predictions
+        validated_with_markets = await repo.get_validated_with_market()
+        total = len(validated_with_markets)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated = validated_with_markets[start:end]
+
+        items = [
+            PredictionListItem(
+                id=p.id if p.id is not None else 0,
+                market_id=p.market_id,
+                market_title=m.title,
+                market_slug=m.slug,
+                predicted_probability=p.predicted_probability,
+                confidence=p.confidence,
+                recommendation=p.recommendation.value if p.recommendation else None,
+                actual_outcome=p.actual_outcome,
+                is_correct=p.is_correct,
+                created_at=p.created_at,
+            )
+            for p, m in paginated
+        ]
     else:
-        predictions = await repo.get_all(limit=1000)
+        # Use get_predictions_with_outcome for all predictions with market info
+        status = PredictionOutcomeStatus.ALL
+        if validated is False:
+            status = PredictionOutcomeStatus.PENDING
 
-    # Calculate pagination
-    total = len(predictions)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_predictions = predictions[start:end]
-
-    # Convert to response models
-    items = [
-        PredictionListItem(
-            id=p.id if p.id is not None else 0,
-            market_id=p.market_id,
-            predicted_probability=p.predicted_probability,
-            confidence=p.confidence,
-            recommendation=p.recommendation.value if p.recommendation else None,
-            actual_outcome=p.actual_outcome,
-            is_correct=p.is_correct,
-            created_at=p.created_at,
+        result = await repo.get_predictions_with_outcome(
+            status=status,
+            pagination=PaginationParams(page=page, per_page=per_page),
+            sort=SortParams(),
         )
-        for p in paginated_predictions
-    ]
+        total = result.total
+
+        items = [
+            PredictionListItem(
+                id=p.id if p.id is not None else 0,
+                market_id=p.market_id,
+                market_title=m.title,
+                market_slug=m.slug,
+                predicted_probability=p.predicted_probability,
+                confidence=p.confidence,
+                recommendation=p.recommendation.value if p.recommendation else None,
+                actual_outcome=p.actual_outcome,
+                is_correct=p.is_correct,
+                created_at=p.created_at,
+            )
+            for p, m in result.predictions
+        ]
 
     return PaginatedResponse(
         success=True,

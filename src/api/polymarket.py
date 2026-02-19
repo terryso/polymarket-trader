@@ -178,12 +178,14 @@ class GammaMarket:
     liquidity: float | None = None
     category: str | None = None
     end_date: datetime | None = None
+    event_slug: str | None = None  # Event slug for URL (from events[0].slug)
 
     def to_market(self) -> Market:
         """Convert to base Market model."""
         return Market(
             id=self.condition_id,
             title=self.question,
+            slug=self.event_slug or self.slug,  # Use event_slug for URL, fallback to slug
             category=self._map_category(),
             liquidity=self.liquidity,
             deadline=self.end_date,
@@ -446,10 +448,17 @@ class PolymarketClient:
         if end_date_str:
             end_date = self._parse_datetime(end_date_str)
 
+        # Parse event slug from events array (for correct Polymarket URL)
+        event_slug: str | None = None
+        events = data.get("events", [])
+        if events and len(events) > 0:
+            event_slug = events[0].get("slug") or events[0].get("ticker")
+
         return GammaMarket(
             condition_id=data.get("conditionId", ""),
             question=data.get("question", ""),
             slug=data.get("slug", ""),
+            event_slug=event_slug,
             active=data.get("active", False),
             closed=data.get("closed", False),
             accepting_orders=data.get("acceptingOrders", False),
@@ -824,8 +833,12 @@ class PolymarketClient:
     def get_balances(self) -> BalanceResult:
         """Get wallet position balances from Polymarket.
 
-        Fetches the user's current position balances. Requires Level 2 authentication
-        (API credentials must be configured).
+        Fetches the user's current position balances by:
+        1. Getting asset IDs from trade history via get_trades()
+        2. Querying on-chain ERC-1155 balances using web3.py
+        3. Returning only non-zero positions
+
+        Requires Level 2 authentication (API credentials must be configured).
 
         Story 5.7: 同步实际持仓
 
@@ -867,78 +880,153 @@ class PolymarketClient:
         )
 
         try:
-            # Use CLOB API /balances endpoint via py-clob-client
-            # The client.balances method returns position balances
-            self._logger.debug(
-                f"{OPERATION_EMOJIS['network']} Calling get_balances()"
-            )
-            response = self._client.balances()
-            self._logger.debug(
-                f"{OPERATION_EMOJIS['network']} balances response type: {type(response)}, count: {len(response) if isinstance(response, list) else 0}"
+            # Step 1: Get asset IDs from trade history
+            # Note: get_trades() may return incomplete data, but we only need
+            # the asset IDs to query on-chain balances (the source of truth)
+            trades_response = self._client.get_trades()
+
+            if not trades_response:
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['network']} No trades found, returning empty balances"
+                )
+                return BalanceResult(balances=[], error=None)
+
+            # Build asset info map from trades
+            asset_info_map: dict[str, dict] = {}
+            for trade in trades_response:
+                asset_id = str(trade.get("asset_id", ""))
+                if asset_id and asset_id not in asset_info_map:
+                    asset_info_map[asset_id] = {
+                        "outcome": str(trade.get("outcome", "YES")).upper(),
+                        "market_id": trade.get("market", ""),
+                    }
+
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Found {len(asset_info_map)} unique assets from trade history"
             )
 
-            # Parse response
+            # Step 2: Query on-chain ERC-1155 balances for each asset
+            wallet = settings.polymarket.proxy_wallet
             balances: list[BalanceItem] = []
 
-            # Response is a list of balance objects
-            if isinstance(response, list):
-                balances_data = response
-            elif isinstance(response, dict) and "balances" in response:
-                balances_data = response["balances"]
-            else:
-                balances_data = []
-
-            for balance_data in balances_data:
+            for asset_id, info in asset_info_map.items():
                 try:
-                    # Parse balance data
-                    # Format: { "condition_id": "...", "outcome": "Yes/No", "shares": "...", "asset": "..." }
-                    # Note: shares may be a string that needs parsing
-                    shares_raw = balance_data.get("shares", 0)
-                    if isinstance(shares_raw, str):
-                        # May be hex or decimal string
-                        try:
-                            shares = float(int(shares_raw, 16)) / 1_000_000  # Try hex first
-                        except ValueError:
-                            shares = float(shares_raw)  # Try decimal
-                    else:
-                        shares = float(shares_raw)
+                    # Query on-chain balance (this is the source of truth)
+                    on_chain_balance = self._get_erc1155_balance(wallet, asset_id)
 
-                    balance = BalanceItem(
-                        condition_id=balance_data.get("condition_id", balance_data.get("market", "")),
-                        outcome=str(balance_data.get("outcome", "YES")).upper(),
-                        shares=shares,
-                        asset_id=balance_data.get("asset", balance_data.get("asset_id")),
-                        market_title=balance_data.get("question", balance_data.get("market_title")),
-                    )
-                    balances.append(balance)
+                    # Only include non-zero positions
+                    if on_chain_balance > 0.0001:
+                        balance = BalanceItem(
+                            condition_id=info["market_id"],
+                            outcome=info["outcome"],
+                            shares=on_chain_balance,
+                            asset_id=asset_id,
+                            market_title=None,
+                        )
+                        balances.append(balance)
+                        self._logger.debug(
+                            f"{OPERATION_EMOJIS['network']} Position: {info['outcome']} "
+                            f"{on_chain_balance:.6f} shares (asset: {asset_id[:10]}...)"
+                        )
+                    else:
+                        self._logger.debug(
+                            f"{OPERATION_EMOJIS['network']} Zero balance for asset: {asset_id[:10]}..."
+                        )
+
                 except Exception as e:
                     self._logger.warning(
-                        f"{OPERATION_EMOJIS['network']} Failed to parse balance: {e}"
+                        f"{OPERATION_EMOJIS['network']} Failed to get balance for asset "
+                        f"{asset_id[:10]}...: {e}"
                     )
                     continue
 
             self._logger.info(
-                f"{OPERATION_EMOJIS['network']} Fetched {len(balances)} position balances"
+                f"{OPERATION_EMOJIS['network']} Found {len(balances)} non-zero positions"
             )
 
-            return BalanceResult(
-                balances=balances,
-                error=None,
-            )
+            return BalanceResult(balances=balances, error=None)
 
         except Exception as e:
-            import traceback
             error_msg = str(e)
             self._logger.warning(
-                f"{OPERATION_EMOJIS['network']} Failed to fetch balances: {error_msg}"
-            )
-            self._logger.debug(
-                f"{OPERATION_EMOJIS['network']} Exception traceback:\n{traceback.format_exc()}"
+                f"{OPERATION_EMOJIS['network']} Failed to fetch position balances: {error_msg}"
             )
             return BalanceResult(
                 balances=[],
                 error=error_msg,
             )
+
+    def _get_erc1155_balance(self, wallet: str, asset_id: str) -> float:
+        """Query ERC-1155 token balance from Polygon chain.
+
+        Uses the Polymarket CTF (Conditional Token Framework) contract
+        to get the actual on-chain balance for a given asset/token.
+
+        Args:
+            wallet: Wallet address to query
+            asset_id: Token/asset ID (as string, will be converted to int)
+
+        Returns:
+            Balance as float (shares with 6 decimal precision)
+
+        Raises:
+            Exception: If RPC call fails after all retries
+        """
+        from web3 import Web3
+
+        # Polymarket CTF contract on Polygon
+        CTF_CONTRACT = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+
+        # List of reliable Polygon RPC endpoints (ordered by preference)
+        POLYGON_RPCS = [
+            "https://rpc.ankr.com/polygon",  # Ankr public RPC
+            "https://polygon-mainnet.g.alchemy.com/v2/demo",  # Alchemy demo
+            "https://polygon-bor-rpc.publicnode.com",  # PublicNode
+            "https://polygon-rpc.com",  # Official (may require auth)
+        ]
+
+        # ERC-1155 balanceOf(address, uint256) ABI
+        ctf_abi = """[{
+            "inputs": [
+                {"internalType": "address", "name": "owner", "type": "address"},
+                {"internalType": "uint256", "name": "id", "type": "uint256"}
+            ],
+            "name": "balanceOf",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+        }]"""
+
+        # Try each RPC endpoint until one works
+        last_error = None
+        for rpc_url in POLYGON_RPCS:
+            try:
+                w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10}))
+                contract = w3.eth.contract(
+                    address=Web3.to_checksum_address(CTF_CONTRACT),
+                    abi=ctf_abi,
+                )
+
+                # Query balance
+                balance_wei = contract.functions.balanceOf(
+                    Web3.to_checksum_address(wallet),
+                    int(asset_id),
+                ).call()
+
+                # Convert from wei to shares (6 decimals)
+                return balance_wei / 1_000_000
+
+            except Exception as e:
+                last_error = e
+                self._logger.debug(
+                    f"{OPERATION_EMOJIS['network']} RPC {rpc_url} failed: {e}"
+                )
+                continue
+
+        # All RPCs failed
+        raise Exception(
+            f"All Polygon RPCs failed for ERC-1155 balance query. Last error: {last_error}"
+        )
 
     def _parse_outcome_from_asset_id(self, asset_id: str) -> str:
         """Parse outcome type from asset ID.

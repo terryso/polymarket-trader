@@ -6,6 +6,7 @@ including list, detail, and accuracy endpoints with pagination and filtering.
 Story 7.4: 预测与统计 API
 """
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,10 +15,28 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.models.prediction import Prediction, Recommendation
+from src.storage.repositories.prediction_repo import (
+    PaginationParams,
+    PredictionQueryResult,
+    PredictionOutcomeStatus,
+    SortParams,
+)
 
 
 @pytest.fixture
-def sample_predictions() -> list[Prediction]:
+def sample_market():
+    """Create a sample market for testing."""
+    @dataclass
+    class MockMarket:
+        id: str
+        title: str
+        slug: str
+
+    return MockMarket(id="market-001", title="Test Market?", slug="test-market")
+
+
+@pytest.fixture
+def sample_predictions(sample_market) -> list[Prediction]:
     """Create sample predictions for testing."""
     return [
         Prediction(
@@ -66,13 +85,27 @@ def sample_predictions() -> list[Prediction]:
 
 
 @pytest.fixture
-def mock_prediction_repo() -> MagicMock:
+def mock_prediction_repo(sample_predictions, sample_market) -> MagicMock:
     """Create a mock PredictionRepository for testing."""
     repo = MagicMock()
-    repo.get_all = AsyncMock(return_value=[])
-    repo.get_by_id = AsyncMock(return_value=None)
-    repo.get_validated_predictions = AsyncMock(return_value=[])
-    repo.get_unvalidated_predictions = AsyncMock(return_value=[])
+
+    # Create (Prediction, Market) tuples for get_predictions_with_outcome
+    prediction_market_tuples = [(p, sample_market) for p in sample_predictions]
+
+    # Mock result for get_predictions_with_outcome
+    mock_result = PredictionQueryResult(
+        predictions=prediction_market_tuples,
+        total=len(sample_predictions),
+        page=1,
+        per_page=20,
+        has_next=False,
+        has_prev=False,
+    )
+
+    repo.get_predictions_with_outcome = AsyncMock(return_value=mock_result)
+    repo.get_validated_with_market = AsyncMock(return_value=prediction_market_tuples)
+    repo.get_all = AsyncMock(return_value=sample_predictions)
+    repo.get_by_id = AsyncMock(return_value=sample_predictions[0] if sample_predictions else None)
     return repo
 
 
@@ -102,7 +135,6 @@ class TestListPredictions:
         self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
     ) -> None:
         """Test list endpoint returns 200."""
-        mock_prediction_repo.get_all.return_value = sample_predictions
         response = client.get("/api/predictions")
         assert response.status_code == 200
 
@@ -110,7 +142,6 @@ class TestListPredictions:
         self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
     ) -> None:
         """Test response format."""
-        mock_prediction_repo.get_all.return_value = sample_predictions
         response = client.get("/api/predictions")
         data = response.json()
         assert "success" in data
@@ -123,18 +154,17 @@ class TestListPredictions:
         self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
     ) -> None:
         """Test pagination functionality."""
-        mock_prediction_repo.get_all.return_value = sample_predictions
         response = client.get("/api/predictions?page=1&per_page=10")
         data = response.json()
         assert data["meta"]["page"] == 1
         assert data["meta"]["per_page"] == 10
 
     def test_list_predictions_validated_filter(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction], sample_market
     ) -> None:
         """Test validated filter."""
-        validated_predictions = [p for p in sample_predictions if p.is_correct is not None]
-        mock_prediction_repo.get_validated_predictions.return_value = validated_predictions
+        validated_predictions = [(p, sample_market) for p in sample_predictions if p.is_correct is not None]
+        mock_prediction_repo.get_validated_with_market.return_value = validated_predictions
 
         response = client.get("/api/predictions?validated=true")
         assert response.status_code == 200
@@ -142,11 +172,19 @@ class TestListPredictions:
         assert data["success"] is True
 
     def test_list_predictions_unvalidated_filter(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction], sample_market
     ) -> None:
         """Test unvalidated filter."""
-        unvalidated_predictions = [p for p in sample_predictions if p.is_correct is None]
-        mock_prediction_repo.get_unvalidated_predictions.return_value = unvalidated_predictions
+        unvalidated_tuples = [(p, sample_market) for p in sample_predictions if p.is_correct is None]
+        mock_result = PredictionQueryResult(
+            predictions=unvalidated_tuples,
+            total=len(unvalidated_tuples),
+            page=1,
+            per_page=20,
+            has_next=False,
+            has_prev=False,
+        )
+        mock_prediction_repo.get_predictions_with_outcome.return_value = mock_result
 
         response = client.get("/api/predictions?validated=false")
         assert response.status_code == 200
@@ -157,7 +195,16 @@ class TestListPredictions:
         self, client: TestClient, mock_prediction_repo: MagicMock
     ) -> None:
         """Test empty list response."""
-        mock_prediction_repo.get_all.return_value = []
+        empty_result = PredictionQueryResult(
+            predictions=[],
+            total=0,
+            page=1,
+            per_page=20,
+            has_next=False,
+            has_prev=False,
+        )
+        mock_prediction_repo.get_predictions_with_outcome.return_value = empty_result
+
         response = client.get("/api/predictions")
         assert response.status_code == 200
         data = response.json()

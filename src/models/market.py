@@ -84,6 +84,7 @@ class Market(BaseModel):
 
     id: str = Field(..., description="Market unique identifier")
     title: str = Field(..., min_length=1, description="Market title")
+    slug: str | None = Field(default=None, description="Market slug for URL")
     description: str | None = Field(default=None, description="Market description")
     category: MarketCategory | None = Field(default=None, description="Market category")
     yes_price: float | None = Field(

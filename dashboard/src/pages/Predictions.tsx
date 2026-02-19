@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { usePredictions, useAccuracy } from "@/hooks/usePredictions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { BarChart3, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, XCircle, AlertCircle, ExternalLink } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -13,24 +14,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 const Predictions = () => {
-  const { data: predictionsData, isLoading: predictionsLoading, error: predictionsError } = usePredictions();
+  const [page, setPage] = useState(1);
+  const { data: predictionsData, isLoading: predictionsLoading, error: predictionsError } = usePredictions({ page, per_page: PAGE_SIZE });
   const { data: accuracy, isLoading: accuracyLoading } = useAccuracy();
 
   const isLoading = predictionsLoading || accuracyLoading;
   const predictions = predictionsData?.items ?? [];
+  const total = predictionsData?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
 
-  // Calculate stats from predictions
-  const total = predictions.length;
-  const correct = predictions.filter((p) => p.is_correct === true).length;
-  const incorrect = predictions.filter((p) => p.is_correct === false).length;
-
-  const confidenceColors: Record<string, string> = {
-    high: "badge-profit",
-    medium: "badge-paper",
-    low: "badge-loss",
-  };
+  // Calculate stats from accuracy API (more accurate for totals)
+  const correct = accuracy?.correct_predictions ?? 0;
+  const incorrect = (accuracy?.validated_predictions ?? 0) - correct;
 
   const getConfidenceLabel = (conf: number): { label: string; color: string } => {
     if (conf >= 0.8) return { label: "高", color: "badge-profit" };
@@ -83,6 +92,50 @@ const Predictions = () => {
       </DashboardLayout>
     );
   }
+
+  // Generate Polymarket URL from slug
+  // Handle different slug patterns:
+  // 1. Normal slug: use as-is
+  // 2. Market-specific slug with "-by-" and date: extract event slug
+  const getPolymarketUrl = (slug: string | null): string | null => {
+    if (!slug) return null;
+
+    // Pattern 1: Slug with hash suffix (e.g., "...-2026-393-221-132-...")
+    // Extract event slug for markets with "-by-" pattern
+    const hashPattern = /-\d{4}(?:-\d{3})+$/;
+    if (hashPattern.test(slug) && slug.includes('-by-')) {
+      const baseSlug = slug.split('-by-')[0] + '-by';
+      return `https://polymarket.com/event/${baseSlug}`;
+    }
+
+    // Pattern 2: Slug with date but no hash (e.g., "us-strikes-iran-by-march-31-2026")
+    // Extract event slug for "-by-" followed by month names
+    const datePattern = /-by-(january|february|march|april|may|june|july|august|september|october|november|december)-/i;
+    if (datePattern.test(slug)) {
+      const baseSlug = slug.split('-by-')[0] + '-by';
+      return `https://polymarket.com/event/${baseSlug}`;
+    }
+
+    // Normal slug - use as-is
+    return `https://polymarket.com/event/${slug}`;
+  };
+
+  // Format prediction display: YES(80%) or NO(20%)
+  const formatPrediction = (probability: number): { text: string; className: string } => {
+    const pct = (probability * 100).toFixed(0);
+    if (probability >= 0.5) {
+      return { text: `YES(${pct}%)`, className: "text-green-600 dark:text-green-400" };
+    } else {
+      return { text: `NO(${pct}%)`, className: "text-red-600 dark:text-red-400" };
+    }
+  };
+
+  // Truncate title for display
+  const truncateTitle = (title: string | null, maxLength: number = 40): string => {
+    if (!title) return "未知市场";
+    if (title.length <= maxLength) return title;
+    return title.slice(0, maxLength) + "...";
+  };
 
   // Format timestamp
   const formatTimestamp = (ts: string | null): string => {
@@ -154,14 +207,30 @@ const Predictions = () => {
                 {predictions.map((p) => {
                   const confidence = getConfidenceLabel(p.confidence);
                   const status = getStatusDisplay(p.is_correct);
+                  const prediction = formatPrediction(p.predicted_probability);
                   return (
                     <TableRow key={p.id} className="border-border hover:bg-accent/50">
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {formatTimestamp(p.created_at)}
                       </TableCell>
-                      <TableCell className="font-medium text-foreground">{p.market_id}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {(p.predicted_probability * 100).toFixed(0)}%
+                      <TableCell className="font-medium text-foreground">
+                        {getPolymarketUrl(p.market_slug) ? (
+                          <a
+                            href={getPolymarketUrl(p.market_slug)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                            title={p.market_title || p.market_id}
+                          >
+                            {truncateTitle(p.market_title)}
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                          </a>
+                        ) : (
+                          <span title={p.market_id}>{truncateTitle(p.market_title)}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className={cn("text-right font-mono font-medium", prediction.className)}>
+                        {prediction.text}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className={confidence.color}>{confidence.label}</span>
@@ -180,6 +249,56 @@ const Predictions = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => setPage(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

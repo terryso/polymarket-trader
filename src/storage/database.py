@@ -138,6 +138,7 @@ class DatabaseManager:
                     CREATE TABLE IF NOT EXISTS markets (
                         id TEXT PRIMARY KEY,
                         title TEXT NOT NULL,
+                        slug TEXT,
                         description TEXT,
                         category TEXT,
                         yes_price REAL,
@@ -272,6 +273,14 @@ class DatabaseManager:
                     CREATE INDEX IF NOT EXISTS idx_trades_created_at
                     ON trades(created_at)
                 """)
+
+                # Migration: Add slug column to markets table
+                try:
+                    await conn.execute("ALTER TABLE markets ADD COLUMN slug TEXT")
+                    logger.info("📊 Added slug column to markets table")
+                except aiosqlite.OperationalError:
+                    # Column already exists, ignore
+                    pass
 
                 # Migration: Add polymarket_order_id column (Story 5.6)
                 # Use try/except to handle case where column already exists

@@ -21,6 +21,8 @@ class PredictionListItem(BaseModel):
     Attributes:
         id: Prediction unique identifier
         market_id: Reference to the market
+        market_title: Title of the market
+        market_slug: Slug for Polymarket URL
         predicted_probability: Predicted probability (0-1)
         confidence: LLM confidence (0-1)
         recommendation: Trade recommendation
@@ -31,6 +33,8 @@ class PredictionListItem(BaseModel):
 
     id: int = Field(..., description="Prediction ID")
     market_id: str = Field(..., description="Market reference")
+    market_title: str | None = Field(None, description="Market title")
+    market_slug: str | None = Field(None, description="Market slug for URL")
     predicted_probability: float = Field(..., description="Predicted probability (0-1)")
     confidence: float = Field(..., description="LLM confidence (0-1)")
     recommendation: str | None = Field(None, description="Trade recommendation")

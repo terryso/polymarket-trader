@@ -61,11 +61,11 @@ class MarketRepository:
                 await conn.execute(
                     """
                     INSERT OR REPLACE INTO markets (
-                        id, title, description, category,
+                        id, title, slug, description, category,
                         yes_price, no_price, liquidity, deadline,
                         resolution_status, resolution_outcome,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     self._market_to_tuple(market, now),
                 )
@@ -112,15 +112,16 @@ class MarketRepository:
                         await conn.execute(
                             """
                             INSERT OR REPLACE INTO markets (
-                                id, title, description, category,
+                                id, title, slug, description, category,
                                 yes_price, no_price, liquidity, deadline,
                                 resolution_status, resolution_outcome,
                                 created_at, updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """,
                             (
                                 market.id,
                                 market.title,
+                                market.slug,
                                 market.description,
                                 market.category.value if market.category else None,
                                 market.yes_price,
@@ -334,6 +335,7 @@ class MarketRepository:
         return Market(
             id=row["id"],
             title=row["title"],
+            slug=row["slug"] if "slug" in row.keys() else None,
             description=row["description"],
             category=category,
             yes_price=row["yes_price"],
@@ -359,6 +361,7 @@ class MarketRepository:
         return (
             market.id,
             market.title,
+            market.slug,
             market.description,
             market.category.value if market.category else None,
             market.yes_price,

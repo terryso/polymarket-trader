@@ -211,6 +211,8 @@ export interface TradeListQueryParams {
 export interface PredictionListItem {
   id: number;
   market_id: string;
+  market_title: string | null;
+  market_slug: string | null;
   predicted_probability: number;
   confidence: number;
   recommendation: string | null;

@@ -154,6 +154,7 @@ class TestDatabaseSchema:
         expected_columns = {
             "id",
             "title",
+            "slug",
             "description",
             "category",
             "yes_price",

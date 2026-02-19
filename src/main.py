@@ -219,20 +219,41 @@ class Application:
                 return
 
             # Analyze filtered markets
+            from src.models.prediction import Prediction
+            from src.storage.repositories.market_repo import MarketRepository
+            from src.storage.repositories.prediction_repo import PredictionRepository
+
             llm_analyzer = LLMAnalyzer()
+            market_repo = MarketRepository()
+            prediction_repo = PredictionRepository()
             analyzed_count = 0
             error_count = 0
 
             for market in filtered_markets:
                 try:
-                    prediction = await llm_analyzer.analyze_market(market)
+                    # Save market to database first (required for foreign key constraint)
+                    await market_repo.save_market(market)
+
+                    prediction_result = await llm_analyzer.analyze_market(market)
                     analyzed_count += 1
+
+                    # Save prediction to database
+                    prediction = Prediction(
+                        market_id=market.id,
+                        predicted_probability=prediction_result.predicted_probability,
+                        confidence=prediction_result.confidence,
+                        reasoning=prediction_result.reasoning,
+                        key_assumptions=prediction_result.key_assumptions,
+                        recommendation=prediction_result.recommendation,
+                        edge=prediction_result.edge,
+                    )
+                    await prediction_repo.save_prediction(prediction)
 
                     logger.info(
                         f"Initial analysis: {market.id[:8]}... "
-                        f"prediction={prediction.predicted_probability:.2%} "
-                        f"confidence={prediction.confidence:.2%} "
-                        f"recommendation={prediction.recommendation.value}"
+                        f"prediction={prediction_result.predicted_probability:.2%} "
+                        f"confidence={prediction_result.confidence:.2%} "
+                        f"recommendation={prediction_result.recommendation.value}"
                     )
                 except Exception as e:
                     error_count += 1
