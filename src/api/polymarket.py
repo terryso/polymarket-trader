@@ -179,6 +179,8 @@ class GammaMarket:
     category: str | None = None
     end_date: datetime | None = None
     event_slug: str | None = None  # Event slug for URL (from events[0].slug)
+    yes_price: float | None = None
+    no_price: float | None = None
 
     def to_market(self) -> Market:
         """Convert to base Market model."""
@@ -187,6 +189,8 @@ class GammaMarket:
             title=self.question,
             slug=self.event_slug or self.slug,  # Use event_slug for URL, fallback to slug
             category=self._map_category(),
+            yes_price=self.yes_price,
+            no_price=self.no_price,
             liquidity=self.liquidity,
             deadline=self.end_date,
         )
@@ -454,6 +458,21 @@ class PolymarketClient:
         if events and len(events) > 0:
             event_slug = events[0].get("slug") or events[0].get("ticker")
 
+        # Parse prices from outcomePrices
+        yes_price: float | None = None
+        no_price: float | None = None
+        outcome_prices = data.get("outcomePrices")
+        if outcome_prices:
+            try:
+                prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
+                if isinstance(prices, list) and len(prices) >= 2:
+                    if prices[0]:
+                        yes_price = float(prices[0])
+                    if prices[1]:
+                        no_price = float(prices[1])
+            except (json.JSONDecodeError, ValueError, TypeError):
+                pass
+
         return GammaMarket(
             condition_id=data.get("conditionId", ""),
             question=data.get("question", ""),
@@ -468,6 +487,8 @@ class PolymarketClient:
             liquidity=data.get("liquidityNum"),
             category=data.get("category"),
             end_date=end_date,
+            yes_price=yes_price,
+            no_price=no_price,
         )
 
     # ==================== CLOB API Methods ====================
@@ -1110,6 +1131,21 @@ class PolymarketClient:
                     yes_price = price_val
                 elif outcome == "no":
                     no_price = price_val
+
+        # Try to get prices from outcomePrices (Gamma API format)
+        if yes_price is None or no_price is None:
+            outcome_prices = data.get("outcomePrices")
+            if outcome_prices:
+                try:
+                    import json
+                    prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
+                    if isinstance(prices, list) and len(prices) >= 2:
+                        if yes_price is None and prices[0]:
+                            yes_price = float(prices[0])
+                        if no_price is None and prices[1]:
+                            no_price = float(prices[1])
+                except (json.JSONDecodeError, ValueError, TypeError):
+                    pass
 
         # Fallback to top-level price fields
         if yes_price is None:
