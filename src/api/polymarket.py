@@ -624,8 +624,8 @@ class PolymarketClient:
             USDC_CONTRACT = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
             # List of reliable Polygon RPC endpoints (ordered by preference)
             POLYGON_RPCS = [
+                "https://polygon-mainnet.g.alchemy.com/v2/ppWb_ez8qZohBDRTqZnX5lEMYtc-5iI6",  # Alchemy (primary)
                 "https://rpc.ankr.com/polygon",  # Ankr public RPC
-                "https://polygon-mainnet.g.alchemy.com/v2/demo",  # Alchemy demo
                 "https://polygon-bor-rpc.publicnode.com",  # PublicNode
                 "https://polygon-rpc.com",  # Official (may require auth)
             ]
@@ -979,8 +979,8 @@ class PolymarketClient:
 
         # List of reliable Polygon RPC endpoints (ordered by preference)
         POLYGON_RPCS = [
+            "https://polygon-mainnet.g.alchemy.com/v2/ppWb_ez8qZohBDRTqZnX5lEMYtc-5iI6",  # Alchemy (primary)
             "https://rpc.ankr.com/polygon",  # Ankr public RPC
-            "https://polygon-mainnet.g.alchemy.com/v2/demo",  # Alchemy demo
             "https://polygon-bor-rpc.publicnode.com",  # PublicNode
             "https://polygon-rpc.com",  # Official (may require auth)
         ]
