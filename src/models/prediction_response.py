@@ -23,8 +23,10 @@ class PredictionListItem(BaseModel):
         market_id: Reference to the market
         market_title: Title of the market
         market_slug: Slug for Polymarket URL
+        market_yes_price: Market YES price at prediction time (0-1)
         predicted_probability: Predicted probability (0-1)
         confidence: LLM confidence (0-1)
+        edge: Edge (price gap) between prediction and market price (0-1)
         recommendation: Trade recommendation
         actual_outcome: Actual market outcome (if resolved)
         is_correct: Whether prediction was correct (if validated)
@@ -35,8 +37,10 @@ class PredictionListItem(BaseModel):
     market_id: str = Field(..., description="Market reference")
     market_title: str | None = Field(None, description="Market title")
     market_slug: str | None = Field(None, description="Market slug for URL")
+    market_yes_price: float | None = Field(None, description="Market YES price (0-1)")
     predicted_probability: float = Field(..., description="Predicted probability (0-1)")
     confidence: float = Field(..., description="LLM confidence (0-1)")
+    edge: float | None = Field(None, description="Edge (price gap) between prediction and market (0-1)")
     recommendation: str | None = Field(None, description="Trade recommendation")
     actual_outcome: str | None = Field(None, description="Actual outcome")
     is_correct: bool | None = Field(None, description="Prediction correctness")

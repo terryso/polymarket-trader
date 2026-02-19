@@ -31,8 +31,9 @@ def sample_market():
         id: str
         title: str
         slug: str
+        yes_price: float | None = None
 
-    return MockMarket(id="market-001", title="Test Market?", slug="test-market")
+    return MockMarket(id="market-001", title="Test Market?", slug="test-market", yes_price=0.65)
 
 
 @pytest.fixture

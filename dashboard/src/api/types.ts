@@ -213,8 +213,10 @@ export interface PredictionListItem {
   market_id: string;
   market_title: string | null;
   market_slug: string | null;
+  market_yes_price: number | null;
   predicted_probability: number;
   confidence: number;
+  edge: number | null;
   recommendation: string | null;
   actual_outcome: string | null;
   is_correct: boolean | null;

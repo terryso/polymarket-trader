@@ -198,8 +198,11 @@ const Predictions = () => {
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">时间</TableHead>
                   <TableHead className="text-muted-foreground">市场</TableHead>
+                  <TableHead className="text-muted-foreground text-right">市场价</TableHead>
                   <TableHead className="text-muted-foreground text-right">LLM 预测</TableHead>
+                  <TableHead className="text-muted-foreground text-center">Edge</TableHead>
                   <TableHead className="text-muted-foreground text-center">置信度</TableHead>
+                  <TableHead className="text-muted-foreground text-center">可交易</TableHead>
                   <TableHead className="text-muted-foreground text-center">状态</TableHead>
                 </TableRow>
               </TableHeader>
@@ -208,6 +211,11 @@ const Predictions = () => {
                   const confidence = getConfidenceLabel(p.confidence);
                   const status = getStatusDisplay(p.is_correct);
                   const prediction = formatPrediction(p.predicted_probability);
+                  // 判断是否可交易: 置信度 >= 65% 且 Edge >= 5%
+                  const isTradeable = p.confidence >= 0.65 && (p.edge ?? 0) >= 0.05;
+                  // Edge 显示
+                  const edgeDisplay = p.edge !== null ? `${(p.edge * 100).toFixed(0)}%` : "-";
+                  const edgeColor = p.edge !== null && p.edge >= 0.05 ? "text-green-600 dark:text-green-400" : "text-muted-foreground";
                   return (
                     <TableRow key={p.id} className="border-border hover:bg-accent/50">
                       <TableCell className="font-mono text-xs text-muted-foreground">
@@ -229,11 +237,24 @@ const Predictions = () => {
                           <span title={p.market_id}>{truncateTitle(p.market_title)}</span>
                         )}
                       </TableCell>
+                      <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                        {p.market_yes_price !== null ? `${(p.market_yes_price * 100).toFixed(0)}%` : "-"}
+                      </TableCell>
                       <TableCell className={cn("text-right font-mono font-medium", prediction.className)}>
                         {prediction.text}
                       </TableCell>
+                      <TableCell className={cn("text-center font-mono text-sm", edgeColor)}>
+                        {edgeDisplay}
+                      </TableCell>
                       <TableCell className="text-center">
                         <span className={confidence.color}>{confidence.label}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isTradeable ? (
+                          <span className="text-green-600 dark:text-green-400">✓</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className={cn("text-center text-sm", status.className)}>
                         {status.text}
