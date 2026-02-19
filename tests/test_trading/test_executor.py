@@ -485,8 +485,8 @@ class TestTradingExecutor:
         """测试仓位计算低于最小值时调整到最小值."""
         mock_state.get_state.return_value = MockStateSnapshot(current_capital=200.0)
 
-        # 1% of $200 = $2, but min is $5
-        amount = await executor._calculate_position_size(0.01)
+        # 0.1% of $200 = $0.2, but min is $1
+        amount = await executor._calculate_position_size(0.001)
         assert amount == settings.risk.min_bet
 
     @pytest.mark.asyncio

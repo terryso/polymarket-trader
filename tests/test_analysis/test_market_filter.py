@@ -49,7 +49,7 @@ class TestMarketFilter:
         settings = MagicMock()
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
-        settings.market_filter.min_deadline_days = 7
+        settings.market_filter.min_deadline_hours = 1
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = []
         return settings
@@ -137,25 +137,24 @@ class TestMarketFilter:
     def test_deadline_pass_boundary(
         self, market_filter: "MarketFilter", valid_market: Market
     ) -> None:
-        """Test deadline filter passes at minimum threshold (7 days)."""
-        # Add extra hours to ensure days calculation is >= 7
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=7, hours=1)
+        """Test deadline filter passes at minimum threshold (1 hour)."""
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(hours=3)
         result = market_filter.filter_markets([valid_market])
         assert len(result.markets) == 1
 
     def test_deadline_fail_below_threshold(
         self, market_filter: "MarketFilter", valid_market: Market
     ) -> None:
-        """Test deadline filter rejects below minimum (7 days)."""
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=6)
+        """Test deadline filter rejects below minimum (1 hour)."""
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(minutes=30)
         result = market_filter.filter_markets([valid_market])
         assert len(result.markets) == 0
 
     def test_deadline_hard_exclude(
         self, market_filter: "MarketFilter", valid_market: Market
     ) -> None:
-        """Test deadline hard exclusion below 3 days."""
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=2)
+        """Test deadline hard exclusion below 1 hour."""
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(minutes=30)
         result = market_filter.filter_markets([valid_market])
         assert len(result.markets) == 0
 
@@ -272,7 +271,7 @@ class TestMarketFilter:
         settings = MagicMock()
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
-        settings.market_filter.min_deadline_days = 7
+        settings.market_filter.min_deadline_hours = 1
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = ["controversial", "sensitive"]
 
@@ -320,13 +319,13 @@ class TestMarketFilter:
                 liquidity=3000.0,
                 deadline=datetime.now(timezone.utc) + timedelta(days=14),
             ),
-            # Short deadline - should fail
+            # Short deadline - should fail (< 1 hour)
             Market(
                 id="fail-deadline",
                 title="Will Z happen?",
                 category=MarketCategory.POLITICS,
                 liquidity=50000.0,
-                deadline=datetime.now(timezone.utc) + timedelta(days=2),
+                deadline=datetime.now(timezone.utc) + timedelta(minutes=30),
             ),
             # Excluded keyword - should fail
             Market(
@@ -442,29 +441,28 @@ class TestMarketFilter:
     def test_deadline_hard_exclude_boundary(
         self, market_filter: "MarketFilter", valid_market: Market
     ) -> None:
-        """Test deadline at hard exclude boundary (2 days fails, 3 days passes hard exclude)."""
-        # Just below hard exclude threshold (2 days, 23 hours)
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=2, hours=23)
+        """Test deadline at hard exclude boundary (30 mins fails, 3 hours passes)."""
+        # Just below threshold (30 minutes)
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(minutes=30)
         result = market_filter.filter_markets([valid_market])
         assert len(result.markets) == 0
 
-        # At 3 days (passes hard exclude, but may fail soft filter)
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=3, hours=1)
+        # Above threshold (3 hours) - passes
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(hours=3)
         result = market_filter.filter_markets([valid_market])
-        # Passes hard exclude (3 days) but fails soft filter (7 days)
-        assert len(result.markets) == 0
+        assert len(result.markets) == 1
 
     def test_deadline_soft_filter_boundary(
         self, market_filter: "MarketFilter", valid_market: Market
     ) -> None:
-        """Test deadline at soft filter boundary (6 days fails, 7 days passes)."""
-        # Just below soft filter threshold
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=6, hours=23)
+        """Test deadline at soft filter boundary (30 mins fails, 3 hours passes)."""
+        # Just below threshold (30 minutes)
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(minutes=30)
         result = market_filter.filter_markets([valid_market])
         assert len(result.markets) == 0
 
-        # At 7 days (passes soft filter)
-        valid_market.deadline = datetime.now(timezone.utc) + timedelta(days=7, hours=1)
+        # Above threshold (3 hours) - passes
+        valid_market.deadline = datetime.now(timezone.utc) + timedelta(hours=3)
         result = market_filter.filter_markets([valid_market])
         assert len(result.markets) == 1
 
@@ -607,8 +605,7 @@ class TestMarketFilter:
     ) -> None:
         """Test _hard_exclude_by_deadline private method directly.
 
-        Note: The hard exclude uses days calculation (deadline - now).days which
-        truncates to whole days. So 3 days deadline may be 2.something days in practice.
+        Note: The hard exclude uses hours calculation (deadline - now).total_seconds() / 3600.
         """
         now = datetime.now(timezone.utc)
         markets = [
@@ -624,14 +621,14 @@ class TestMarketFilter:
                 title="Valid",
                 category=MarketCategory.POLITICS,
                 liquidity=50000.0,
-                deadline=now + timedelta(days=3, hours=12),  # 3+ days to ensure >= 3
+                deadline=now + timedelta(hours=3),  # > 1 hour
             ),
             Market(
                 id="below-threshold",
                 title="Valid",
                 category=MarketCategory.POLITICS,
                 liquidity=50000.0,
-                deadline=now + timedelta(days=2, hours=12),  # < 3 days
+                deadline=now + timedelta(minutes=30),  # < 1 hour
             ),
             Market(
                 id="no-deadline",
@@ -738,7 +735,7 @@ class TestMarketFilter:
         from src.analysis.market_filter import MarketFilter
 
         assert MarketFilter.HARD_EXCLUDE_LIQUIDITY == 5000.0
-        assert MarketFilter.HARD_EXCLUDE_DEADLINE_DAYS == 3
+        assert MarketFilter.HARD_EXCLUDE_DEADLINE_HOURS == 1
 
     def test_default_excluded_keywords_constant(
         self, market_filter: "MarketFilter"

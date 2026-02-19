@@ -106,7 +106,7 @@ class MarketFilter:
 
     # Hard exclusion thresholds
     HARD_EXCLUDE_LIQUIDITY: float = 5000.0
-    HARD_EXCLUDE_DEADLINE_DAYS: int = 3
+    HARD_EXCLUDE_DEADLINE_HOURS: int = 1  # Same as min_deadline_hours for short-term markets
 
     # Default excluded keywords for title (case insensitive)
     DEFAULT_EXCLUDED_KEYWORDS: list[str] = ["price", "USD", "tomorrow"]
@@ -122,7 +122,7 @@ class MarketFilter:
         """
         self._settings = settings or Settings()
         self._min_liquidity = self._settings.market_filter.min_liquidity
-        self._min_deadline_days = self._settings.market_filter.min_deadline_days
+        self._min_deadline_hours = self._settings.market_filter.min_deadline_hours
         # Get excluded keywords from settings or use defaults
         self._excluded_keywords = getattr(
             self._settings.market_filter,
@@ -249,7 +249,7 @@ class MarketFilter:
     def _hard_exclude_by_deadline(self, markets: list[Market]) -> list[Market]:
         """Hard exclude markets with deadline too close.
 
-        Markets with deadline < 3 days are excluded immediately.
+        Markets with deadline < HARD_EXCLUDE_DEADLINE_HOURS are excluded immediately.
 
         Args:
             markets: List of markets to filter
@@ -269,12 +269,13 @@ class MarketFilter:
                     f"{market.id}"
                 )
             else:
-                days_remaining = (market.deadline - now).days
-                if days_remaining < self.HARD_EXCLUDE_DEADLINE_DAYS:
+                time_remaining = market.deadline - now
+                hours_remaining = time_remaining.total_seconds() / 3600
+                if hours_remaining < self.HARD_EXCLUDE_DEADLINE_HOURS:
                     excluded_count += 1
                     logger.debug(
                         f"{OPERATION_EMOJIS['data']} ⚠️ Excluded (deadline < "
-                        f"{self.HARD_EXCLUDE_DEADLINE_DAYS} days): {market.id}"
+                        f"{self.HARD_EXCLUDE_DEADLINE_HOURS} hours): {market.id}"
                     )
                 else:
                     result.append(market)
@@ -282,7 +283,7 @@ class MarketFilter:
         if excluded_count > 0:
             logger.info(
                 f"{OPERATION_EMOJIS['data']} Hard excluded {excluded_count} "
-                f"markets by deadline (< {self.HARD_EXCLUDE_DEADLINE_DAYS} days)"
+                f"markets by deadline (< {self.HARD_EXCLUDE_DEADLINE_HOURS} hours)"
             )
 
         return result
@@ -321,10 +322,10 @@ class MarketFilter:
         return result
 
     def _filter_by_deadline(self, markets: list[Market]) -> list[Market]:
-        """Filter markets by minimum deadline days.
+        """Filter markets by minimum deadline hours.
 
-        Markets with deadline >= min_deadline_days pass.
-        Markets with deadline < min_deadline_days are filtered out.
+        Markets with deadline >= min_deadline_hours pass.
+        Markets with deadline < min_deadline_hours are filtered out.
 
         Args:
             markets: List of markets to filter
@@ -344,12 +345,13 @@ class MarketFilter:
                     f"{market.id}"
                 )
             else:
-                days_remaining = (market.deadline - now).days
-                if days_remaining < self._min_deadline_days:
+                time_remaining = market.deadline - now
+                hours_remaining = time_remaining.total_seconds() / 3600
+                if hours_remaining < self._min_deadline_hours:
                     filtered_count += 1
                     logger.debug(
                         f"{OPERATION_EMOJIS['data']} ⚠️ Filtered (deadline < "
-                        f"{self._min_deadline_days} days): {market.id}"
+                        f"{self._min_deadline_hours} hours): {market.id}"
                     )
                 else:
                     result.append(market)
@@ -357,7 +359,7 @@ class MarketFilter:
         if filtered_count > 0:
             logger.info(
                 f"{OPERATION_EMOJIS['data']} Filtered {filtered_count} "
-                f"markets by deadline (< {self._min_deadline_days} days)"
+                f"markets by deadline (< {self._min_deadline_hours} hours)"
             )
 
         return result

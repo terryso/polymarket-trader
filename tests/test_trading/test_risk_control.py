@@ -139,7 +139,7 @@ class TestRiskControllerInit:
         assert controller._max_position_per_market == 0.40
         assert controller._max_open_markets == 3
         assert controller._max_single_ratio == 0.20
-        assert controller._min_bet == 5.0
+        assert controller._min_bet == 1.0
 
     def test_init_with_overrides(self):
         """Test initialization with custom override values."""

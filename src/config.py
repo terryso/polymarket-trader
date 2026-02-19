@@ -376,11 +376,11 @@ class MarketFilterSettings(BaseSettings):
         gt=0,
         description="Minimum market liquidity in USD",
     )
-    min_deadline_days: int = Field(
-        default=7,
-        alias="MIN_DEADLINE_DAYS",
+    min_deadline_hours: int = Field(
+        default=1,
+        alias="MIN_DEADLINE_HOURS",
         gt=0,
-        description="Minimum days until market deadline",
+        description="Minimum hours until market deadline",
     )
     excluded_keywords: list[str] = Field(
         default=["price", "USD", "tomorrow"],

@@ -26,7 +26,7 @@ class TestMarketFilterLogging:
         settings = MagicMock()
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
-        settings.market_filter.min_deadline_days = 7
+        settings.market_filter.min_deadline_hours = 1
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = []
         return settings
@@ -100,7 +100,7 @@ class TestNonTargetCategoryFiltering:
         settings = MagicMock()
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
-        settings.market_filter.min_deadline_days = 7
+        settings.market_filter.min_deadline_hours = 1
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = []
         return settings
@@ -226,7 +226,7 @@ class TestDeadlineFilterEdgeCases:
         settings = MagicMock()
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
-        settings.market_filter.min_deadline_days = 7
+        settings.market_filter.min_deadline_hours = 1
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = []
         return settings
@@ -292,7 +292,7 @@ class TestDeadlineFilterEdgeCases:
                 title="Short deadline",
                 category=MarketCategory.POLITICS,
                 liquidity=50000.0,
-                deadline=datetime.now(timezone.utc) + timedelta(days=3),
+                deadline=datetime.now(timezone.utc) + timedelta(minutes=30),
             ),
         ]
 

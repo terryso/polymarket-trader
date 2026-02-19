@@ -309,7 +309,7 @@ class TestRiskControlSettings:
         settings = RiskControlSettings()
         # 资金管理
         assert settings.max_single_ratio == 0.20
-        assert settings.min_bet == 5.0
+        assert settings.min_bet == 1.0
         # 熔断机制
         assert settings.consecutive_losses_limit == 3
         assert settings.reduce_ratio_after_losses == 0.10
@@ -356,7 +356,7 @@ class TestMarketFilterSettings:
         """Test default market filter values."""
         settings = MarketFilterSettings()
         assert settings.min_liquidity == 10000.0
-        assert settings.min_deadline_days == 7
+        assert settings.min_deadline_hours == 1
 
     def test_custom_values_via_env(self) -> None:
         """Test custom market filter values via environment variables."""
@@ -364,12 +364,12 @@ class TestMarketFilterSettings:
             os.environ,
             {
                 "MIN_LIQUIDITY": "50000.0",
-                "MIN_DEADLINE_DAYS": "14",
+                "MIN_DEADLINE_HOURS": "24",
             },
         ):
             settings = MarketFilterSettings()
             assert settings.min_liquidity == 50000.0
-            assert settings.min_deadline_days == 14
+            assert settings.min_deadline_hours == 24
 
 
 class TestSettings:
@@ -622,13 +622,13 @@ class TestMarketFilterSettingsValidation:
             with pytest.raises(PydanticValidationError):
                 MarketFilterSettings()
 
-    def test_min_deadline_days_must_be_positive(self) -> None:
-        """Test min_deadline_days rejects non-positive values."""
-        with patch.dict(os.environ, {"MIN_DEADLINE_DAYS": "0"}):
+    def test_min_deadline_hours_must_be_positive(self) -> None:
+        """Test min_deadline_hours rejects non-positive values."""
+        with patch.dict(os.environ, {"MIN_DEADLINE_HOURS": "0"}):
             with pytest.raises(PydanticValidationError):
                 MarketFilterSettings()
 
-        with patch.dict(os.environ, {"MIN_DEADLINE_DAYS": "-1"}):
+        with patch.dict(os.environ, {"MIN_DEADLINE_HOURS": "-1"}):
             with pytest.raises(PydanticValidationError):
                 MarketFilterSettings()
 
@@ -700,7 +700,7 @@ class TestRiskControlSettingsExtended:
     def test_min_bet_default(self) -> None:
         """Test min_bet default value."""
         settings = RiskControlSettings()
-        assert settings.min_bet == 5.0
+        assert settings.min_bet == 1.0
 
     def test_reduce_ratio_after_losses_default(self) -> None:
         """Test reduce_ratio_after_losses default value."""
@@ -828,7 +828,7 @@ class TestSettingsRiskControlExtended:
     def test_settings_contains_extended_risk_params(self) -> None:
         """Test Settings contains extended risk control parameters."""
         settings = Settings()
-        assert settings.risk.min_bet == 5.0
+        assert settings.risk.min_bet == 1.0
         assert settings.risk.reduce_ratio_after_losses == 0.10
         assert settings.risk.reduce_ratio_low_capital == 0.10
         assert settings.risk.max_position_per_market == 0.40
