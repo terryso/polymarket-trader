@@ -6,12 +6,16 @@ the Polymarket Trader application.
 
 import asyncio
 import os
+import sys
 from typing import Any, AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
 
+# Set PYTEST_VERSION IMMEDIATELY at module load time
+# This happens before any other imports in conftest.py
+os.environ["PYTEST_VERSION"] = pytest.__version__
 
 # Configure pytest-asyncio
 pytest_plugins = ("pytest_asyncio",)
@@ -43,6 +47,7 @@ ENV_VARS_TO_CLEAR = [
     "CAPITAL_THRESHOLD",
     "MIN_LIQUIDITY",
     "MIN_DEADLINE_HOURS",
+    "MAX_DEADLINE_HOURS",
     "TRADING_MODE",
     "LOG_LEVEL",
 ]

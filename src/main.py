@@ -179,18 +179,28 @@ class Application:
         await asyncio.sleep(0.5)
 
     async def run_initial_analysis(self) -> None:
-        """Run initial market analysis on startup.
+        """Run initial market analysis and trading on startup.
 
         This method triggers an immediate analysis when the application starts,
         before the scheduled tasks begin their regular intervals.
         Uses Gamma API to get active markets with liquidity data.
+        Uses TradingExecutor to analyze, check risks, and execute trades.
+
+        Story 5.3: 交易决策流程
         """
         logger.info("Running initial market analysis on startup...")
 
         try:
-            from src.analysis.llm_analyzer import LLMAnalyzer
             from src.analysis.market_filter import MarketFilter
             from src.api.polymarket import PolymarketClient
+            from src.core.circuit_breaker import CircuitBreaker
+            from src.storage.repositories.market_repo import MarketRepository
+            from src.storage.repositories.position_repo import PositionRepository
+            from src.storage.repositories.trade_repo import TradeRepository
+            from src.trading.executor import TradingExecutor
+            from src.trading.paper_trading import PaperTradingExecutor
+            from src.trading.position_manager import PositionManager
+            from src.trading.risk_control import RiskController
 
             # Fetch active markets using Gamma API (has liquidity data)
             client = PolymarketClient()
@@ -218,15 +228,44 @@ class Application:
                 logger.info("No markets passed filter, skipping initial analysis")
                 return
 
-            # Analyze filtered markets
-            from src.models.prediction import Prediction
-            from src.storage.repositories.market_repo import MarketRepository
-            from src.storage.repositories.prediction_repo import PredictionRepository
+            # Initialize trading components
+            if not self.state:
+                logger.warning("State not initialized, skipping trading")
+                return
 
-            llm_analyzer = LLMAnalyzer()
             market_repo = MarketRepository()
-            prediction_repo = PredictionRepository()
+            trade_repo = TradeRepository()
+            position_repo = PositionRepository()
+            circuit_breaker = CircuitBreaker(self.state)
+            risk_controller = RiskController(self.state, circuit_breaker)
+
+            # Initialize LLM analyzer lazily to avoid import issues
+            from src.analysis.llm_analyzer import LLMAnalyzer
+            llm_analyzer = LLMAnalyzer()
+
+            # Create position manager first
+            position_manager = PositionManager(
+                repository=position_repo,
+                state=self.state,
+            )
+
+            paper_executor = PaperTradingExecutor(
+                trade_repo=trade_repo,
+                position_manager=position_manager,
+                state=self.state,
+            )
+
+            executor = TradingExecutor(
+                llm_analyzer=llm_analyzer,
+                risk_controller=risk_controller,
+                paper_executor=paper_executor,
+                state=self.state,
+            )
+
+            # Process each market through the complete trading flow
             analyzed_count = 0
+            traded_count = 0
+            skipped_count = 0
             error_count = 0
 
             for market in filtered_markets:
@@ -234,33 +273,36 @@ class Application:
                     # Save market to database first (required for foreign key constraint)
                     await market_repo.save_market(market)
 
-                    prediction_result = await llm_analyzer.analyze_market(market)
+                    # Process market through complete trading flow
+                    decision = await executor.process_market(market)
                     analyzed_count += 1
 
-                    # Save prediction to database
-                    prediction = Prediction(
-                        market_id=market.id,
-                        predicted_probability=prediction_result.predicted_probability,
-                        confidence=prediction_result.confidence,
-                        reasoning=prediction_result.reasoning,
-                        key_assumptions=prediction_result.key_assumptions,
-                        recommendation=prediction_result.recommendation,
-                        edge=prediction_result.edge,
-                    )
-                    await prediction_repo.save_prediction(prediction)
+                    if decision.success:
+                        if decision.skipped:
+                            skipped_count += 1
+                            logger.info(
+                                f"Market {market.id[:8]}... skipped: {decision.reason}"
+                            )
+                        elif decision.trade:
+                            traded_count += 1
+                            logger.info(
+                                f"Market {market.id[:8]}... traded: "
+                                f"{decision.trade.trade_type.value} "
+                                f"${decision.trade.amount:.2f}"
+                            )
+                    else:
+                        error_count += 1
+                        logger.warning(
+                            f"Market {market.id[:8]}... error: {decision.error_message}"
+                        )
 
-                    logger.info(
-                        f"Initial analysis: {market.id[:8]}... "
-                        f"prediction={prediction_result.predicted_probability:.2%} "
-                        f"confidence={prediction_result.confidence:.2%} "
-                        f"recommendation={prediction_result.recommendation.value}"
-                    )
                 except Exception as e:
                     error_count += 1
-                    logger.warning(f"Failed to analyze market {market.id}: {e}")
+                    logger.warning(f"Failed to process market {market.id}: {e}")
 
             logger.info(
                 f"Initial analysis complete: {analyzed_count} analyzed, "
+                f"{traded_count} traded, {skipped_count} skipped, "
                 f"{error_count} errors"
             )
 
@@ -292,23 +334,90 @@ class Application:
         # Note: These imports are placed here to avoid circular imports
         # and to allow the tasks to be mocked in tests
 
-        # Task 1: Fetch markets periodically
-        async def fetch_markets_task() -> None:
-            """Fetch and store markets from Polymarket."""
-            try:
-                from src.api.polymarket import PolymarketClient
+        # Task 1: Analyze markets and execute trades periodically
+        async def analyze_and_trade_task() -> None:
+            """Fetch, filter, analyze markets and execute trades.
 
+            Story 5.3: 交易决策流程
+            """
+            try:
+                from src.analysis.llm_analyzer import LLMAnalyzer
+                from src.analysis.market_filter import MarketFilter
+                from src.api.polymarket import PolymarketClient
+                from src.core.circuit_breaker import CircuitBreaker
+                from src.storage.repositories.market_repo import MarketRepository
+                from src.storage.repositories.position_repo import PositionRepository
+                from src.storage.repositories.trade_repo import TradeRepository
+                from src.trading.executor import TradingExecutor
+                from src.trading.paper_trading import PaperTradingExecutor
+                from src.trading.position_manager import PositionManager
+                from src.trading.risk_control import RiskController
+
+                # Fetch active markets using Gamma API
                 client = PolymarketClient()
-                markets = client.get_markets()
-                logger.info(f"Fetched {len(markets)} markets")
+                gamma_markets = client.get_active_markets(limit=50)
+                logger.info(f"Fetched {len(gamma_markets)} active markets")
+
+                if not gamma_markets or not self.state:
+                    return
+
+                # Convert and filter
+                markets = [gm.to_market() for gm in gamma_markets]
+                market_filter = MarketFilter()
+                filter_result = market_filter.filter_markets(markets)
+                filtered_markets = filter_result.markets
+
+                logger.info(
+                    f"Filtered: {len(filtered_markets)}/{len(markets)} markets"
+                )
+
+                if not filtered_markets:
+                    return
+
+                # Initialize trading components
+                market_repo = MarketRepository()
+                trade_repo = TradeRepository()
+                position_repo = PositionRepository()
+                circuit_breaker = CircuitBreaker(self.state)
+                risk_controller = RiskController(self.state, circuit_breaker)
+                llm_analyzer = LLMAnalyzer()
+                position_manager = PositionManager(
+                    repository=position_repo,
+                    state=self.state,
+                )
+                paper_executor = PaperTradingExecutor(
+                    trade_repo=trade_repo,
+                    position_manager=position_manager,
+                    state=self.state,
+                )
+                executor = TradingExecutor(
+                    llm_analyzer=llm_analyzer,
+                    risk_controller=risk_controller,
+                    paper_executor=paper_executor,
+                    state=self.state,
+                )
+
+                # Process each market
+                traded = 0
+                for market in filtered_markets:
+                    try:
+                        await market_repo.save_market(market)
+                        decision = await executor.process_market(market)
+                        if decision.success and decision.trade:
+                            traded += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to process {market.id}: {e}")
+
+                logger.info(f"Analysis complete: {traded} trades executed")
+
             except Exception as e:
-                logger.error(f"Failed to fetch markets: {e}")
+                logger.error(f"Failed to analyze and trade: {e}")
 
         self.scheduler.add_job(
-            fetch_markets_task,
+            analyze_and_trade_task,
             IntervalTrigger(hours=app_settings.task_schedule.fetch_markets_interval_hours),
-            id="fetch_markets",
-            name="Fetch Markets",
+            id="analyze_and_trade",
+            name="Analyze Markets & Trade",
         )
 
         # Task 2: Check open positions periodically

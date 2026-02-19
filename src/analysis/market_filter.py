@@ -39,6 +39,7 @@ class FilterStatistics:
         passed_hard_deadline: Markets passing hard deadline exclusion
         passed_soft_liquidity: Markets passing soft liquidity filter
         passed_soft_deadline: Markets passing soft deadline filter
+        passed_max_deadline: Markets passing max deadline filter
         passed_category: Markets passing category filter
         passed_exclusion: Markets passing exclusion rules
         final_count: Final count of filtered markets
@@ -49,6 +50,7 @@ class FilterStatistics:
     passed_hard_deadline: int = 0
     passed_soft_liquidity: int = 0
     passed_soft_deadline: int = 0
+    passed_max_deadline: int = 0
     passed_category: int = 0
     passed_exclusion: int = 0
     final_count: int = 0
@@ -123,6 +125,7 @@ class MarketFilter:
         self._settings = settings or Settings()
         self._min_liquidity = self._settings.market_filter.min_liquidity
         self._min_deadline_hours = self._settings.market_filter.min_deadline_hours
+        self._max_deadline_hours = self._settings.market_filter.max_deadline_hours
         # Get excluded keywords from settings or use defaults
         self._excluded_keywords = getattr(
             self._settings.market_filter,
@@ -190,6 +193,10 @@ class MarketFilter:
         # Step 4: Soft filter by deadline (>= 7 days)
         current = self._filter_by_deadline(current)
         stats.passed_soft_deadline = len(current)
+
+        # Step 4.5: Filter by max deadline (only markets ending within max_deadline_hours)
+        current = self._filter_by_max_deadline(current)
+        stats.passed_max_deadline = len(current)
 
         # Step 5: Filter by category
         current = self._filter_by_category(current)
@@ -360,6 +367,51 @@ class MarketFilter:
             logger.info(
                 f"{OPERATION_EMOJIS['data']} Filtered {filtered_count} "
                 f"markets by deadline (< {self._min_deadline_hours} hours)"
+            )
+
+        return result
+
+    def _filter_by_max_deadline(self, markets: list[Market]) -> list[Market]:
+        """Filter markets by maximum deadline hours.
+
+        Only markets with deadline <= max_deadline_hours pass.
+        Markets with deadline > max_deadline_hours are filtered out.
+        If max_deadline_hours is None, all markets pass.
+
+        Args:
+            markets: List of markets to filter
+
+        Returns:
+            List of markets passing max deadline filter
+        """
+        # If no max deadline configured, pass all markets
+        if self._max_deadline_hours is None or not isinstance(self._max_deadline_hours, (int, float)):
+            return markets
+
+        result = []
+        filtered_count = 0
+        now = datetime.now(timezone.utc)
+
+        for market in markets:
+            if market.deadline is None:
+                # Markets with no deadline are kept (already filtered by min deadline)
+                result.append(market)
+            else:
+                time_remaining = market.deadline - now
+                hours_remaining = time_remaining.total_seconds() / 3600
+                if hours_remaining > self._max_deadline_hours:
+                    filtered_count += 1
+                    logger.debug(
+                        f"{OPERATION_EMOJIS['data']} ⚠️ Filtered (deadline > "
+                        f"{self._max_deadline_hours} hours): {market.id}"
+                    )
+                else:
+                    result.append(market)
+
+        if filtered_count > 0:
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Filtered {filtered_count} "
+                f"markets by max deadline (> {self._max_deadline_hours} hours)"
             )
 
         return result

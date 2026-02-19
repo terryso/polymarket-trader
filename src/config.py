@@ -6,10 +6,25 @@ variables using Pydantic BaseSettings for type safety.
 
 import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, EnvSettingsSource, InitSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
+
+
+def _is_running_tests() -> bool:
+    """Check if we're running under pytest.
+
+    This is used to disable .env file reading during tests.
+    """
+    import sys
+
+    return (
+        "PYTEST_CURRENT_TEST" in os.environ
+        or "PYTEST_VERSION" in os.environ
+        or "pytest" in sys.modules
+        or (len(sys.argv) > 0 and "pytest" in sys.argv[0])
+    )
 
 
 def _get_env_file() -> str | None:
@@ -18,13 +33,32 @@ def _get_env_file() -> str | None:
     Returns None during pytest to ensure unit tests use default values
     instead of reading from .env file.
     """
-    # Check if running under pytest
-    if "PYTEST_CURRENT_TEST" in os.environ or "PYTEST_VERSION" in os.environ:
+    if _is_running_tests():
         return None
     return ".env"
 
 
-class LLMSettings(BaseSettings):
+class BaseEnvSettings(BaseSettings):
+    """Base settings class that dynamically disables .env file during tests."""
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: InitSettingsSource,
+        env_settings: EnvSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customize settings sources to disable .env during tests."""
+        if _is_running_tests():
+            # During tests, only use init and env settings, skip dotenv
+            return init_settings, env_settings
+        # Normal operation: use all sources including dotenv
+        return init_settings, env_settings, dotenv_settings
+
+
+class LLMSettings(BaseEnvSettings):
     """LLM API configuration settings."""
 
     model_config = SettingsConfigDict(
@@ -59,7 +93,7 @@ class LLMSettings(BaseSettings):
         return v
 
 
-class PolymarketSettings(BaseSettings):
+class PolymarketSettings(BaseEnvSettings):
     """Polymarket configuration settings."""
 
     model_config = SettingsConfigDict(
@@ -123,7 +157,7 @@ class PolymarketSettings(BaseSettings):
         return bool(self.api_key and self.api_secret and self.api_passphrase)
 
 
-class TradingSettings(BaseSettings):
+class TradingSettings(BaseEnvSettings):
     """Trading parameters configuration."""
 
     model_config = SettingsConfigDict(
@@ -165,7 +199,7 @@ class TradingSettings(BaseSettings):
     )
 
 
-class RiskControlSettings(BaseSettings):
+class RiskControlSettings(BaseEnvSettings):
     """Risk control parameters configuration.
 
     风险控制参数配置，包括资金管理、熔断机制、置信度门槛和持仓限制。
@@ -297,7 +331,7 @@ class RiskControlSettings(BaseSettings):
         return v
 
 
-class TelegramSettings(BaseSettings):
+class TelegramSettings(BaseEnvSettings):
     """Telegram Bot configuration settings.
 
     Story 9.1: Telegram Bot 配置与初始化
@@ -360,7 +394,7 @@ class TelegramSettings(BaseSettings):
         return v
 
 
-class MarketFilterSettings(BaseSettings):
+class MarketFilterSettings(BaseEnvSettings):
     """Market filter parameters configuration."""
 
     model_config = SettingsConfigDict(
@@ -382,6 +416,11 @@ class MarketFilterSettings(BaseSettings):
         gt=0,
         description="Minimum hours until market deadline",
     )
+    max_deadline_hours: int | None = Field(
+        default=None,
+        alias="MAX_DEADLINE_HOURS",
+        description="Maximum hours until market deadline (None = no limit, only trade markets ending within this time)",
+    )
     excluded_keywords: list[str] = Field(
         default=["price", "USD", "tomorrow"],
         alias="EXCLUDED_KEYWORDS",
@@ -394,7 +433,7 @@ class MarketFilterSettings(BaseSettings):
     )
 
 
-class SchedulerSettings(BaseSettings):
+class SchedulerSettings(BaseEnvSettings):
     """Scheduler configuration settings.
 
     调度器配置，包括时区、任务存储和执行器设置。
@@ -432,7 +471,7 @@ class SchedulerSettings(BaseSettings):
     )
 
 
-class TaskScheduleSettings(BaseSettings):
+class TaskScheduleSettings(BaseEnvSettings):
     """Task schedule configuration settings.
 
     定时任务频率配置，定义各个定时任务的执行间隔。
@@ -496,7 +535,7 @@ class TaskScheduleSettings(BaseSettings):
     )
 
 
-class Settings(BaseSettings):
+class Settings(BaseEnvSettings):
     """Main application settings."""
 
     model_config = SettingsConfigDict(
@@ -553,4 +592,57 @@ def get_settings() -> Settings:
 
 
 # Global settings instance for convenience
-settings = get_settings()
+# Use a lazy-loading proxy to ensure PYTEST_VERSION is set before loading
+class _SettingsProxy:
+    """Proxy that lazily loads settings on first access.
+
+    This ensures that PYTEST_VERSION is set (by conftest.py) before
+    the settings are actually loaded from .env file.
+    """
+
+    # Environment variables that should be cleared during tests
+    ENV_VARS_TO_CLEAR = [
+        "LLM_API_BASE",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_TIMEOUT",
+        "PK",
+        "YOUR_PROXY_WALLET",
+        "BOT_TRADER_ADDRESS",
+        "TRADE_UNIT",
+        "SLIPPAGE_TOLERANCE",
+        "PCT_PROFIT",
+        "PCT_LOSS",
+        "INITIAL_CAPITAL",
+        "MAX_SINGLE_RATIO",
+        "MIN_CONFIDENCE",
+        "MIN_EDGE",
+        "MAX_OPEN_MARKETS",
+        "MAX_CONCURRENT_TRADES",
+        "DAILY_LOSS_LIMIT",
+        "CONSECUTIVE_LOSSES_LIMIT",
+        "CAPITAL_THRESHOLD",
+        "MIN_LIQUIDITY",
+        "MIN_DEADLINE_HOURS",
+        "MAX_DEADLINE_HOURS",
+        "TRADING_MODE",
+        "LOG_LEVEL",
+    ]
+
+    def __init__(self) -> None:
+        self._settings: BaseEnvSettings | None = None
+
+    def _get_settings(self) -> BaseEnvSettings:
+        if self._settings is None:
+            # If running tests but env vars from .env are still set, clear them
+            if _is_running_tests():
+                for key in self.ENV_VARS_TO_CLEAR:
+                    os.environ.pop(key, None)
+            self._settings = get_settings()
+        return self._settings
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get_settings(), name)
+
+
+settings = _SettingsProxy()  # type: ignore[assignment]
