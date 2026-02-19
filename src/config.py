@@ -207,7 +207,7 @@ class RiskControlSettings(BaseSettings):
         description="Maximum single trade ratio of capital (0-1)",
     )
     min_bet: float = Field(
-        default=5.0,
+        default=1.0,
         alias="MIN_BET",
         gt=0,
         description="Minimum bet amount in USD",
