@@ -455,7 +455,7 @@ class TaskScheduleSettings(BaseSettings):
         extra="ignore",
     )
 
-    fetch_markets_interval_hours: int = Field(
+    fetch_markets_interval_hours: float = Field(
         default=2,
         alias="SCHEDULE_FETCH_MARKETS_INTERVAL_HOURS",
         gt=0,
