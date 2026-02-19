@@ -55,10 +55,13 @@ class PredictionListItem(BaseModel):
             _info: Field serializer info (unused)
 
         Returns:
-            ISO 8601 formatted string or None
+            ISO 8601 formatted string with timezone (UTC)
         """
         if dt is None:
             return None
+        # If datetime has no timezone, assume UTC and add 'Z' suffix
+        if dt.tzinfo is None:
+            return dt.isoformat() + "Z"
         return dt.isoformat()
 
 
@@ -104,10 +107,13 @@ class PredictionResponse(BaseModel):
             _info: Field serializer info (unused)
 
         Returns:
-            ISO 8601 formatted string or None
+            ISO 8601 formatted string with timezone (UTC)
         """
         if dt is None:
             return None
+        # If datetime has no timezone, assume UTC and add 'Z' suffix
+        if dt.tzinfo is None:
+            return dt.isoformat() + "Z"
         return dt.isoformat()
 
 
