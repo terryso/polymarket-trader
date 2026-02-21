@@ -189,6 +189,7 @@ class GammaMarket:
             title=self.question,
             slug=self.event_slug or self.slug,  # Use event_slug for URL, fallback to slug
             category=self._map_category(),
+            clob_token_ids=self.clob_token_ids,  # Preserve token IDs for live trading
             yes_price=self.yes_price,
             no_price=self.no_price,
             liquidity=self.liquidity,
@@ -276,16 +277,31 @@ class PolymarketClient:
                 f"{OPERATION_EMOJIS['network']} Initializing Polymarket client "
                 f"with Level 2 auth (proxy wallet: {proxy_wallet[:6]}...{proxy_wallet[-4:]})"
             )
-            # For proxy wallet trading, need signature_type=1 and funder
+            # For proxy wallet trading, need signature_type=2 (POLY_PROXY) and funder
             self._client = ClobClient(
                 host,
                 key=pk,
                 chain_id=chain_id,
-                signature_type=1,  # Email/Magic wallet signatures
+                signature_type=2,  # POLY_PROXY for proxy wallet trading
                 funder=proxy_wallet,  # Address that holds funds
             )
             self._auth_level = 2
-            self._api_creds_set = False  # Will be set lazily when needed
+
+            # Set API credentials for posting orders
+            # Derive credentials from private key (most reliable method)
+            try:
+                creds = self._client.create_or_derive_api_creds()
+                self._client.set_api_creds(creds)
+                self._api_creds_set = True
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['network']} Derived API credentials for order posting"
+                )
+            except Exception as e:
+                self._api_creds_set = False
+                self._logger.warning(
+                    f"Failed to derive API credentials - order posting may fail: {e}"
+                )
+
             self._logger.info(
                 f"{OPERATION_EMOJIS['network']} Running with full authentication "
                 "(Level 2 - can access order history)"

@@ -187,6 +187,9 @@ class TestTradingExecutor:
             state=mock_state,
         )
 
+        # Mock _save_prediction to return the expected ID
+        executor._save_prediction = AsyncMock(return_value=42)
+
         decision = await executor.process_market(sample_market)
 
         assert decision.success is True

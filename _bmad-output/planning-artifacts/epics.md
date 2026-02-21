@@ -1218,6 +1218,44 @@ So that **我能够实时了解系统的交易、预测和系统事件**.
 
 ---
 
+### Story 7.8: 预测详情抽屉组件 - 展示 LLM 分析过程
+
+As a **用户**,
+I want **在预测记录页面点击某条预测时，能看到完整的 LLM 分析过程**,
+So that **我能够理解 LLM 为什么做出这个预测，包括分析理由和关键假设**.
+
+**Acceptance Criteria:**
+
+**Given** Story 7.4 预测与统计 API 已实现
+**When** 实现预测详情展示功能
+**Then** 创建预测详情抽屉组件 `dashboard/src/components/predictions/PredictionDetailSheet.tsx`:
+- 使用 Sheet 组件（侧边抽屉）
+- 点击预测行的"详情"按钮时打开
+- 调用 `usePrediction(id)` 获取完整预测详情
+- 展示内容包含:
+  - 市场标题
+  - LLM 模型名称 (`model_used`)
+  - 预测概率和置信度
+  - **分析过程** (`reasoning`) - 主要内容，长文本格式化展示
+  - **关键假设** (`key_assumptions`) - 列表形式展示
+  - 验证结果（如有）
+
+**And** 修改预测列表页面 `dashboard/src/pages/Predictions.tsx`:
+- 添加状态管理: `selectedPredictionId` 和 `sheetOpen`
+- 在表格操作列添加"详情"按钮（Eye 图标）
+- 集成 `PredictionDetailSheet` 组件
+
+**And** 处理加载状态:
+- Sheet 打开时显示骨架屏
+- 数据加载完成后渲染内容
+
+**And** 添加单元测试:
+- 测试组件渲染
+- 测试数据加载状态
+- 测试空数据处理
+
+---
+
 ## Epic 8: 系统调度与自动化运行
 
 **目标:** 实现 24/7 自动运行并自动恢复，真正无人值守交易。
@@ -1819,7 +1857,7 @@ Edge: 20%
 | Metric | Count |
 |--------|-------|
 | **Total Epics** | 9 |
-| **Total Stories** | 56 |
+| **Total Stories** | 57 |
 | **FR Coverage** | 12/12 (100%) |
 | **NFR Coverage** | 10/10 (100%) |
 | **AR Coverage** | 12/12 (100%) |
@@ -1834,6 +1872,6 @@ Edge: 20%
 | Epic 4: 风险控制与熔断系统 | 5 | FR5, FR6, FR7, FR8 |
 | Epic 5: Paper Trading 模拟交易 | 5 | FR4 |
 | Epic 6: 预测追踪与学习日志 | 5 | FR9, FR10 |
-| Epic 7: Dashboard 后端 API 集成 | 7 | FR11, FR12, AR2, AR10 |
+| Epic 7: Dashboard 后端 API 集成 | 8 | FR11, FR12, AR2, AR10 |
 | Epic 8: 系统调度与自动化运行 | 6 | NFR1, NFR2, NFR10, AR4 |
 | Epic 9: Telegram 通知与远程控制 | 12 | (新增功能) |

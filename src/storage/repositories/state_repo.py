@@ -103,6 +103,9 @@ class StateRepository:
         Retrieves all key-value pairs from the system_state table
         and deserializes them to their original types.
 
+        Also handles the 'trading_state' key which stores all trading state
+        as a JSON object for backwards compatibility.
+
         Returns:
             Dictionary of all stored state key-value pairs
 
@@ -111,6 +114,8 @@ class StateRepository:
             >>> print(state.get("current_capital", 0))
             150.0
         """
+        import json
+
         state: dict[str, Any] = {}
         async with get_connection() as conn:
             conn.row_factory = aiosqlite.Row
@@ -122,7 +127,18 @@ class StateRepository:
             for row in rows:
                 key = row["key"]
                 value = row["value"]
-                state[key] = self._deserialize_value(value)
+
+                # Handle 'trading_state' JSON blob for backwards compatibility
+                if key == "trading_state":
+                    try:
+                        trading_state = json.loads(value)
+                        if isinstance(trading_state, dict):
+                            # Merge trading state into main state dict
+                            state.update(trading_state)
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning(f"Failed to parse trading_state JSON: {value}")
+                else:
+                    state[key] = self._deserialize_value(value)
 
         logger.debug(f"State loaded: {len(state)} keys")
         return state

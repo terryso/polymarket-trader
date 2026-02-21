@@ -55,10 +55,11 @@ class TestTradeStatus:
         assert TradeStatus.PENDING.value == "PENDING"
         assert TradeStatus.FILLED.value == "FILLED"
         assert TradeStatus.CANCELLED.value == "CANCELLED"
+        assert TradeStatus.CANCELED.value == "CANCELED"
 
     def test_status_count(self) -> None:
         """Test total number of trade statuses."""
-        assert len(TradeStatus) == 3
+        assert len(TradeStatus) == 4
 
 
 class TestTrade:

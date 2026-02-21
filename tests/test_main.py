@@ -32,7 +32,7 @@ class TestParseArgs:
         """Test default argument values."""
         with patch.object(sys, "argv", ["main.py"]):
             args = parse_args()
-            assert args.mode == "paper"
+            assert args.mode is None  # Default is None, uses env var
             assert args.config is None
 
     def test_live_mode(self) -> None:

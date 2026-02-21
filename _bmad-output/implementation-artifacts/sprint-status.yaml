@@ -1,4 +1,4 @@
-# generated: 2026-02-15
+# generated: 2026-02-19
 # project: polymarket-trader
 # project_key: NOKEY
 # tracking_system: file-system
@@ -32,6 +32,12 @@
 # - Stories can be worked in parallel if team capacity allows
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-02-19
+project: polymarket-trader
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # Epic 1: 项目基础设施与配置
@@ -100,6 +106,7 @@ development_status:
   7-5-system-status-api: done
   7-6-frontend-api-integration: done
   7-7-recent-activity-api: done
+  7-8-prediction-detail-drawer-component: done
   epic-7-retrospective: optional
 
   # Epic 8: 系统调度与自动化运行

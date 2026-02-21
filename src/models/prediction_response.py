@@ -73,6 +73,7 @@ class PredictionResponse(BaseModel):
     Attributes:
         id: Prediction unique identifier
         market_id: Reference to the market
+        market_title: Title of the market
         predicted_probability: Predicted probability (0-1)
         confidence: LLM confidence (0-1)
         reasoning: LLM analysis reasoning
@@ -87,6 +88,7 @@ class PredictionResponse(BaseModel):
 
     id: int = Field(..., description="Prediction ID")
     market_id: str = Field(..., description="Market reference")
+    market_title: str | None = Field(None, description="Market title")
     predicted_probability: float = Field(..., description="Predicted probability (0-1)")
     confidence: float = Field(..., description="LLM confidence (0-1)")
     reasoning: str | None = Field(None, description="Analysis reasoning")

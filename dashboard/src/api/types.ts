@@ -226,6 +226,7 @@ export interface PredictionListItem {
 export interface PredictionResponse {
   id: number;
   market_id: string;
+  market_title: string | null;
   predicted_probability: number;
   confidence: number;
   reasoning: string | null;

@@ -24,6 +24,7 @@ from src.models.prediction_response import (
     PredictionListItem,
     PredictionResponse,
 )
+from src.storage.repositories.market_repo import MarketRepository
 from src.storage.repositories.prediction_repo import (
     PaginationParams,
     PredictionOutcomeStatus,
@@ -211,9 +212,15 @@ async def get_prediction(
             },
         )
 
+    # Get market title
+    market_repo = MarketRepository()
+    market = await market_repo.get_market(prediction.market_id)
+    market_title = market.title if market else None
+
     response = PredictionResponse(
         id=prediction.id if prediction.id is not None else 0,
         market_id=prediction.market_id,
+        market_title=market_title,
         predicted_probability=prediction.predicted_probability,
         confidence=prediction.confidence,
         reasoning=prediction.reasoning,

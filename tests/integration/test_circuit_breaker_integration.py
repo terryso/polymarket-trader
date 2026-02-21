@@ -511,7 +511,8 @@ class TestStatePersistence:
     async def test_state_can_be_persisted(self, fresh_state: ThreadSafeState) -> None:
         """Test that state can be persisted to database.
 
-        Note: This test uses an in-memory database via the test configuration.
+        Note: Integration tests use a separate test database (tests/integration/conftest.py)
+        to avoid polluting production data.
         """
         # Modify state
         await fresh_state.update_capital(50.0)

@@ -142,7 +142,8 @@ class _TestDatabaseManager:
                     status TEXT,
                     llm_prediction_id INTEGER,
                     position_id INTEGER,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    polymarket_order_id TEXT
                 )
             """)
 

@@ -72,6 +72,7 @@ class TradeStatus(str, Enum):
     PENDING = "PENDING"
     FILLED = "FILLED"
     CANCELLED = "CANCELLED"
+    CANCELED = "CANCELED"  # Alternative spelling
 
 
 class Trade(BaseModel):

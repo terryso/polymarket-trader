@@ -87,6 +87,9 @@ class Market(BaseModel):
     slug: str | None = Field(default=None, description="Market slug for URL")
     description: str | None = Field(default=None, description="Market description")
     category: MarketCategory | None = Field(default=None, description="Market category")
+    clob_token_ids: list[str] | None = Field(
+        default=None, description="CLOB token IDs for trading [YES, NO]"
+    )
     yes_price: float | None = Field(
         default=None, ge=0, le=1, description="YES price (0-1)"
     )
