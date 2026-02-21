@@ -68,6 +68,7 @@ class TradingDecision:
         trade: The executed trade (if any)
         position: The opened position (if any)
         prediction: The LLM prediction (if analysis was performed)
+        prediction_id: Database ID of the saved prediction
         reason: Reason for skip or failure
         error_message: Error message if process failed
     """
@@ -78,6 +79,7 @@ class TradingDecision:
     trade: Trade | None = None
     position: "Position | None" = None
     prediction: "PredictionResult | None" = None
+    prediction_id: int | None = None
     reason: str | None = None
     error_message: str | None = None
 
@@ -90,10 +92,15 @@ class TradingExecutor:
 
     Story 9.3: Added Telegram notification support for trade events.
 
+    The executor selects between paper and live trading based on TRADING_MODE:
+    - TRADING_MODE=paper: Uses PaperTradingExecutor (simulation only)
+    - TRADING_MODE=live: Uses LiveTradingExecutor (real Polymarket orders)
+
     Attributes:
         _llm_analyzer: LLMAnalyzer for market analysis
         _risk_controller: RiskController for risk checks
-        _paper_executor: PaperTradingExecutor for trade execution
+        _paper_executor: PaperTradingExecutor for paper trading
+        _live_executor: LiveTradingExecutor for live trading (optional)
         _state: ThreadSafeState for capital tracking
         _notifier: Optional TelegramNotifier for trade notifications
 
@@ -102,6 +109,7 @@ class TradingExecutor:
         ...     llm_analyzer=analyzer,
         ...     risk_controller=controller,
         ...     paper_executor=paper_exec,
+        ...     live_executor=live_exec,  # Optional, for live trading
         ...     state=state,
         ... )
         >>> decision = await executor.process_market(market)
@@ -116,34 +124,101 @@ class TradingExecutor:
         paper_executor: "PaperTradingExecutor",
         state: "ThreadSafeState",
         notifier: "TelegramNotifier | None" = None,
+        live_executor: "LiveTradingExecutor | None" = None,
     ) -> None:
         """Initialize trading executor.
 
         Args:
             llm_analyzer: LLM analyzer for market predictions
             risk_controller: Risk controller for trade validation
-            paper_executor: Paper trading executor for trade execution
+            paper_executor: Paper trading executor for paper trading
             state: Thread-safe state for capital tracking
             notifier: Optional Telegram notifier for trade notifications
+            live_executor: Optional live trading executor for real trades
         """
         self._llm_analyzer = llm_analyzer
         self._risk_controller = risk_controller
         self._paper_executor = paper_executor
+        self._live_executor = live_executor
         self._state = state
         self._notifier = notifier
         self._logger = get_logger(__name__)
 
-        # Log notification status
-        if self._notifier:
+        # Lazy import to avoid circular dependency
+        self._prediction_repo: "PredictionRepository | None" = None
+
+        # Log trading mode
+        trading_mode = settings.trading_mode.upper()
+        if trading_mode == "LIVE" and live_executor:
             self._logger.info(
-                f"TradingExecutor initialized (mode={settings.trading_mode}, "
-                f"notifications=enabled)"
+                f"TradingExecutor initialized (mode=LIVE, notifications={'enabled' if notifier else 'disabled'})"
             )
         else:
             self._logger.info(
-                f"TradingExecutor initialized (mode={settings.trading_mode}, "
-                f"notifications=disabled)"
+                f"TradingExecutor initialized (mode=PAPER, notifications={'enabled' if notifier else 'disabled'})"
             )
+
+    def _get_executor(self) -> "PaperTradingExecutor | LiveTradingExecutor":
+        """Get the appropriate executor based on TRADING_MODE.
+
+        Returns:
+            PaperTradingExecutor for paper mode, LiveTradingExecutor for live mode
+        """
+        trading_mode = settings.trading_mode.upper()
+        if trading_mode == "LIVE" and self._live_executor:
+            return self._live_executor
+        return self._paper_executor
+
+    def _get_prediction_repo(self) -> "PredictionRepository":
+        """Get or create PredictionRepository instance."""
+        if self._prediction_repo is None:
+            from src.storage.repositories.prediction_repo import PredictionRepository
+
+            self._prediction_repo = PredictionRepository()
+        return self._prediction_repo
+
+    async def _save_prediction(
+        self, market: "Market", prediction: "PredictionResult"
+    ) -> int | None:
+        """Save prediction to database.
+
+        Args:
+            market: Market that was analyzed
+            prediction: LLM prediction result
+
+        Returns:
+            Prediction ID if saved successfully, None otherwise
+        """
+        try:
+            from src.models.prediction import Prediction
+            from src.storage.repositories.market_repo import MarketRepository
+
+            # Ensure market exists in database before saving prediction
+            # This is required for the foreign key constraint
+            market_repo = MarketRepository()
+            existing_market = await market_repo.get_market(market.id)
+            if existing_market is None:
+                self._logger.warning(
+                    f"Market {market.id} not found in database, saving it first"
+                )
+                await market_repo.save_market(market)
+
+            record = Prediction(
+                market_id=market.id,
+                predicted_probability=prediction.predicted_probability,
+                confidence=prediction.confidence,
+                reasoning=prediction.reasoning,
+                key_assumptions=prediction.key_assumptions,
+                model_used=getattr(prediction, "model_used", "unknown"),
+                recommendation=prediction.recommendation.value,
+                edge=prediction.edge,
+            )
+            prediction_id = await self._get_prediction_repo().save_prediction(record)
+            self._logger.debug(f"Saved prediction {prediction_id} for market {market.id}")
+            return prediction_id
+        except Exception as e:
+            self._logger.warning(f"Failed to save prediction for market {market.id}: {e}")
+            return None
 
     async def process_market(self, market: "Market") -> TradingDecision:
         """Process a single market and make a trading decision.
@@ -178,6 +253,9 @@ class TradingExecutor:
                 f"confidence={prediction.confidence:.2%}"
             )
 
+            # 1.5. Save prediction to database (always save for accuracy tracking)
+            prediction_id = await self._save_prediction(market, prediction)
+
             # 2. Risk Check
             self._logger.debug(f"Running risk check for market {market.id}...")
             risk_check = await self._risk_controller.check_trade_allowed(
@@ -195,6 +273,7 @@ class TradingExecutor:
                     skipped=True,
                     prediction=prediction,
                     reason=reason,
+                    prediction_id=prediction_id,
                 )
 
             # 3. Calculate Position Size
@@ -204,11 +283,13 @@ class TradingExecutor:
                 f"(ratio={risk_check.position_ratio:.2%})"
             )
 
-            # 4. Execute Trade (Paper Trading)
-            self._logger.debug(f"Executing paper trade for market {market.id}...")
-            # Get prediction_id if available (PredictionResult doesn't have id, Prediction does)
-            prediction_id = getattr(prediction, "id", None)
-            result = await self._paper_executor.execute_trade(
+            # 4. Execute Trade (Paper or Live based on TRADING_MODE)
+            executor = self._get_executor()
+            trading_mode = settings.trading_mode.upper()
+            self._logger.debug(
+                f"Executing {trading_mode} trade for market {market.id}..."
+            )
+            result = await executor.execute_trade(
                 market=market,
                 prediction=prediction,
                 amount=amount,

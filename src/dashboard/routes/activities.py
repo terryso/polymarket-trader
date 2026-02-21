@@ -21,7 +21,7 @@ from __future__ import annotations
 __all__ = ["router"]
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -237,7 +237,9 @@ async def get_activities(
         )
 
     # Sort by timestamp (most recent first), handling None values
-    activities.sort(key=lambda x: x.timestamp or datetime.min, reverse=True)
+    # Use timezone-aware datetime.min to match potentially timezone-aware timestamps
+    datetime_min = datetime.min.replace(tzinfo=timezone.utc)
+    activities.sort(key=lambda x: x.timestamp or datetime_min, reverse=True)
 
     # Apply limit
     total = len(activities)

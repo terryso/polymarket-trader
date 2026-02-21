@@ -99,21 +99,25 @@ class DatabaseManager:
             DatabaseError: If connection fails
         """
         async with self._lock:
+            conn: aiosqlite.Connection | None = None
             try:
-                conn: aiosqlite.Connection = await aiosqlite.connect(self._db_path)
-                # Enable foreign key constraints
+                conn = await aiosqlite.connect(self._db_path)
+                # Enable foreign key constraints (must be set for each connection)
                 await conn.execute("PRAGMA foreign_keys = ON")
-                try:
-                    yield conn
-                finally:
-                    await conn.close()
+                yield conn
+                # Auto-commit on successful exit from context
+                await conn.commit()
             except aiosqlite.Error as e:
-                logger.error(f"❌ Database connection error: {e}")
+                # Log with more context about what operation failed
+                logger.error(f"❌ Database error: {e}")
                 raise DatabaseError(
-                    f"Failed to connect to database: {e}",
-                    operation="connect",
+                    f"Database operation failed: {e}",
+                    operation="execute",
                     original_exception=e,
                 ) from e
+            finally:
+                if conn is not None:
+                    await conn.close()
 
     async def init_db(self) -> None:
         """Initialize database schema.

@@ -255,11 +255,25 @@ class Application:
                 state=self.state,
             )
 
+            # Create live executor if in live mode
+            live_executor = None
+            if settings.trading_mode.lower() == "live":
+                from src.trading.live_trading import LiveTradingExecutor
+
+                live_executor = LiveTradingExecutor(
+                    client=client,
+                    trade_repo=trade_repo,
+                    position_manager=position_manager,
+                    state=self.state,
+                )
+                logger.info("Live trading executor initialized")
+
             executor = TradingExecutor(
                 llm_analyzer=llm_analyzer,
                 risk_controller=risk_controller,
                 paper_executor=paper_executor,
                 state=self.state,
+                live_executor=live_executor,
             )
 
             # Process each market through the complete trading flow
@@ -335,7 +349,7 @@ class Application:
         # and to allow the tasks to be mocked in tests
 
         # Task 1: Analyze markets and execute trades periodically
-        async def analyze_and_trade_task() -> None:
+        async def _analyze_and_trade_async() -> None:
             """Fetch, filter, analyze markets and execute trades.
 
             Story 5.3: 交易决策流程
@@ -390,11 +404,25 @@ class Application:
                     position_manager=position_manager,
                     state=self.state,
                 )
+
+                # Create live executor if in live mode
+                live_executor = None
+                if app_settings.trading_mode.lower() == "live":
+                    from src.trading.live_trading import LiveTradingExecutor
+
+                    live_executor = LiveTradingExecutor(
+                        client=client,
+                        trade_repo=trade_repo,
+                        position_manager=position_manager,
+                        state=self.state,
+                    )
+
                 executor = TradingExecutor(
                     llm_analyzer=llm_analyzer,
                     risk_controller=risk_controller,
                     paper_executor=paper_executor,
                     state=self.state,
+                    live_executor=live_executor,
                 )
 
                 # Process each market
@@ -413,6 +441,10 @@ class Application:
             except Exception as e:
                 logger.error(f"Failed to analyze and trade: {e}")
 
+        def analyze_and_trade_task() -> None:
+            """Sync wrapper for the async analyze_and_trade function."""
+            asyncio.run(_analyze_and_trade_async())
+
         self.scheduler.add_job(
             analyze_and_trade_task,
             IntervalTrigger(hours=app_settings.task_schedule.fetch_markets_interval_hours),
@@ -421,13 +453,17 @@ class Application:
         )
 
         # Task 2: Check open positions periodically
-        async def check_positions_task() -> None:
+        async def _check_positions_task_async() -> None:
             """Check and update open positions."""
             try:
                 logger.debug("Checking open positions...")
                 # TODO: Implement position checking logic in Story 8.4
             except Exception as e:
                 logger.error(f"Failed to check positions: {e}")
+
+        def check_positions_task() -> None:
+            """Sync wrapper for the async check_positions function."""
+            asyncio.run(_check_positions_task_async())
 
         self.scheduler.add_job(
             check_positions_task,
@@ -437,13 +473,17 @@ class Application:
         )
 
         # Task 3: Generate daily statistics
-        async def daily_statistics_task() -> None:
+        async def _daily_statistics_task_async() -> None:
             """Generate daily trading statistics."""
             try:
                 logger.info("Generating daily statistics...")
                 # TODO: Implement daily statistics logic
             except Exception as e:
                 logger.error(f"Failed to generate daily statistics: {e}")
+
+        def daily_statistics_task() -> None:
+            """Sync wrapper for the async daily_statistics function."""
+            asyncio.run(_daily_statistics_task_async())
 
         self.scheduler.add_job(
             daily_statistics_task,
@@ -453,13 +493,17 @@ class Application:
         )
 
         # Task 4: Validate predictions
-        async def validate_predictions_task() -> None:
+        async def _validate_predictions_task_async() -> None:
             """Validate past predictions against actual outcomes."""
             try:
                 logger.info("Validating predictions...")
                 # TODO: Implement prediction validation logic
             except Exception as e:
                 logger.error(f"Failed to validate predictions: {e}")
+
+        def validate_predictions_task() -> None:
+            """Sync wrapper for the async validate_predictions function."""
+            asyncio.run(_validate_predictions_task_async())
 
         self.scheduler.add_job(
             validate_predictions_task,
@@ -469,7 +513,7 @@ class Application:
         )
 
         # Task 5: Reset daily state
-        async def reset_daily_state_task() -> None:
+        async def _reset_daily_state_task_async() -> None:
             """Reset daily state (PnL, consecutive losses)."""
             try:
                 if self.state:
@@ -477,6 +521,10 @@ class Application:
                     logger.info("Daily state reset complete")
             except Exception as e:
                 logger.error(f"Failed to reset daily state: {e}")
+
+        def reset_daily_state_task() -> None:
+            """Sync wrapper for the async reset_daily_state function."""
+            asyncio.run(_reset_daily_state_task_async())
 
         self.scheduler.add_job(
             reset_daily_state_task,
@@ -486,7 +534,7 @@ class Application:
         )
 
         # Task 6: Persist state periodically
-        async def persist_state_task() -> None:
+        async def _persist_state_task_async() -> None:
             """Persist state to database."""
             try:
                 if self.state:
@@ -494,6 +542,10 @@ class Application:
                     logger.debug("State persisted to database")
             except Exception as e:
                 logger.error(f"Failed to persist state: {e}")
+
+        def persist_state_task() -> None:
+            """Sync wrapper for the async persist_state function."""
+            asyncio.run(_persist_state_task_async())
 
         self.scheduler.add_job(
             persist_state_task,
@@ -700,8 +752,8 @@ Examples:
     parser.add_argument(
         "--mode",
         choices=["paper", "live"],
-        default="paper",
-        help="Trading mode: paper (simulation) or live (real trading). Default: paper",
+        default=None,
+        help="Trading mode: paper (simulation) or live (real trading). Default: from TRADING_MODE env or paper",
     )
     parser.add_argument(
         "--config",
@@ -725,9 +777,14 @@ async def async_main() -> None:
     """
     args = parse_args()
 
-    # Override trading mode from command line
+    # Determine trading mode: CLI arg > env var > default
     if args.mode:
+        # Override trading mode from command line
         os.environ["TRADING_MODE"] = args.mode
+        mode = args.mode
+    else:
+        # Use mode from settings (which reads from env/.env)
+        mode = settings.trading_mode
 
     # Load custom config file if specified
     if args.config:
@@ -736,7 +793,7 @@ async def async_main() -> None:
             raise ConfigurationError(f"Configuration file not found: {args.config}")
         # Settings will be reloaded with the new config via environment
 
-    app = Application(mode=args.mode, config_path=args.config)
+    app = Application(mode=mode, config_path=args.config)
     await app.start()
 
 

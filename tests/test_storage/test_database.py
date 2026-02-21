@@ -626,7 +626,7 @@ class TestDatabaseManagerErrorHandling:
             # Verify error was logged
             mock_logger.error.assert_called()
             error_call_args = str(mock_logger.error.call_args)
-            assert "Database connection error" in error_call_args
+            assert "Database error" in error_call_args
 
     @pytest.mark.asyncio
     async def test_init_db_with_mkdir_failure(self, tmp_path: Path) -> None:
