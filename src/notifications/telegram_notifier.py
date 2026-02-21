@@ -424,9 +424,13 @@ class TelegramNotifier:
         yes_price = market.yes_price or 0.5
         direction = "YES" if prediction.recommendation.value == "BUY_YES" else "NO"
 
+        # Escape special Markdown characters in title
+        title = market.title or ""
+        title = title.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`").replace("[", "\\[")
+
         lines = [
             "\U0001f9e0 *市场分析*",
-            f"市场: {market.title}",
+            f"市场: {title}",
             f"市场价格: YES {yes_price:.2f}",
             f"预测概率: {direction} {prediction.predicted_probability:.2f}",
             f"置信度: {prediction.confidence:.0%}",
@@ -442,7 +446,9 @@ class TelegramNotifier:
             lines.append("")
             lines.append("*关键假设:*")
             for assumption in prediction.key_assumptions[:3]:
-                lines.append(f"- {assumption}")
+                # Escape special characters in assumptions
+                safe_assumption = assumption.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
+                lines.append(f"- {safe_assumption}")
 
         return "\n".join(lines)
 
