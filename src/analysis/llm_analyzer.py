@@ -16,6 +16,9 @@ Usage:
 Story 9.4: LLM 分析结果通知
     - Added optional TelegramNotifier integration
     - Analysis notifications sent when conditions are met
+
+Story: 分析内容语言配置支持
+    - Updated to use get_market_analyst_system_prompt() with language config
 """
 
 from __future__ import annotations
@@ -26,9 +29,9 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from src.analysis.prompts import (
-    MARKET_ANALYST_SYSTEM_PROMPT,
     Recommendation,
     build_market_analysis_prompt,
+    get_market_analyst_system_prompt,
     parse_llm_analysis_response,
 )
 from src.api import LLMClient
@@ -158,9 +161,13 @@ class LLMAnalyzer:
 
             # 调用 LLM API (使用 to_thread 避免阻塞事件循环)
             def _call_llm() -> str:
+                language = settings.llm.analysis_language
+                self._logger.debug(
+                    f"{OPERATION_EMOJIS['analysis']} Using analysis language: {language}"
+                )
                 with LLMClient() as client:
                     return client.chat_with_system(
-                        system_prompt=MARKET_ANALYST_SYSTEM_PROMPT,
+                        system_prompt=get_market_analyst_system_prompt(language),
                         user_prompt=user_prompt,
                     )
 

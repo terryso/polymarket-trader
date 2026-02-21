@@ -6,7 +6,7 @@ to analyze prediction markets and output standardized results.
 
 Usage:
     from src.analysis import (
-        MARKET_ANALYST_SYSTEM_PROMPT,
+        get_market_analyst_system_prompt,
         build_market_analysis_prompt,
         parse_llm_analysis_response,
         LLMAnalysisResult,
@@ -18,18 +18,26 @@ Usage:
     # Get LLM response
     with LLMClient() as client:
         response = client.chat_with_system(
-            system_prompt=MARKET_ANALYST_SYSTEM_PROMPT,
+            system_prompt=get_market_analyst_system_prompt(language="zh"),
             user_prompt=user_prompt
         )
 
     # Parse response
     result = parse_llm_analysis_response(response)
+
+Story: 分析内容语言配置支持
+    - Added get_market_analyst_system_prompt() for dynamic language support
+    - Added LanguageType and LANGUAGE_INSTRUCTIONS for language configuration
+    - Deprecated MARKET_ANALYST_SYSTEM_PROMPT constant
 """
 
 from __future__ import annotations
 
 __all__ = [
     "MARKET_ANALYST_SYSTEM_PROMPT",
+    "LanguageType",
+    "LANGUAGE_INSTRUCTIONS",
+    "get_market_analyst_system_prompt",
     "Recommendation",
     "LLMAnalysisResult",
     "build_market_analysis_prompt",
@@ -38,13 +46,28 @@ __all__ = [
 ]
 
 import json
+import logging
 import re
+import warnings
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 from src.models.market import Market
+
+_logger = logging.getLogger(__name__)
+
+
+# Type alias for supported languages
+LanguageType = Literal["zh", "en"]
+
+# Language-specific instructions to append to system prompt
+LANGUAGE_INSTRUCTIONS: dict[LanguageType, str] = {
+    "zh": "\n\n**IMPORTANT: Please output all analysis content (reasoning and key_assumptions) in Chinese (中文).**",
+    "en": "",  # English is the default, no additional instruction needed
+}
 
 
 class Recommendation(str, Enum):
@@ -107,7 +130,26 @@ class LLMAnalysisResult(BaseModel):
         return [a.strip() for a in v if a.strip()]
 
 
-MARKET_ANALYST_SYSTEM_PROMPT = """You are an expert prediction market analyst with deep knowledge of:
+def get_market_analyst_system_prompt(language: LanguageType = "en") -> str:
+    """Get market analyst system prompt with language instruction.
+
+    Args:
+        language: Output language ("zh" for Chinese, "en" for English)
+
+    Returns:
+        System prompt string with language instruction appended
+
+    Example:
+        >>> prompt = get_market_analyst_system_prompt("zh")
+        >>> "中文" in prompt
+        True
+    """
+    if language not in LANGUAGE_INSTRUCTIONS:
+        _logger.warning(
+            f"Unknown language '{language}', using default (English). "
+            f"Supported languages: {list(LANGUAGE_INSTRUCTIONS.keys())}"
+        )
+    base_prompt = """You are an expert prediction market analyst with deep knowledge of:
 - Political events and elections
 - Economic indicators and trends
 - Technology and crypto markets
@@ -148,6 +190,26 @@ You MUST respond with ONLY a valid JSON object in this exact format:
 - Acknowledge uncertainty in predictions
 - Do NOT output anything outside the JSON structure
 """
+    instruction = LANGUAGE_INSTRUCTIONS.get(language, "")
+    return base_prompt + instruction
+
+
+def _get_deprecated_constant() -> str:
+    """Get deprecated MARKET_ANALYST_SYSTEM_PROMPT constant.
+
+    Emits deprecation warning and returns English prompt for backward compatibility.
+    """
+    warnings.warn(
+        "MARKET_ANALYST_SYSTEM_PROMPT is deprecated. "
+        "Use get_market_analyst_system_prompt() instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return get_market_analyst_system_prompt("en")
+
+
+# Backward compatibility - deprecated constant
+MARKET_ANALYST_SYSTEM_PROMPT = _get_deprecated_constant()
 
 
 def build_market_analysis_prompt(market: Market) -> str:

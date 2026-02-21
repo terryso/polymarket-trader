@@ -120,6 +120,62 @@ class TestLLMSettingsLiveModeValidation:
             )
 
 
+class TestLLMSettingsAnalysisLanguage:
+    """Tests for analysis_language configuration.
+
+    Story: 分析内容语言配置支持
+    """
+
+    def test_default_value_is_zh(self) -> None:
+        """Test default value is Chinese."""
+        for key in ["ANALYSIS_LANGUAGE"]:
+            os.environ.pop(key, None)
+        settings = LLMSettings()
+        assert settings.analysis_language == "zh"
+
+    def test_env_override_to_en(self) -> None:
+        """Test environment variable override to English."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "en"}):
+            settings = LLMSettings()
+            assert settings.analysis_language == "en"
+
+    def test_env_override_to_zh(self) -> None:
+        """Test environment variable override to Chinese."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "zh"}):
+            settings = LLMSettings()
+            assert settings.analysis_language == "zh"
+
+    def test_case_insensitive_uppercase(self) -> None:
+        """Test uppercase value is normalized to lowercase."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "EN"}):
+            settings = LLMSettings()
+            assert settings.analysis_language == "en"
+
+    def test_case_insensitive_mixed(self) -> None:
+        """Test mixed case value is normalized to lowercase."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "Zh"}):
+            settings = LLMSettings()
+            assert settings.analysis_language == "zh"
+
+    def test_invalid_value_rejected(self) -> None:
+        """Test invalid language value is rejected."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "fr"}):
+            with pytest.raises(PydanticValidationError):
+                LLMSettings()
+
+    def test_whitespace_stripped(self) -> None:
+        """Test whitespace is stripped from language value."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "  zh  "}):
+            settings = LLMSettings()
+            assert settings.analysis_language == "zh"
+
+    def test_whitespace_stripped_uppercase(self) -> None:
+        """Test whitespace is stripped and case normalized."""
+        with patch.dict(os.environ, {"ANALYSIS_LANGUAGE": "  EN  "}):
+            settings = LLMSettings()
+            assert settings.analysis_language == "en"
+
+
 class TestPolymarketSettings:
     """Tests for PolymarketSettings class."""
 

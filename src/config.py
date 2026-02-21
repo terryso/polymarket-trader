@@ -59,7 +59,11 @@ class BaseEnvSettings(BaseSettings):
 
 
 class LLMSettings(BaseEnvSettings):
-    """LLM API configuration settings."""
+    """LLM API configuration settings.
+
+    Story: 分析内容语言配置支持
+        - Added analysis_language for LLM output language configuration
+    """
 
     model_config = SettingsConfigDict(
         env_prefix="LLM_",
@@ -81,6 +85,11 @@ class LLMSettings(BaseEnvSettings):
         alias="THINKING_ENABLED",
         description="Enable GLM thinking mode for better reasoning (default: True for GLM-5)",
     )
+    analysis_language: Literal["zh", "en"] = Field(
+        default="zh",
+        alias="ANALYSIS_LANGUAGE",
+        description="Language for LLM analysis output (zh=Chinese, en=English)",
+    )
 
     @field_validator("api_key")
     @classmethod
@@ -90,6 +99,14 @@ class LLMSettings(BaseEnvSettings):
         trading_mode = os.getenv("TRADING_MODE", "paper")
         if trading_mode == "live" and not v:
             raise ValueError("LLM_API_KEY is required when TRADING_MODE=live")
+        return v
+
+    @field_validator("analysis_language", mode="before")
+    @classmethod
+    def normalize_analysis_language(cls, v: str) -> str:
+        """Normalize language to lowercase and strip whitespace."""
+        if isinstance(v, str):
+            return v.strip().lower()
         return v
 
 
@@ -606,6 +623,7 @@ class _SettingsProxy:
         "LLM_API_KEY",
         "LLM_MODEL",
         "LLM_TIMEOUT",
+        "ANALYSIS_LANGUAGE",
         "PK",
         "YOUR_PROXY_WALLET",
         "BOT_TRADER_ADDRESS",
