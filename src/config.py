@@ -8,7 +8,7 @@ import os
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, EnvSettingsSource, InitSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
 
 
@@ -392,14 +392,13 @@ class TelegramSettings(BaseEnvSettings):
         description="Notify all analyses (not just tradeable signals)",
     )
 
-    @field_validator("enabled")
-    @classmethod
-    def validate_enabled(cls, v: bool) -> bool:
-        """If enabled, bot_token must be set.
+    @model_validator(mode="after")
+    def validate_enabled_has_token(self) -> "TelegramSettings":
+        """If enabled, bot_token should be set.
 
-        Logs a warning and returns False if enabled but token is not set.
+        Logs a warning if enabled but token is not set.
         """
-        if v:
+        if self.enabled and not self.bot_token:
             import warnings
 
             warnings.warn(
@@ -408,7 +407,7 @@ class TelegramSettings(BaseEnvSettings):
                 UserWarning,
                 stacklevel=2,
             )
-        return v
+        return self
 
 
 class MarketFilterSettings(BaseEnvSettings):
