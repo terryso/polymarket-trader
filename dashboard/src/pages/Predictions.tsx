@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { BarChart3, CheckCircle2, XCircle, AlertCircle, ExternalLink } from "lucide-react";
+import { PredictionDetailSheet } from "@/components/predictions/PredictionDetailSheet";
 import {
   Table,
   TableBody,
@@ -28,6 +29,8 @@ const PAGE_SIZE = 20;
 
 const Predictions = () => {
   const [page, setPage] = useState(1);
+  const [selectedPredictionId, setSelectedPredictionId] = useState<number | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { data: predictionsData, isLoading: predictionsLoading, error: predictionsError } = usePredictions({ page, per_page: PAGE_SIZE });
   const { data: accuracy, isLoading: accuracyLoading } = useAccuracy();
 
@@ -217,11 +220,21 @@ const Predictions = () => {
                   const edgeDisplay = p.edge !== null ? `${(p.edge * 100).toFixed(0)}%` : "-";
                   const edgeColor = p.edge !== null && p.edge >= 0.05 ? "text-green-600 dark:text-green-400" : "text-muted-foreground";
                   return (
-                    <TableRow key={p.id} className="border-border hover:bg-accent/50">
+                    <TableRow
+                      key={p.id}
+                      className="border-border hover:bg-accent/50 cursor-pointer"
+                      onClick={() => {
+                        setSelectedPredictionId(p.id);
+                        setIsSheetOpen(true);
+                      }}
+                    >
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {formatTimestamp(p.created_at)}
                       </TableCell>
-                      <TableCell className="font-medium text-foreground">
+                      <TableCell
+                        className="font-medium text-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {getPolymarketUrl(p.market_slug) ? (
                           <a
                             href={getPolymarketUrl(p.market_slug)!}
@@ -321,6 +334,16 @@ const Predictions = () => {
           </div>
         )}
       </div>
+
+      {/* Prediction Detail Sheet */}
+      <PredictionDetailSheet
+        predictionId={selectedPredictionId}
+        open={isSheetOpen}
+        onOpenChange={(open) => {
+          setIsSheetOpen(open);
+          if (!open) setSelectedPredictionId(null);
+        }}
+      />
     </DashboardLayout>
   );
 };
