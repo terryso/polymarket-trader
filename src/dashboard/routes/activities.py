@@ -128,6 +128,26 @@ def _format_time(dt: datetime | None) -> str:
     return dt.strftime("%H:%M")
 
 
+def _normalize_timestamp(dt: datetime | None) -> datetime:
+    """Normalize datetime to timezone-aware UTC for comparison.
+
+    Args:
+        dt: Datetime to normalize (can be naive or aware)
+
+    Returns:
+        Timezone-aware datetime in UTC, or epoch if None
+    """
+    if dt is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+    # If naive, assume UTC
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+
+    # Convert to UTC
+    return dt.astimezone(timezone.utc)
+
+
 @router.get(
     "",
     response_model=ApiResponse[ActivityListResponse],
@@ -221,8 +241,8 @@ async def get_activities(
     # For now, we'll add a simple system event if there are any activities
     # In a production system, we would track actual system events
     if len(activities) > 0:
-        # Get current time for system event
-        now = datetime.now()
+        # Get current time for system event (use UTC to be consistent)
+        now = datetime.now(timezone.utc)
         current_time = now.strftime("%H:%M")
         # Add system startup event based on the earliest activity
         activities.append(
@@ -236,10 +256,8 @@ async def get_activities(
             )
         )
 
-    # Sort by timestamp (most recent first), handling None values
-    # Use timezone-aware datetime.min to match potentially timezone-aware timestamps
-    datetime_min = datetime.min.replace(tzinfo=timezone.utc)
-    activities.sort(key=lambda x: x.timestamp or datetime_min, reverse=True)
+    # Sort by timestamp (most recent first), normalizing all to UTC
+    activities.sort(key=lambda x: _normalize_timestamp(x.timestamp), reverse=True)
 
     # Apply limit
     total = len(activities)
