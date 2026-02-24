@@ -141,6 +141,6 @@ development_status:
   10-2-exit-strategy-config: review
   10-3-exit-condition-checker: done
   10-4-exit-strategy-scheduling: review
-  10-5-exit-notification-integration: backlog
+  10-5-exit-notification-integration: done
   10-6-dashboard-exit-strategy-management: backlog
   epic-10-retrospective: optional

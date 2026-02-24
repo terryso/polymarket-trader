@@ -6,6 +6,7 @@ formatted notifications to Telegram.
 Story 9.2: 通知消息发送
 Story 9.3: 交易事件通知集成
 Story 9.12: 消息队列与限流
+Story 10.5: 退出通知集成
 
 Usage:
     from src.notifications import TelegramNotifier
@@ -30,7 +31,7 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["TelegramNotifier"]
+__all__ = ["TelegramNotifier", "EXIT_REASON_MAP"]
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -50,6 +51,16 @@ if TYPE_CHECKING:
     from src.models.position import Position
     from src.models.prediction import PredictionResult
     from src.models.trade import Trade
+
+
+# Exit reason Chinese mapping (Story 10.5)
+EXIT_REASON_MAP = {
+    "take_profit": "止盈",
+    "stop_loss": "止损",
+    "time_exit": "时间退出",
+    "signal_exit": "信号反转",
+    "manual": "手动退出",
+}
 
 
 class TelegramNotifier:
@@ -426,7 +437,12 @@ class TelegramNotifier:
 
         # Escape special Markdown characters in title
         title = market.title or ""
-        title = title.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`").replace("[", "\\[")
+        title = (
+            title.replace("_", "\\_")
+            .replace("*", "\\*")
+            .replace("`", "\\`")
+            .replace("[", "\\[")
+        )
 
         lines = [
             "\U0001f9e0 *市场分析*",
@@ -447,7 +463,11 @@ class TelegramNotifier:
             lines.append("*关键假设:*")
             for assumption in prediction.key_assumptions[:3]:
                 # Escape special characters in assumptions
-                safe_assumption = assumption.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
+                safe_assumption = (
+                    assumption.replace("_", "\\_")
+                    .replace("*", "\\*")
+                    .replace("`", "\\`")
+                )
                 lines.append(f"- {safe_assumption}")
 
         return "\n".join(lines)
@@ -531,6 +551,93 @@ class TelegramNotifier:
             "\U0001f4ca *持仓平仓*",
             f"市场: {market.title}",
             f"方向: {position.outcome.value}",
+            f"份额: {position.shares:.2f}",
+            (
+                f"成本: ${position.initial_value:.2f}"
+                if position.initial_value
+                else "成本: N/A"
+            ),
+            (
+                f"收益: ${position.current_value:.2f}"
+                if position.current_value
+                else "收益: N/A"
+            ),
+            f"盈亏: {pnl_emoji} {pnl_sign}${pnl:.2f} ({pnl_sign}{pnl_pct:.1%})",
+            f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        ]
+
+        return "\n".join(lines)
+
+    # ========== Exit Notification Methods (Story 10.5) ==========
+
+    async def send_exit_notification(
+        self,
+        position: "Position",
+        market: "Market",
+        pnl: float,
+        pnl_pct: float,
+        exit_reason: str,
+    ) -> bool:
+        """Send an exit notification for a position.
+
+        Story 10.5: 退出通知集成
+
+        Args:
+            position: The exited position
+            market: The market for the position
+            pnl: Realized profit/loss in USD
+            pnl_pct: Profit/loss percentage
+            exit_reason: Reason for exit (take_profit, stop_loss, time_exit,
+                        signal_exit, manual)
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        message = self._format_exit_message(position, market, pnl, pnl_pct, exit_reason)
+
+        if self._queue:
+            return await self._queue.enqueue(
+                text=message,
+                priority=MessagePriority.NORMAL,
+                category=MessageCategory.TRADE,
+            )
+
+        return await self.send_message(message)
+
+    def _format_exit_message(
+        self,
+        position: "Position",
+        market: "Market",
+        pnl: float,
+        pnl_pct: float,
+        exit_reason: str,
+    ) -> str:
+        """Format an exit notification message.
+
+        Story 10.5: 退出通知集成
+
+        Args:
+            position: The exited position
+            market: The market for the position
+            pnl: Realized profit/loss in USD
+            pnl_pct: Profit/loss percentage
+            exit_reason: Reason for exit
+
+        Returns:
+            Formatted Markdown message
+        """
+        # Get localized exit reason
+        reason_display = EXIT_REASON_MAP.get(exit_reason, exit_reason)
+
+        # Choose emoji based on profit/loss
+        pnl_emoji = "\U0001f4c8" if pnl >= 0 else "\U0001f4c9"  # chart_up / chart_down
+        pnl_sign = "+" if pnl >= 0 else ""
+
+        lines = [
+            "\U0001f6aa *持仓退出*",  # door emoji
+            f"市场: {market.title}",
+            f"方向: {position.outcome.value}",
+            f"退出原因: {reason_display}",
             f"份额: {position.shares:.2f}",
             (
                 f"成本: ${position.initial_value:.2f}"

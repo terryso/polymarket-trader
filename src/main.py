@@ -36,11 +36,12 @@ from src.storage.database import close_db, init_db
 from src.utils.logger import get_logger, setup_logging
 
 if TYPE_CHECKING:
+    from uvicorn import Server
+
     from src.api.telegram import TelegramClient
     from src.core.alerting import AlertManager
     from src.core.scheduler import Scheduler
     from src.core.state import ThreadSafeState
-    from uvicorn import Server
 
 logger = get_logger(__name__)
 
@@ -109,11 +110,11 @@ class Application:
         logger.debug("Logging configured")
 
         # 2. Setup error handling and alerting
-        from src.core.alerting import AlertManager, AlertLevel, LogAlertChannel
+        from src.core.alerting import AlertLevel, AlertManager, LogAlertChannel
         from src.core.error_handler import (
+            setup_async_exception_handler,
             setup_error_handler,
             setup_global_exception_handler,
-            setup_async_exception_handler,
         )
 
         self.alert_manager = AlertManager(
@@ -212,6 +213,12 @@ class Application:
         logger.info("Running initial market analysis on startup...")
 
         try:
+            # Fetch active markets using Gamma API with pagination
+            # Use server-side deadline filtering to only get markets with
+            # enough time remaining. This is more efficient than fetching
+            # all and filtering locally
+            from datetime import datetime, timedelta, timezone
+
             from src.analysis.market_filter import MarketFilter
             from src.api.polymarket import PolymarketClient
             from src.core.circuit_breaker import CircuitBreaker
@@ -222,12 +229,6 @@ class Application:
             from src.trading.paper_trading import PaperTradingExecutor
             from src.trading.position_manager import PositionManager
             from src.trading.risk_control import RiskController
-
-            # Fetch active markets using Gamma API with pagination
-            # Use server-side deadline filtering to only get markets with
-            # enough time remaining. This is more efficient than fetching
-            # all and filtering locally
-            from datetime import datetime, timedelta, timezone
 
             client = PolymarketClient()
             min_deadline_hours = settings.market_filter.min_deadline_hours
@@ -379,7 +380,7 @@ class Application:
             logger.warning("Scheduler not initialized, skipping task registration")
             return
 
-        # APScheduler lacks type stubs, ignore import-untyped errors
+        # APScheduler lacks type stubs
         from apscheduler.triggers.cron import CronTrigger  # type: ignore
         from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
 
@@ -388,7 +389,6 @@ class Application:
         # Import task functions
         # Note: These imports are placed here to avoid circular imports
         # and to allow the tasks to be mocked in tests
-
         # Task 1: Analyze markets and execute trades periodically
         async def _analyze_and_trade_async() -> None:
             """Fetch, filter, analyze markets and execute trades.
@@ -396,6 +396,11 @@ class Application:
             Story 5.3: 交易决策流程
             """
             try:
+                # Fetch active markets using Gamma API with pagination
+                # Use server-side deadline filtering to only get markets
+                # with enough time remaining
+                from datetime import datetime, timedelta, timezone
+
                 from src.analysis.llm_analyzer import LLMAnalyzer
                 from src.analysis.market_filter import MarketFilter
                 from src.api.polymarket import PolymarketClient
@@ -407,11 +412,6 @@ class Application:
                 from src.trading.paper_trading import PaperTradingExecutor
                 from src.trading.position_manager import PositionManager
                 from src.trading.risk_control import RiskController
-
-                # Fetch active markets using Gamma API with pagination
-                # Use server-side deadline filtering to only get markets
-                # with enough time remaining
-                from datetime import datetime, timedelta, timezone
 
                 client = PolymarketClient()
                 min_deadline_hours = app_settings.market_filter.min_deadline_hours
@@ -622,15 +622,18 @@ class Application:
 
         # Task 7: Check exit strategies periodically
         # Story 10.4: 退出策略调度
+        # Story 10.5: 退出通知集成
         async def _check_exit_strategies_async() -> None:
             """定期检查并执行退出策略.
 
             Story 10.4: 退出策略调度
+            Story 10.5: 退出通知集成
 
             检查所有未平仓持仓，如果触发退出条件则执行卖出。
             """
             try:
                 from src.api.polymarket import PolymarketClient
+                from src.notifications.telegram_notifier import TelegramNotifier
                 from src.storage.repositories.market_repo import MarketRepository
                 from src.storage.repositories.position_repo import PositionRepository
                 from src.storage.repositories.trade_repo import TradeRepository
@@ -653,6 +656,17 @@ class Application:
                     state=self.state,
                 )
                 exit_checker = ExitChecker()
+
+                # 初始化 Telegram 通知器 (Story 10.5)
+                notifier: TelegramNotifier | None = None
+                if (
+                    self.telegram_client
+                    and self.telegram_client.is_enabled
+                    and settings.telegram.enabled
+                ):
+                    notifier = TelegramNotifier(self.telegram_client, use_queue=True)
+                    await notifier.start()
+                    logger.debug("Exit strategy: Telegram notifier initialized")
 
                 # 获取所有未平仓持仓
                 open_positions = await position_manager.get_open_positions()
@@ -723,6 +737,27 @@ class Application:
                                         f"💰 Exit executed: position {position.id}, "
                                         f"realized_pnl=${sell_result.realized_pnl:.2f}"
                                     )
+
+                                    # Story 10.5: 发送退出成功通知
+                                    if notifier and result.pnl_pct is not None:
+                                        try:
+                                            await notifier.send_exit_notification(
+                                                position=position,
+                                                market=market,
+                                                pnl=sell_result.realized_pnl,
+                                                pnl_pct=result.pnl_pct,
+                                                exit_reason=result.reason,
+                                            )
+                                            logger.debug(
+                                                f"Exit notification sent for "
+                                                f"position {position.id}"
+                                            )
+                                        except Exception as notify_error:
+                                            # 通知发送失败不影响主流程
+                                            logger.warning(
+                                                f"Failed to send exit notification: "
+                                                f"{notify_error}"
+                                            )
                                 else:
                                     fail_count += 1
                                     logger.error(
@@ -734,6 +769,23 @@ class Application:
                                         self.alert_manager.record_failure(
                                             f"exit_strategy:{position.id}"
                                         )
+
+                                    # Story 10.5: 发送退出失败通知
+                                    if notifier:
+                                        try:
+                                            error_msg = (
+                                                f"Exit failed for {market.title} "
+                                                f"(position {position.id}): "
+                                                f"{sell_result.error_message}"
+                                            )
+                                            await notifier.send_error_notification(
+                                                error_msg
+                                            )
+                                        except Exception as notify_error:
+                                            logger.warning(
+                                                f"Failed to send exit error "
+                                                f"notification: {notify_error}"
+                                            )
                             else:
                                 # Paper 模式下只记录日志
                                 exit_count += 1
@@ -763,6 +815,10 @@ class Application:
                 # 如果有任何成功的退出，重置失败计数
                 if exit_count > 0 and self.alert_manager:
                     self.alert_manager.reset_failures("exit_strategy")
+
+                # Story 10.5: 停止通知器
+                if notifier:
+                    await notifier.stop()
 
             except Exception as e:
                 logger.error(f"❌ Exit strategy check task failed: {e}")
