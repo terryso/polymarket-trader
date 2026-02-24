@@ -148,7 +148,9 @@ class Application:
                     "trading may be disabled for safety"
                 )
         else:
-            logger.warning("State manager initialized with fresh state (recovery failed)")
+            logger.warning(
+                "State manager initialized with fresh state (recovery failed)"
+            )
 
         # 4. Initialize scheduler
         from src.core.scheduler import Scheduler
@@ -222,13 +224,16 @@ class Application:
             from src.trading.risk_control import RiskController
 
             # Fetch active markets using Gamma API with pagination
-            # Use server-side deadline filtering to only get markets with enough time remaining
-            # This is more efficient than fetching all and filtering locally
+            # Use server-side deadline filtering to only get markets with
+            # enough time remaining. This is more efficient than fetching
+            # all and filtering locally
             from datetime import datetime, timedelta, timezone
 
             client = PolymarketClient()
             min_deadline_hours = settings.market_filter.min_deadline_hours
-            end_date_min = datetime.now(timezone.utc) + timedelta(hours=min_deadline_hours)
+            end_date_min = datetime.now(timezone.utc) + timedelta(
+                hours=min_deadline_hours
+            )
 
             gamma_markets = client.get_all_active_markets(
                 total_limit=200,
@@ -237,7 +242,9 @@ class Application:
                 ascending=False,
                 end_date_min=end_date_min,  # Server-side deadline filter
             )
-            logger.info(f"Fetched {len(gamma_markets)} active markets for initial analysis")
+            logger.info(
+                f"Fetched {len(gamma_markets)} active markets for initial analysis"
+            )
 
             if not gamma_markets:
                 logger.info("No markets found, skipping initial analysis")
@@ -273,6 +280,7 @@ class Application:
 
             # Initialize LLM analyzer lazily to avoid import issues
             from src.analysis.llm_analyzer import LLMAnalyzer
+
             llm_analyzer = LLMAnalyzer()
 
             # Create position manager first
@@ -316,7 +324,7 @@ class Application:
 
             for market in filtered_markets:
                 try:
-                    # Save market to database first (required for foreign key constraint)
+                    # Save market to database first (required for FK constraint)
                     await market_repo.save_market(market)
 
                     # Process market through complete trading flow
@@ -365,14 +373,15 @@ class Application:
         - Validate predictions (cron-based)
         - Reset daily state (cron-based)
         - Persist state (interval-based)
+        - Check exit strategies (interval-based) - Story 10.4
         """
         if not self.scheduler:
             logger.warning("Scheduler not initialized, skipping task registration")
             return
 
         # APScheduler lacks type stubs, ignore import-untyped errors
-        from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
-        from apscheduler.triggers.interval import IntervalTrigger  # type: ignore[import-untyped]
+        from apscheduler.triggers.cron import CronTrigger  # type: ignore
+        from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
 
         from src.config import settings as app_settings
 
@@ -400,12 +409,15 @@ class Application:
                 from src.trading.risk_control import RiskController
 
                 # Fetch active markets using Gamma API with pagination
-                # Use server-side deadline filtering to only get markets with enough time remaining
+                # Use server-side deadline filtering to only get markets
+                # with enough time remaining
                 from datetime import datetime, timedelta, timezone
 
                 client = PolymarketClient()
                 min_deadline_hours = app_settings.market_filter.min_deadline_hours
-                end_date_min = datetime.now(timezone.utc) + timedelta(hours=min_deadline_hours)
+                end_date_min = datetime.now(timezone.utc) + timedelta(
+                    hours=min_deadline_hours
+                )
 
                 gamma_markets = client.get_all_active_markets(
                     total_limit=200,
@@ -425,9 +437,7 @@ class Application:
                 filter_result = market_filter.filter_markets(markets)
                 filtered_markets = filter_result.markets
 
-                logger.info(
-                    f"Filtered: {len(filtered_markets)}/{len(markets)} markets"
-                )
+                logger.info(f"Filtered: {len(filtered_markets)}/{len(markets)} markets")
 
                 if not filtered_markets:
                     return
@@ -491,7 +501,9 @@ class Application:
 
         self.scheduler.add_job(
             analyze_and_trade_task,
-            IntervalTrigger(hours=app_settings.task_schedule.fetch_markets_interval_hours),
+            IntervalTrigger(
+                hours=app_settings.task_schedule.fetch_markets_interval_hours
+            ),
             id="analyze_and_trade",
             name="Analyze Markets & Trade",
         )
@@ -511,7 +523,9 @@ class Application:
 
         self.scheduler.add_job(
             check_positions_task,
-            IntervalTrigger(seconds=app_settings.task_schedule.check_positions_interval_seconds),
+            IntervalTrigger(
+                seconds=app_settings.task_schedule.check_positions_interval_seconds
+            ),
             id="check_positions",
             name="Check Positions",
         )
@@ -531,7 +545,9 @@ class Application:
 
         self.scheduler.add_job(
             daily_statistics_task,
-            CronTrigger(hour=app_settings.task_schedule.daily_statistics_hour, minute=0),
+            CronTrigger(
+                hour=app_settings.task_schedule.daily_statistics_hour, minute=0
+            ),
             id="daily_statistics",
             name="Daily Statistics",
         )
@@ -551,7 +567,9 @@ class Application:
 
         self.scheduler.add_job(
             validate_predictions_task,
-            CronTrigger(hour=app_settings.task_schedule.validate_predictions_hour, minute=0),
+            CronTrigger(
+                hour=app_settings.task_schedule.validate_predictions_hour, minute=0
+            ),
             id="validate_predictions",
             name="Validate Predictions",
         )
@@ -572,7 +590,9 @@ class Application:
 
         self.scheduler.add_job(
             reset_daily_state_task,
-            CronTrigger(hour=app_settings.task_schedule.reset_daily_state_hour, minute=0),
+            CronTrigger(
+                hour=app_settings.task_schedule.reset_daily_state_hour, minute=0
+            ),
             id="reset_daily_state",
             name="Reset Daily State",
         )
@@ -593,10 +613,176 @@ class Application:
 
         self.scheduler.add_job(
             persist_state_task,
-            IntervalTrigger(minutes=app_settings.task_schedule.state_persist_interval_minutes),
+            IntervalTrigger(
+                minutes=app_settings.task_schedule.state_persist_interval_minutes
+            ),
             id="persist_state",
             name="Persist State",
         )
+
+        # Task 7: Check exit strategies periodically
+        # Story 10.4: 退出策略调度
+        async def _check_exit_strategies_async() -> None:
+            """定期检查并执行退出策略.
+
+            Story 10.4: 退出策略调度
+
+            检查所有未平仓持仓，如果触发退出条件则执行卖出。
+            """
+            try:
+                from src.api.polymarket import PolymarketClient
+                from src.storage.repositories.market_repo import MarketRepository
+                from src.storage.repositories.position_repo import PositionRepository
+                from src.storage.repositories.trade_repo import TradeRepository
+                from src.trading.exit_checker import ExitChecker
+                from src.trading.live_trading import LiveTradingExecutor
+                from src.trading.position_manager import PositionManager
+
+                if not self.state:
+                    logger.warning(
+                        "State not initialized, skipping exit strategy check"
+                    )
+                    return
+
+                # 初始化组件
+                position_repo = PositionRepository()
+                market_repo = MarketRepository()
+                trade_repo = TradeRepository()
+                position_manager = PositionManager(
+                    repository=position_repo,
+                    state=self.state,
+                )
+                exit_checker = ExitChecker()
+
+                # 获取所有未平仓持仓
+                open_positions = await position_manager.get_open_positions()
+
+                if not open_positions:
+                    logger.debug("🔍 No open positions to check for exit")
+                    return
+
+                logger.info(
+                    f"🔍 Checking exit strategies for "
+                    f"{len(open_positions)} open positions"
+                )
+
+                # 统计变量
+                checked_count = 0
+                exit_count = 0
+                fail_count = 0
+
+                # 遍历检查每个持仓
+                for position in open_positions:
+                    try:
+                        checked_count += 1
+
+                        # 获取市场信息
+                        market = await market_repo.get_market(position.market_id)
+                        if not market:
+                            logger.warning(
+                                f"🔍 Market {position.market_id} not found "
+                                f"for position {position.id}"
+                            )
+                            continue
+
+                        # 检查退出条件
+                        result = await exit_checker.check_exit_conditions(
+                            position, market
+                        )
+
+                        if result.should_exit:
+                            pnl_pct_str = (
+                                f"{result.pnl_pct:.2%}"
+                                if result.pnl_pct is not None
+                                else "N/A"
+                            )
+                            logger.info(
+                                f"🔍 Exit triggered for position {position.id}: "
+                                f"reason={result.reason}, pnl_pct={pnl_pct_str}"
+                            )
+
+                            # 执行卖出 (仅 live 模式)
+                            if app_settings.trading_mode.lower() == "live":
+                                client = PolymarketClient()
+                                live_executor = LiveTradingExecutor(
+                                    client=client,
+                                    trade_repo=trade_repo,
+                                    position_manager=position_manager,
+                                    state=self.state,
+                                )
+
+                                sell_result = await live_executor.sell_position(
+                                    position=position,
+                                    market=market,
+                                    reason=result.reason,
+                                )
+
+                                if sell_result.success:
+                                    exit_count += 1
+                                    logger.info(
+                                        f"💰 Exit executed: position {position.id}, "
+                                        f"realized_pnl=${sell_result.realized_pnl:.2f}"
+                                    )
+                                else:
+                                    fail_count += 1
+                                    logger.error(
+                                        f"❌ Exit failed for position {position.id}: "
+                                        f"{sell_result.error_message}"
+                                    )
+                                    # 记录失败到 AlertManager
+                                    if self.alert_manager:
+                                        self.alert_manager.record_failure(
+                                            f"exit_strategy:{position.id}"
+                                        )
+                            else:
+                                # Paper 模式下只记录日志
+                                exit_count += 1
+                                logger.info(
+                                    f"📝 Paper mode: Would exit position {position.id} "
+                                    f"due to {result.reason}"
+                                )
+
+                    except Exception as e:
+                        fail_count += 1
+                        logger.error(
+                            f"❌ Failed to check/exit position {position.id}: {e}"
+                        )
+                        # 记录失败到 AlertManager
+                        if self.alert_manager:
+                            self.alert_manager.record_failure(
+                                f"exit_strategy:{position.id}"
+                            )
+                        # 继续处理其他持仓
+
+                # 记录摘要
+                logger.info(
+                    f"🔍 Exit strategy check complete: "
+                    f"checked={checked_count}, exited={exit_count}, failed={fail_count}"
+                )
+
+                # 如果有任何成功的退出，重置失败计数
+                if exit_count > 0 and self.alert_manager:
+                    self.alert_manager.reset_failures("exit_strategy")
+
+            except Exception as e:
+                logger.error(f"❌ Exit strategy check task failed: {e}")
+                # 记录整体任务失败
+                if self.alert_manager:
+                    self.alert_manager.record_failure("exit_strategy_task")
+
+        def check_exit_strategies_task() -> None:
+            """Sync wrapper for exit strategy check."""
+            asyncio.run(_check_exit_strategies_async())
+
+        self.scheduler.add_job(
+            check_exit_strategies_task,
+            IntervalTrigger(
+                minutes=app_settings.exit_strategy.exit_check_interval_minutes
+            ),
+            id="check_exit_strategies",
+            name="Check Exit Strategies",
+        )
+        logger.info("Exit strategy task registered")
 
         logger.info("All scheduled tasks registered")
 
@@ -817,13 +1003,19 @@ Examples:
         "--mode",
         choices=["paper", "live"],
         default=None,
-        help="Trading mode: paper (simulation) or live (real trading). Default: from TRADING_MODE env or paper",
+        help=(
+            "Trading mode: paper (simulation) or live (real trading). "
+            "Default: from TRADING_MODE env or paper"
+        ),
     )
     parser.add_argument(
         "--config",
         type=str,
         default=None,
-        help="Path to configuration file (.env format). Default: use .env in current directory",
+        help=(
+            "Path to configuration file (.env format). "
+            "Default: use .env in current directory"
+        ),
     )
     return parser.parse_args()
 

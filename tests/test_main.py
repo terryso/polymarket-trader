@@ -185,8 +185,8 @@ class TestApplicationRegisterScheduledTasks:
 
             await app.register_scheduled_tasks()
 
-            # Should have registered 6 tasks
-            assert mock_scheduler.add_job.call_count == 6
+            # Should have registered 7 tasks (including exit strategy task - Story 10.4)
+            assert mock_scheduler.add_job.call_count == 7
 
 
 class TestApplicationShutdown:
