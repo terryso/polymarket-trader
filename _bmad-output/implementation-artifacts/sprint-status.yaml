@@ -138,9 +138,9 @@ development_status:
   # Epic 10: 持仓退出策略 (NEW)
   epic-10: in-progress
   10-1-sell-executor: done
-  10-2-exit-strategy-config: review
+  10-2-exit-strategy-config: done
   10-3-exit-condition-checker: done
-  10-4-exit-strategy-scheduling: review
+  10-4-exit-strategy-scheduling: done
   10-5-exit-notification-integration: done
-  10-6-dashboard-exit-strategy-management: backlog
+  10-6-dashboard-exit-strategy-management: done
   epic-10-retrospective: optional

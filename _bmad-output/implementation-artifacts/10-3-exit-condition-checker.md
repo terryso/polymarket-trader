@@ -51,62 +51,62 @@ So that **在合适的时机自动触发卖出**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 ExitCheckResult 数据类 (AC: #3)
-  - [ ] 1.1 在 `src/trading/exit_checker.py` 创建文件
-  - [ ] 1.2 定义 `ExitCheckResult` dataclass
-  - [ ] 1.3 添加字段: should_exit, reason, priority, position_id, pnl_pct
-  - [ ] 1.4 添加 `ExitReason` 枚举定义
+- [x] Task 1: 创建 ExitCheckResult 数据类 (AC: #3)
+  - [x] 1.1 在 `src/trading/exit_checker.py` 创建文件
+  - [x] 1.2 定义 `ExitCheckResult` dataclass
+  - [x] 1.3 添加字段: should_exit, reason, priority, position_id, pnl_pct
+  - [x] 1.4 添加 `ExitReason` 枚举定义
 
-- [ ] Task 2: 实现 ExitChecker 类基础结构 (AC: #1, #2)
-  - [ ] 2.1 创建 `ExitChecker` 类
-  - [ ] 2.2 添加构造函数接收 `ExitStrategySettings` 配置
-  - [ ] 2.3 添加 logger 初始化
-  - [ ] 2.4 实现 `check_exit_conditions` 主方法签名
+- [x] Task 2: 实现 ExitChecker 类基础结构 (AC: #1, #2)
+  - [x] 2.1 创建 `ExitChecker` 类
+  - [x] 2.2 添加构造函数接收 `ExitStrategySettings` 配置
+  - [x] 2.3 添加 logger 初始化
+  - [x] 2.4 实现 `check_exit_conditions` 主方法签名
 
-- [ ] Task 3: 实现止盈检查方法 (AC: #2, #4)
-  - [ ] 3.1 实现 `_check_take_profit` 方法
-  - [ ] 3.2 计算 PnL 百分比
-  - [ ] 3.3 检查是否达到止盈阈值
-  - [ ] 3.4 返回 ExitCheckResult
+- [x] Task 3: 实现止盈检查方法 (AC: #2, #4)
+  - [x] 3.1 实现 `_check_take_profit` 方法
+  - [x] 3.2 计算 PnL 百分比
+  - [x] 3.3 检查是否达到止盈阈值
+  - [x] 3.4 返回 ExitCheckResult
 
-- [ ] Task 4: 实现止损检查方法 (AC: #2, #4)
-  - [ ] 4.1 实现 `_check_stop_loss` 方法
-  - [ ] 4.2 检查是否达到止损阈值
-  - [ ] 4.3 返回 ExitCheckResult
+- [x] Task 4: 实现止损检查方法 (AC: #2, #4)
+  - [x] 4.1 实现 `_check_stop_loss` 方法
+  - [x] 4.2 检查是否达到止损阈值
+  - [x] 4.3 返回 ExitCheckResult
 
-- [ ] Task 5: 实现时间退出检查方法 (AC: #2, #4)
-  - [ ] 5.1 实现 `_check_time_exit` 方法
-  - [ ] 5.2 计算持仓时间 (小时)
-  - [ ] 5.3 检查是否超过配置的时间阈值
-  - [ ] 5.4 返回 ExitCheckResult
+- [x] Task 5: 实现时间退出检查方法 (AC: #2, #4)
+  - [x] 5.1 实现 `_check_time_exit` 方法
+  - [x] 5.2 计算持仓时间 (小时)
+  - [x] 5.3 检查是否超过配置的时间阈值
+  - [x] 5.4 返回 ExitCheckResult
 
-- [ ] Task 6: 实现信号反转检查方法 (AC: #2)
-  - [ ] 6.1 实现 `_check_signal_exit` 方法
-  - [ ] 6.2 获取最新 LLM 预测结果
-  - [ ] 6.3 比较预测方向与持仓方向
-  - [ ] 6.4 返回 ExitCheckResult
+- [x] Task 6: 实现信号反转检查方法 (AC: #2)
+  - [x] 6.1 实现 `_check_signal_exit` 方法
+  - [x] 6.2 获取最新 LLM 预测结果
+  - [x] 6.3 比较预测方向与持仓方向
+  - [x] 6.4 返回 ExitCheckResult
 
-- [ ] Task 7: 实现主检查方法 (AC: #2, #5, #6)
-  - [ ] 7.1 实现 `check_exit_conditions` 完整逻辑
-  - [ ] 7.2 按优先级顺序调用各检查方法
-  - [ ] 7.3 返回最高优先级的退出信号
-  - [ ] 7.4 添加日志记录 (包含 🔍 emoji)
+- [x] Task 7: 实现主检查方法 (AC: #2, #5, #6)
+  - [x] 7.1 实现 `check_exit_conditions` 完整逻辑
+  - [x] 7.2 按优先级顺序调用各检查方法
+  - [x] 7.3 返回最高优先级的退出信号
+  - [x] 7.4 添加日志记录 (包含 🔍 emoji)
 
-- [ ] Task 8: 实现批量检查方法 (AC: #2)
-  - [ ] 8.1 实现 `check_all_positions` 方法
-  - [ ] 8.2 并行或顺序检查多个持仓
-  - [ ] 8.3 返回所有需要退出的持仓列表
-  - [ ] 8.4 记录批量检查统计日志
+- [x] Task 8: 实现批量检查方法 (AC: #2)
+  - [x] 8.1 实现 `check_all_positions` 方法
+  - [x] 8.2 并行或顺序检查多个持仓
+  - [x] 8.3 返回所有需要退出的持仓列表
+  - [x] 8.4 记录批量检查统计日志
 
-- [ ] Task 9: 添加单元测试 (AC: All)
-  - [ ] 9.1 测试 ExitCheckResult 数据类
-  - [ ] 9.2 测试止盈检查 (触发和未触发)
-  - [ ] 9.3 测试止损检查 (触发和未触发)
-  - [ ] 9.4 测试时间退出检查 (触发和未触发)
-  - [ ] 9.5 测试信号反转检查
-  - [ ] 9.6 测试优先级排序
-  - [ ] 9.7 测试批量检查
-  - [ ] 9.8 测试配置禁用时跳过检查
+- [x] Task 9: 添加单元测试 (AC: All)
+  - [x] 9.1 测试 ExitCheckResult 数据类
+  - [x] 9.2 测试止盈检查 (触发和未触发)
+  - [x] 9.3 测试止损检查 (触发和未触发)
+  - [x] 9.4 测试时间退出检查 (触发和未触发)
+  - [x] 9.5 测试信号反转检查
+  - [x] 9.6 测试优先级排序
+  - [x] 9.7 测试批量检查
+  - [x] 9.8 测试配置禁用时跳过检查
 
 ## Dev Notes
 

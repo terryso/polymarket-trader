@@ -43,45 +43,45 @@ So that **我可以在任何时候变现持有的 shares**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 扩展 TradeType 枚举 (AC: #3)
-  - [ ] 1.1 在 `src/models/trade.py` 添加 `SELL_YES` 和 `SELL_NO` 枚举值
-  - [ ] 1.2 更新 Trade 模型的 trade_type 字段验证
-  - [ ] 1.3 添加单元测试验证新枚举值
+- [x] Task 1: 扩展 TradeType 枚举 (AC: #3)
+  - [x] 1.1 在 `src/models/trade.py` 添加 `SELL_YES` 和 `SELL_NO` 枚举值
+  - [x] 1.2 更新 Trade 模型的 trade_type 字段验证
+  - [x] 1.3 添加单元测试验证新枚举值
 
-- [ ] Task 2: 创建 SellResult 数据类 (AC: #4)
-  - [ ] 2.1 在 `src/trading/live_trading.py` 创建 `SellResult` dataclass
-  - [ ] 2.2 定义字段: trade, position, realized_pnl, success, error_message
-  - [ ] 2.3 添加类型注解和文档字符串
+- [x] Task 2: 创建 SellResult 数据类 (AC: #4)
+  - [x] 2.1 在 `src/trading/live_trading.py` 创建 `SellResult` dataclass
+  - [x] 2.2 定义字段: trade, position, realized_pnl, success, error_message
+  - [x] 2.3 添加类型注解和文档字符串
 
-- [ ] Task 3: 实现 sell_position 方法 (AC: #1, #2, #5, #6)
-  - [ ] 3.1 在 `LiveTradingExecutor` 添加 `sell_position` 方法签名
-  - [ ] 3.2 实现参数验证 (position status, shares 有效性)
-  - [ ] 3.3 实现 token ID 获取逻辑 (根据 outcome 选择正确 token)
-  - [ ] 3.4 实现份额计算逻辑 (全部或部分)
-  - [ ] 3.5 调用 Polymarket CLOB API 下卖单
-  - [ ] 3.6 创建 SELL_YES/SELL_NO Trade 记录
-  - [ ] 3.7 更新 Position 状态 (CLOSED 或减少 shares)
-  - [ ] 3.8 更新 ThreadSafeState 资金
-  - [ ] 3.9 返回 SellResult
+- [x] Task 3: 实现 sell_position 方法 (AC: #1, #2, #5, #6)
+  - [x] 3.1 在 `LiveTradingExecutor` 添加 `sell_position` 方法签名
+  - [x] 3.2 实现参数验证 (position status, shares 有效性)
+  - [x] 3.3 实现 token ID 获取逻辑 (根据 outcome 选择正确 token)
+  - [x] 3.4 实现份额计算逻辑 (全部或部分)
+  - [x] 3.5 调用 Polymarket CLOB API 下卖单
+  - [x] 3.6 创建 SELL_YES/SELL_NO Trade 记录
+  - [x] 3.7 更新 Position 状态 (CLOSED 或减少 shares)
+  - [x] 3.8 更新 ThreadSafeState 资金
+  - [x] 3.9 返回 SellResult
 
-- [ ] Task 4: 实现部分卖出逻辑 (AC: #5)
-  - [ ] 4.1 检查 shares 参数是否小于 position.shares
-  - [ ] 4.2 部分卖出时更新 Position 的 shares 和 current_value
-  - [ ] 4.3 全部卖出时关闭 Position (status=CLOSED, closed_at=now)
-  - [ ] 4.4 更新 system_state 的 open_positions 计数
+- [x] Task 4: 实现部分卖出逻辑 (AC: #5)
+  - [x] 4.1 检查 shares 参数是否小于 position.shares
+  - [x] 4.2 部分卖出时更新 Position 的 shares 和 current_value
+  - [x] 4.3 全部卖出时关闭 Position (status=CLOSED, closed_at=now)
+  - [x] 4.4 更新 system_state 的 open_positions 计数
 
-- [ ] Task 5: 错误处理 (AC: #4)
-  - [ ] 5.1 处理 API 调用失败
-  - [ ] 5.2 处理 position 不存在或已关闭
-  - [ ] 5.3 处理 shares 超过持仓数量
-  - [ ] 5.4 返回带有 error_message 的 SellResult
+- [x] Task 5: 错误处理 (AC: #4)
+  - [x] 5.1 处理 API 调用失败
+  - [x] 5.2 处理 position 不存在或已关闭
+  - [x] 5.3 处理 shares 超过持仓数量
+  - [x] 5.4 返回带有 error_message 的 SellResult
 
-- [ ] Task 6: 添加单元测试 (AC: All)
-  - [ ] 6.1 测试 SELL_YES/SELL_NO 枚举值
-  - [ ] 6.2 测试全部卖出成功场景
-  - [ ] 6.3 测试部分卖出成功场景
-  - [ ] 6.4 测试卖出失败场景 (API 错误、无效参数等)
-  - [ ] 6.5 测试 Position 状态更新
+- [x] Task 6: 添加单元测试 (AC: All)
+  - [x] 6.1 测试 SELL_YES/SELL_NO 枚举值
+  - [x] 6.2 测试全部卖出成功场景
+  - [x] 6.3 测试部分卖出成功场景
+  - [x] 6.4 测试卖出失败场景 (API 错误、无效参数等)
+  - [x] 6.5 测试 Position 状态更新
 
 ## Dev Notes
 

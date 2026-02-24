@@ -56,46 +56,46 @@ So that **我能实时了解系统的退出操作和盈亏结果**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 扩展 TelegramNotifier (AC: #1, #2, #4, #5, #6)
-  - [ ] 1.1 添加 `send_exit_notification` 方法签名
-  - [ ] 1.2 添加 `_format_exit_message` 格式化方法
-  - [ ] 1.3 实现退出原因中文映射 (take_profit -> 止盈 等)
-  - [ ] 1.4 实现盈亏 emoji 和格式化 (盈利📈/亏损📉, +前缀)
-  - [ ] 1.5 使用 MessagePriority.NORMAL 和 MessageCategory.TRADE
-  - [ ] 1.6 更新 `src/notifications/__init__.py` (如需要)
+- [x] Task 1: 扩展 TelegramNotifier (AC: #1, #2, #4, #5, #6)
+  - [x] 1.1 添加 `send_exit_notification` 方法签名
+  - [x] 1.2 添加 `_format_exit_message` 格式化方法
+  - [x] 1.3 实现退出原因中文映射 (take_profit -> 止盈 等)
+  - [x] 1.4 实现盈亏 emoji 和格式化 (盈利📈/亏损📉, +前缀)
+  - [x] 1.5 使用 MessagePriority.NORMAL 和 MessageCategory.TRADE
+  - [x] 1.6 更新 `src/notifications/__init__.py` (如需要)
 
-- [ ] Task 2: 修改 ExitScheduler 构造函数 (AC: #3)
-  - [ ] 2.1 添加 `notifier: TelegramNotifier | None` 参数
-  - [ ] 2.2 存储 notifier 到实例变量
-  - [ ] 2.3 记录日志说明通知是否启用
-  - [ ] 2.4 保持向后兼容 (notifier 可选)
+- [x] Task 2: 修改 ExitScheduler 构造函数 (AC: #3)
+  - [x] 2.1 添加 `notifier: TelegramNotifier | None` 参数
+  - [x] 2.2 存储 notifier 到实例变量
+  - [x] 2.3 记录日志说明通知是否启用
+  - [x] 2.4 保持向后兼容 (notifier 可选)
 
-- [ ] Task 3: 实现退出成功通知 (AC: #3)
-  - [ ] 3.1 在退出成功后调用 `notifier.send_exit_notification()`
-  - [ ] 3.2 传递 position, market, pnl, pnl_pct, exit_reason 参数
-  - [ ] 3.3 处理通知发送失败 (不影响主流程)
-  - [ ] 3.4 记录通知发送状态日志
+- [x] Task 3: 实现退出成功通知 (AC: #3)
+  - [x] 3.1 在退出成功后调用 `notifier.send_exit_notification()`
+  - [x] 3.2 传递 position, market, pnl, pnl_pct, exit_reason 参数
+  - [x] 3.3 处理通知发送失败 (不影响主流程)
+  - [x] 3.4 记录通知发送状态日志
 
-- [ ] Task 4: 实现退出失败通知 (AC: #3)
-  - [ ] 4.1 在退出失败后调用 `notifier.send_error_notification()`
-  - [ ] 4.2 构造有意义的错误消息
-  - [ ] 4.3 处理通知发送失败 (不影响主流程)
+- [x] Task 4: 实现退出失败通知 (AC: #3)
+  - [x] 4.1 在退出失败后调用 `notifier.send_error_notification()`
+  - [x] 4.2 构造有意义的错误消息
+  - [x] 4.3 处理通知发送失败 (不影响主流程)
 
-- [ ] Task 5: 编写测试 (AC: All)
-  - [ ] 5.1 创建 `tests/test_notifications/test_exit_notification.py`
-  - [ ] 5.2 测试退出通知消息格式
-  - [ ] 5.3 测试不同退出原因的显示
-  - [ ] 5.4 测试盈亏格式化 (正数/负数)
-  - [ ] 5.5 测试 notifier 为 None 时行为
-  - [ ] 5.6 测试通知发送失败不影响主流程
-  - [ ] 5.7 扩展 `tests/test_trading/test_exit_scheduler.py` 添加通知集成测试
+- [x] Task 5: 编写测试 (AC: All)
+  - [x] 5.1 创建 `tests/test_notifications/test_exit_notification.py`
+  - [x] 5.2 测试退出通知消息格式
+  - [x] 5.3 测试不同退出原因的显示
+  - [x] 5.4 测试盈亏格式化 (正数/负数)
+  - [x] 5.5 测试 notifier 为 None 时行为
+  - [x] 5.6 测试通知发送失败不影响主流程
+  - [x] 5.7 扩展 `tests/test_trading/test_exit_scheduler.py` 添加通知集成测试
 
-- [ ] Task 6: 代码质量检查 (AC: All)
-  - [ ] 6.1 运行 `mypy src/notifications/telegram_notifier.py` 无错误
-  - [ ] 6.2 运行 `mypy src/trading/exit_scheduler.py` 无错误
-  - [ ] 6.3 运行 `black --check src/` 通过
-  - [ ] 6.4 运行 `isort --check src/` 通过
-  - [ ] 6.5 运行完整测试套件确保通过
+- [x] Task 6: 代码质量检查 (AC: All)
+  - [x] 6.1 运行 `mypy src/notifications/telegram_notifier.py` 无错误
+  - [x] 6.2 运行 `mypy src/trading/exit_scheduler.py` 无错误
+  - [x] 6.3 运行 `black --check src/` 通过
+  - [x] 6.4 运行 `isort --check src/` 通过
+  - [x] 6.5 运行完整测试套件确保通过
 
 ## Dev Notes
 

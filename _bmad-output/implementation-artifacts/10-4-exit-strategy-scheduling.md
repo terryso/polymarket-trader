@@ -1,6 +1,6 @@
 # Story 10.4: 退出策略调度
 
-Status: review
+Status: done
 
 ## Story
 

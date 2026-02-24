@@ -1,6 +1,6 @@
 # Story 10.2: 退出策略配置
 
-Status: review
+Status: done
 
 ## Story
 
