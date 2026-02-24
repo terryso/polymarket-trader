@@ -695,6 +695,7 @@ class TestRiskCheckFailureEnum:
             "low_edge",
             "no_trade_recommendation",
             "max_position_per_market",
+            "max_total_position",
             "max_open_markets",
             "trade_too_large",
             "trade_too_small",

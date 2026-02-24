@@ -111,6 +111,7 @@ class CircuitBreaker:
         capital_threshold: float | None = None,
         reduce_ratio_low_capital: float | None = None,
         initial_capital: float | None = None,
+        disable_circuit_breaker: bool | None = None,
     ) -> None:
         """Initialize circuit breaker.
 
@@ -122,6 +123,7 @@ class CircuitBreaker:
             capital_threshold: Override config value (for testing)
             reduce_ratio_low_capital: Override config value (for testing)
             initial_capital: Override config value (for testing)
+            disable_circuit_breaker: Override config value (for testing)
         """
         self._state = state
         self._consecutive_losses_limit = (
@@ -152,6 +154,11 @@ class CircuitBreaker:
         self._initial_capital = (
             initial_capital if initial_capital is not None else settings.initial_capital
         )
+        self._disable_circuit_breaker = (
+            disable_circuit_breaker
+            if disable_circuit_breaker is not None
+            else settings.risk.disable_circuit_breaker
+        )
         self._triggered_breakers: list[BreakerTrigger] = []
 
     async def check_trading_allowed(self) -> CircuitBreakerResult:
@@ -171,6 +178,16 @@ class CircuitBreaker:
         triggers: list[BreakerTrigger] = []
         position_ratio = 1.0
         allowed = True
+
+        # If circuit breaker is disabled, skip all checks
+        if self._disable_circuit_breaker:
+            logger.debug("Circuit breaker disabled, skipping all checks")
+            return CircuitBreakerResult(
+                allowed=True,
+                position_ratio=1.0,
+                reasons=[],
+                triggers=[],
+            )
 
         # Get current state
         state_snapshot = await self._state.get_state()

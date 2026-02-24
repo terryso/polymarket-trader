@@ -41,6 +41,8 @@ ENV_VARS_TO_CLEAR = [
     "MIN_CONFIDENCE",
     "MIN_EDGE",
     "MAX_OPEN_MARKETS",
+    "MAX_TOTAL_POSITION_RATIO",
+    "DISABLE_CIRCUIT_BREAKER",
     "MAX_CONCURRENT_TRADES",
     "DAILY_LOSS_LIMIT",
     "CONSECUTIVE_LOSSES_LIMIT",
@@ -88,8 +90,14 @@ def reset_settings_cache() -> Generator[None, None, None]:
 
     This ensures tests don't share cached settings from other tests
     that may have modified environment variables.
+    Also clears new environment variables that may have been set by integration tests.
     """
     from src.config import get_settings
+
+    # Clear any env vars that integration tests may have set
+    for key in ["DISABLE_CIRCUIT_BREAKER", "MAX_TOTAL_POSITION_RATIO"]:
+        if key in os.environ:
+            del os.environ[key]
 
     get_settings.cache_clear()
     yield

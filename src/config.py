@@ -314,6 +314,12 @@ class RiskControlSettings(BaseEnvSettings):
         le=1,
         description="Minimum edge (price gap) to trade (0-1)",
     )
+    # 是否禁用熔断器检查（只检查持仓比例和最大持仓数）
+    disable_circuit_breaker: bool = Field(
+        default=False,
+        alias="DISABLE_CIRCUIT_BREAKER",
+        description="Disable circuit breaker checks (daily loss, consecutive losses, capital threshold)",
+    )
 
     # 持仓限制
     max_position_per_market: float = Field(
@@ -322,6 +328,13 @@ class RiskControlSettings(BaseEnvSettings):
         ge=0,
         le=1,
         description="Maximum position ratio per market (0-1)",
+    )
+    max_total_position_ratio: float = Field(
+        default=0.80,
+        alias="MAX_TOTAL_POSITION_RATIO",
+        ge=0,
+        le=1,
+        description="Maximum total position ratio of capital (0-1)",
     )
     max_open_markets: int = Field(
         default=3,
@@ -426,11 +439,11 @@ class MarketFilterSettings(BaseEnvSettings):
         gt=0,
         description="Minimum market liquidity in USD",
     )
-    min_deadline_hours: int = Field(
-        default=1,
+    min_deadline_hours: float = Field(
+        default=1.0,
         alias="MIN_DEADLINE_HOURS",
         gt=0,
-        description="Minimum hours until market deadline",
+        description="Minimum hours until market deadline (supports 0.5 for 30 minutes)",
     )
     max_deadline_hours: int | None = Field(
         default=None,

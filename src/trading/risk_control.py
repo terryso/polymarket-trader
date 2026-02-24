@@ -45,6 +45,7 @@ class RiskCheckFailure(str, Enum):
     LOW_EDGE = "low_edge"
     NO_TRADE_RECOMMENDATION = "no_trade_recommendation"
     MAX_POSITION_PER_MARKET = "max_position_per_market"
+    MAX_TOTAL_POSITION = "max_total_position"
     MAX_OPEN_MARKETS = "max_open_markets"
     TRADE_TOO_LARGE = "trade_too_large"
     TRADE_TOO_SMALL = "trade_too_small"
@@ -106,6 +107,7 @@ class RiskController:
         min_confidence: float | None = None,
         min_edge: float | None = None,
         max_position_per_market: float | None = None,
+        max_total_position_ratio: float | None = None,
         max_open_markets: int | None = None,
         max_single_ratio: float | None = None,
         min_bet: float | None = None,
@@ -118,6 +120,7 @@ class RiskController:
             min_confidence: Override config value (for testing)
             min_edge: Override config value (for testing)
             max_position_per_market: Override config value (for testing)
+            max_total_position_ratio: Override config value (for testing)
             max_open_markets: Override config value (for testing)
             max_single_ratio: Override config value (for testing)
             min_bet: Override config value (for testing)
@@ -137,6 +140,11 @@ class RiskController:
             max_position_per_market
             if max_position_per_market is not None
             else settings.risk.max_position_per_market
+        )
+        self._max_total_position_ratio = (
+            max_total_position_ratio
+            if max_total_position_ratio is not None
+            else settings.risk.max_total_position_ratio
         )
         self._max_open_markets = (
             max_open_markets
@@ -158,6 +166,7 @@ class RiskController:
             f"min_confidence={self._min_confidence}, "
             f"min_edge={self._min_edge}, "
             f"max_position_per_market={self._max_position_per_market}, "
+            f"max_total_position_ratio={self._max_total_position_ratio}, "
             f"max_open_markets={self._max_open_markets}, "
             f"max_single_ratio={self._max_single_ratio}, "
             f"min_bet={self._min_bet}"
@@ -278,6 +287,18 @@ class RiskController:
                     f"{state_snapshot.open_positions_count} >= {self._max_open_markets}"
                 )
                 failures.append(RiskCheckFailure.MAX_OPEN_MARKETS)
+
+        # 7. Check total position ratio
+        total_position_value = self.get_total_position_value()
+        # Exclude current market's position if we're adding to it
+        total_position_value -= current_position
+        total_position_ratio = total_position_value / state_snapshot.current_capital
+        if total_position_ratio >= self._max_total_position_ratio:
+            reasons.append(
+                f"Total position ratio exceeded: "
+                f"{total_position_ratio:.2%} >= {self._max_total_position_ratio:.2%}"
+            )
+            failures.append(RiskCheckFailure.MAX_TOTAL_POSITION)
 
         # Early return if position limit checks failed
         if failures:

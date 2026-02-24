@@ -36,6 +36,7 @@ class TestCircuitBreaker:
             capital_threshold=100.0,
             reduce_ratio_low_capital=0.10,
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
 
     @pytest.mark.asyncio
@@ -163,6 +164,7 @@ class TestCircuitBreaker:
             capital_threshold=100.0,
             reduce_ratio_low_capital=0.10,
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
 
         # Simulate capital below $100
@@ -204,6 +206,7 @@ class TestCircuitBreaker:
             capital_threshold=100.0,
             reduce_ratio_low_capital=0.10,
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
 
         # Simulate consecutive losses
