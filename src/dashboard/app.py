@@ -422,6 +422,7 @@ def _register_routers(app: FastAPI) -> None:
         markets,
         positions,
         predictions,
+        settings,
         statistics,
         trades,
     )
@@ -439,6 +440,10 @@ def _register_routers(app: FastAPI) -> None:
     )
     app.include_router(
         activities.router, prefix="/api/activities", tags=["activities"]
+    )
+    # Story 10.6: Dashboard 退出策略管理
+    app.include_router(
+        settings.router, prefix="/api/settings", tags=["settings"]
     )
 
 

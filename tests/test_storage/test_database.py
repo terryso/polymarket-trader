@@ -312,7 +312,7 @@ class TestDatabaseSchema:
     async def test_trades_table_columns(
         self, initialized_db: "DatabaseManager"
     ) -> None:
-        """Test trades table has all required columns (Story 5.1, 5.6)."""
+        """Test trades table has all required columns (Story 5.1, 5.6, 10.6)."""
         expected_columns = {
             "id",
             "market_id",
@@ -325,6 +325,7 @@ class TestDatabaseSchema:
             "llm_prediction_id",
             "position_id",
             "polymarket_order_id",  # Story 5.6
+            "exit_type",  # Story 10.6
             "created_at",
         }
 

@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, Key, BarChart3, Download, FileText, ToggleLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ExitStrategySettings } from "@/components/settings/ExitStrategySettings";
 
 const SettingSection = ({
   icon,
@@ -98,6 +99,9 @@ const Settings = () => {
             <SettingRow label="LLM Key" value={settings?.llm_api_key ?? "-"} />
             <SettingRow label="Proxy Wallet" value={settings?.proxy_wallet ?? "-"} />
           </SettingSection>
+
+          {/* Story 10.6: 退出策略设置 */}
+          <ExitStrategySettings />
 
           <SettingSection icon={<BarChart3 className="h-4 w-4" />} title="交易设置">
             <SettingRow label="交易单位" value={`$${settings?.trade_unit ?? 0}`} />

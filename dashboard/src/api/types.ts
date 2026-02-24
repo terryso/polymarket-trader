@@ -181,6 +181,7 @@ export interface TradeListItem {
   price: number;
   shares: number | null;
   status: TradeStatus;
+  exit_type: string | null;
   created_at: string | null;
 }
 
@@ -195,6 +196,7 @@ export interface TradeResponse {
   status: TradeStatus;
   llm_prediction_id: number | null;
   position_id: number | null;
+  exit_type: string | null;
   created_at: string | null;
 }
 
@@ -302,4 +304,41 @@ export interface PositionSyncResult {
   total_fetched: number;
   last_sync_at: string;
   error: string | null;
+}
+
+// ============================================================================
+// Exit Strategy Types (Story 10.6)
+// ============================================================================
+
+export interface ExitStrategyConfig {
+  take_profit_enabled: boolean;
+  take_profit_pct: number;
+  stop_loss_enabled: boolean;
+  stop_loss_pct: number;
+  time_exit_enabled: boolean;
+  time_exit_hours: number;
+  signal_exit_enabled: boolean;
+  exit_check_interval_minutes: number;
+}
+
+export interface ExitStrategyConfigUpdate {
+  take_profit_enabled?: boolean;
+  take_profit_pct?: number;
+  stop_loss_enabled?: boolean;
+  stop_loss_pct?: number;
+  time_exit_enabled?: boolean;
+  time_exit_hours?: number;
+  signal_exit_enabled?: boolean;
+  exit_check_interval_minutes?: number;
+}
+
+export interface ManualExitResponse {
+  success: boolean;
+  position_id: number;
+  market_id: string;
+  shares_sold: number;
+  avg_price: number;
+  total_value: number;
+  realized_pnl: number | null;
+  exit_type: string;
 }

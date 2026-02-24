@@ -36,6 +36,8 @@ class TradeListItem(BaseModel):
     Contains trade fields for list display.
     Used in the trade list endpoint.
 
+    Story 10.6: Added exit_type field for displaying exit reason in trade history.
+
     Attributes:
         id: Trade unique identifier
         market_id: Reference to the market
@@ -45,6 +47,7 @@ class TradeListItem(BaseModel):
         price: Price per share
         shares: Number of shares traded
         status: Trade status
+        exit_type: Type of exit (take_profit, stop_loss, time_exit, signal_exit, manual, or None)
         created_at: Trade creation timestamp
 
     Example:
@@ -73,6 +76,7 @@ class TradeListItem(BaseModel):
     price: float = Field(..., ge=0, le=1, description="Price per share (0-1)")
     shares: float | None = Field(None, ge=0, description="Number of shares")
     status: TradeStatus = Field(..., description="Trade status")
+    exit_type: str | None = Field(None, description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)")
     created_at: datetime | None = Field(None, description="Creation timestamp")
 
     @field_serializer("created_at")
@@ -97,6 +101,8 @@ class TradeResponse(BaseModel):
     Contains all trade fields for detailed view.
     Used in the trade detail endpoint.
 
+    Story 10.6: Added exit_type field for displaying exit reason in trade history.
+
     Attributes:
         id: Trade unique identifier
         market_id: Reference to the market
@@ -108,6 +114,7 @@ class TradeResponse(BaseModel):
         status: Trade status
         llm_prediction_id: Reference to LLM prediction
         position_id: Reference to position
+        exit_type: Type of exit (take_profit, stop_loss, time_exit, signal_exit, manual, or None)
         created_at: Trade creation timestamp
 
     Example:
@@ -140,6 +147,7 @@ class TradeResponse(BaseModel):
     status: TradeStatus = Field(..., description="Trade status")
     llm_prediction_id: int | None = Field(None, description="LLM prediction reference")
     position_id: int | None = Field(None, description="Position reference")
+    exit_type: str | None = Field(None, description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)")
     created_at: datetime | None = Field(None, description="Creation timestamp")
 
     @field_serializer("created_at")

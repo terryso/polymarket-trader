@@ -117,6 +117,7 @@ async def list_trades(
             price=t.price,
             shares=t.shares,
             status=t.status,
+            exit_type=t.exit_type,
             created_at=t.created_at,
         )
         for t in paginated_trades
@@ -187,6 +188,7 @@ async def get_trade(
         status=trade.status,
         llm_prediction_id=trade.llm_prediction_id,
         position_id=trade.position_id,
+        exit_type=trade.exit_type,
         created_at=trade.created_at,
     )
 

@@ -5,10 +5,11 @@
  *
  * Story 7.6: 前端 API 集成
  * Story 5.7: 同步实际持仓
+ * Story 10.6: 手动退出持仓
  */
 
 import { get, post } from './client';
-import type { PositionListItem, PositionResponse, PositionSyncStatus, PositionSyncResult } from './types';
+import type { PositionListItem, PositionResponse, PositionSyncStatus, PositionSyncResult, ManualExitResponse } from './types';
 
 /**
  * Get list of open positions.
@@ -45,6 +46,17 @@ export async function syncPositions(): Promise<PositionSyncResult> {
 }
 
 /**
+ * Manually exit a position.
+ *
+ * Story 10.6: Dashboard 退出策略管理
+ *
+ * @param positionId - Position ID to exit
+ */
+export async function exitPosition(positionId: number): Promise<ManualExitResponse> {
+  return post<ManualExitResponse>(`/api/positions/${positionId}/exit`);
+}
+
+/**
  * Positions API object with all methods.
  */
 export const positionsApi = {
@@ -52,4 +64,5 @@ export const positionsApi = {
   getById: fetchPosition,
   getSyncStatus: fetchPositionSyncStatus,
   sync: syncPositions,
+  exit: exitPosition,
 };

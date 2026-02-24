@@ -1,3 +1,13 @@
+/**
+ * Positions Page.
+ *
+ * Displays list of open positions with exit functionality.
+ *
+ * Story 7.6: 前端 API 集成
+ * Story 5.7: 同步实际持仓
+ * Story 10.6: Dashboard 退出策略管理 - 手动退出按钮
+ */
+
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -7,7 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Wallet, AlertCircle, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Wallet, AlertCircle, RefreshCw, CheckCircle2, XCircle, LogOut, Clock } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,13 +28,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { positionsApi } from "@/api/positions";
-import type { PositionSyncStatus, PositionSyncResult } from "@/api/types";
+import type { PositionSyncStatus, PositionSyncResult, PositionListItem, ManualExitResponse } from "@/api/types";
+import { ConfirmExitDialog } from "@/components/positions/ConfirmExitDialog";
 
 const Positions = () => {
+  const { toast } = useToast();
   const { data: positions, isLoading, error } = usePositions();
   const [syncStatus, setSyncStatus] = useState<PositionSyncStatus | null>(null);
   const [syncResult, setSyncResult] = useState<PositionSyncResult | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Exit dialog state
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<PositionListItem | null>(null);
+  const [isExiting, setIsExiting] = useState(false);
+
   const queryClient = useQueryClient();
 
   // Fetch sync status on mount
@@ -107,6 +126,53 @@ const Positions = () => {
     }
   };
 
+  // Handle exit button click
+  const handleExitClick = (position: PositionListItem) => {
+    setSelectedPosition(position);
+    setExitDialogOpen(true);
+  };
+
+  // Handle exit confirmation
+  const handleExitConfirm = async () => {
+    if (!selectedPosition) return;
+
+    setIsExiting(true);
+
+    try {
+      const result: ManualExitResponse = await positionsApi.exit(selectedPosition.id);
+
+      if (result.success) {
+        toast({
+          title: "退出成功",
+          description: `已卖出 ${result.shares_sold.toFixed(2)} 份额，价值 $${result.total_value.toFixed(2)}${
+            result.realized_pnl !== null
+              ? `，盈亏 ${result.realized_pnl >= 0 ? '+' : ''}$${result.realized_pnl.toFixed(2)}`
+              : ''
+          }`,
+        });
+        // Refresh positions list
+        queryClient.invalidateQueries({ queryKey: ['positions'] });
+        queryClient.invalidateQueries({ queryKey: ['trades'] });
+      } else {
+        toast({
+          title: "退出失败",
+          description: "操作未能完成",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "退出失败",
+        description: err instanceof Error ? err.message : "发生未知错误",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExiting(false);
+      setExitDialogOpen(false);
+      setSelectedPosition(null);
+    }
+  };
+
   // Format sync time
   const formatSyncTime = (ts: string | null): string => {
     if (!ts) return "从未同步";
@@ -120,6 +186,29 @@ const Positions = () => {
       });
     } catch {
       return ts;
+    }
+  };
+
+  // Format holding duration
+  const formatHoldingDuration = (openedAt: string | null): string => {
+    if (!openedAt) return "-";
+    try {
+      const opened = new Date(openedAt);
+      const now = new Date();
+      const diffMs = now.getTime() - opened.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffDays > 0) {
+        return `${diffDays}天 ${diffHours % 24}小时`;
+      } else if (diffHours > 0) {
+        return `${diffHours}小时`;
+      } else {
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        return `${diffMinutes}分钟`;
+      }
+    } catch {
+      return "-";
     }
   };
 
@@ -211,43 +300,65 @@ const Positions = () => {
 
         <div className="stat-card overflow-hidden p-0" data-testid="positions-table">
           {positions && positions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">市场 ID</TableHead>
-                  <TableHead className="text-muted-foreground">方向</TableHead>
-                  <TableHead className="text-muted-foreground text-right">份额</TableHead>
-                  <TableHead className="text-muted-foreground text-right">成本价</TableHead>
-                  <TableHead className="text-muted-foreground text-right">当前价值</TableHead>
-                  <TableHead className="text-muted-foreground text-right">PnL</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {positions.map((p) => (
-                  <TableRow key={p.id} className="border-border hover:bg-accent/50">
-                    <TableCell className="font-medium text-foreground">{p.market_id}</TableCell>
-                    <TableCell>
-                      <span className={p.outcome === "YES" ? "badge-profit" : "badge-loss"}>
-                        {p.outcome}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">{p.shares.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">${p.avg_price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${(p.current_value ?? p.shares * p.avg_price).toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-mono font-medium",
-                        (p.pnl ?? 0) >= 0 ? "profit-text" : "loss-text"
-                      )}
-                    >
-                      {(p.pnl ?? 0) >= 0 ? "+" : ""}${(p.pnl ?? 0).toFixed(2)}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground">市场 ID</TableHead>
+                    <TableHead className="text-muted-foreground">方向</TableHead>
+                    <TableHead className="text-muted-foreground text-right">份额</TableHead>
+                    <TableHead className="text-muted-foreground text-right">成本价</TableHead>
+                    <TableHead className="text-muted-foreground text-right">当前价值</TableHead>
+                    <TableHead className="text-muted-foreground text-right">PnL</TableHead>
+                    <TableHead className="text-muted-foreground text-right hidden md:table-cell">持有时间</TableHead>
+                    <TableHead className="text-muted-foreground text-center">操作</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {positions.map((p) => (
+                    <TableRow key={p.id} className="border-border hover:bg-accent/50">
+                      <TableCell className="font-medium text-foreground max-w-[150px] truncate">{p.market_id}</TableCell>
+                      <TableCell>
+                        <span className={p.outcome === "YES" ? "badge-profit" : "badge-loss"}>
+                          {p.outcome}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{p.shares.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono">${p.avg_price.toFixed(4)}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${(p.current_value ?? p.shares * p.avg_price).toFixed(2)}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-right font-mono font-medium",
+                          (p.pnl ?? 0) >= 0 ? "profit-text" : "loss-text"
+                        )}
+                      >
+                        {(p.pnl ?? 0) >= 0 ? "+" : ""}${(p.pnl ?? 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-muted-foreground hidden md:table-cell">
+                        <div className="flex items-center justify-end gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatHoldingDuration(p.opened_at)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleExitClick(p)}
+                          className="h-7 text-xs"
+                          data-testid={`exit-button-${p.id}`}
+                        >
+                          <LogOut className="h-3 w-3 mr-1" />
+                          退出
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <div className="p-8 text-center text-muted-foreground" data-testid="empty-state">
               暂无持仓数据
@@ -255,6 +366,15 @@ const Positions = () => {
           )}
         </div>
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      <ConfirmExitDialog
+        open={exitDialogOpen}
+        onOpenChange={setExitDialogOpen}
+        position={selectedPosition}
+        onConfirm={handleExitConfirm}
+        isLoading={isExiting}
+      />
     </DashboardLayout>
   );
 };

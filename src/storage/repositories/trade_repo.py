@@ -92,7 +92,7 @@ class TradeRepository:
                         UPDATE trades SET
                             market_id = ?, trade_type = ?, mode = ?, amount = ?,
                             price = ?, shares = ?, status = ?, llm_prediction_id = ?,
-                            position_id = ?, polymarket_order_id = ?, created_at = ?
+                            position_id = ?, polymarket_order_id = ?, exit_type = ?, created_at = ?
                         WHERE id = ?
                         """,
                         (
@@ -106,6 +106,7 @@ class TradeRepository:
                             trade.llm_prediction_id,
                             trade.position_id,
                             trade.polymarket_order_id,
+                            trade.exit_type,
                             trade.created_at.isoformat() if trade.created_at else None,
                             trade.id,
                         ),
@@ -117,8 +118,8 @@ class TradeRepository:
                         """
                         INSERT INTO trades (
                             market_id, trade_type, mode, amount, price, shares,
-                            status, llm_prediction_id, position_id, polymarket_order_id, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            status, llm_prediction_id, position_id, polymarket_order_id, exit_type, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             trade.market_id,
@@ -131,6 +132,7 @@ class TradeRepository:
                             trade.llm_prediction_id,
                             trade.position_id,
                             trade.polymarket_order_id,
+                            trade.exit_type,
                             trade.created_at.isoformat() if trade.created_at else None,
                         ),
                     )
@@ -438,6 +440,13 @@ class TradeRepository:
         except (KeyError, IndexError):
             pass
 
+        # Handle exit_type (may not exist in older rows)
+        exit_type = None
+        try:
+            exit_type = row["exit_type"]
+        except (KeyError, IndexError):
+            pass
+
         return Trade(
             id=row["id"],
             market_id=row["market_id"],
@@ -450,6 +459,7 @@ class TradeRepository:
             llm_prediction_id=row["llm_prediction_id"],
             position_id=row["position_id"],
             polymarket_order_id=polymarket_order_id,
+            exit_type=exit_type,
             created_at=created_at,
         )
 

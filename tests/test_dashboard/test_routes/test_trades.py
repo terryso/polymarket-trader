@@ -439,3 +439,136 @@ class TestGetTrade:
         assert response.status_code == 200
         assert data["data"]["llm_prediction_id"] is None
         assert data["data"]["position_id"] is None
+
+    # ==================== Story 10.6: 退出类型标签 ====================
+
+    def test_get_trade_includes_exit_type(
+        self,
+        client: TestClient,
+        mock_trade_repo: MagicMock,
+    ) -> None:
+        """Test get trade includes exit_type field (Story 10.6)."""
+        trade_with_exit = Trade(
+            id=7,
+            market_id="market-007",
+            trade_type=TradeType.SELL_YES,
+            mode=TradeMode.PAPER,
+            amount=100.0,
+            price=0.80,
+            shares=125.0,
+            status=TradeStatus.FILLED,
+            llm_prediction_id=None,
+            position_id=5,
+            exit_type="take_profit",  # Story 10.6: Exit type
+            created_at=datetime(2026, 2, 17, 10, 0, 0),
+        )
+        mock_trade_repo.get_by_id.return_value = trade_with_exit
+
+        response = client.get("/api/trades/7")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["data"]["exit_type"] == "take_profit"
+
+    def test_get_trade_exit_type_null_for_buy(
+        self,
+        client: TestClient,
+        mock_trade_repo: MagicMock,
+    ) -> None:
+        """Test get trade has null exit_type for buy trades (Story 10.6)."""
+        buy_trade = Trade(
+            id=8,
+            market_id="market-008",
+            trade_type=TradeType.BUY_YES,
+            mode=TradeMode.PAPER,
+            amount=50.0,
+            price=0.45,
+            shares=111.11,
+            status=TradeStatus.FILLED,
+            llm_prediction_id=15,
+            position_id=None,
+            exit_type=None,  # Buy trades don't have exit type
+            created_at=datetime(2026, 2, 17, 11, 0, 0),
+        )
+        mock_trade_repo.get_by_id.return_value = buy_trade
+
+        response = client.get("/api/trades/8")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["data"]["exit_type"] is None
+
+    def test_list_trades_includes_exit_type(
+        self,
+        client: TestClient,
+        mock_trade_repo: MagicMock,
+    ) -> None:
+        """Test list trades includes exit_type in response (Story 10.6)."""
+        trades_with_exit = [
+            Trade(
+                id=10,
+                market_id="market-010",
+                trade_type=TradeType.SELL_YES,
+                mode=TradeMode.PAPER,
+                amount=100.0,
+                price=0.80,
+                shares=125.0,
+                status=TradeStatus.FILLED,
+                exit_type="stop_loss",
+                created_at=datetime(2026, 2, 18, 10, 0, 0),
+            ),
+            Trade(
+                id=11,
+                market_id="market-011",
+                trade_type=TradeType.SELL_NO,
+                mode=TradeMode.PAPER,
+                amount=75.0,
+                price=0.30,
+                shares=250.0,
+                status=TradeStatus.FILLED,
+                exit_type="time_exit",
+                created_at=datetime(2026, 2, 18, 11, 0, 0),
+            ),
+        ]
+        mock_trade_repo.get_recent.return_value = trades_with_exit
+
+        response = client.get("/api/trades")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["data"][0]["exit_type"] == "stop_loss"
+        assert data["data"][1]["exit_type"] == "time_exit"
+
+    def test_list_trades_various_exit_types(
+        self,
+        client: TestClient,
+        mock_trade_repo: MagicMock,
+    ) -> None:
+        """Test list trades with various exit types (Story 10.6)."""
+        # Test all exit types defined in Story 10.6
+        exit_types = ["take_profit", "stop_loss", "time_exit", "signal_exit", "manual"]
+        trades = []
+        for i, exit_type in enumerate(exit_types):
+            trades.append(
+                Trade(
+                    id=20 + i,
+                    market_id=f"market-{20 + i}",
+                    trade_type=TradeType.SELL_YES,
+                    mode=TradeMode.PAPER,
+                    amount=50.0,
+                    price=0.50,
+                    shares=100.0,
+                    status=TradeStatus.FILLED,
+                    exit_type=exit_type,
+                    created_at=datetime(2026, 2, 19, 10 + i, 0, 0),
+                )
+            )
+        mock_trade_repo.get_recent.return_value = trades
+
+        response = client.get("/api/trades")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert len(data["data"]) == 5
+        for i, trade in enumerate(data["data"]):
+            assert trade["exit_type"] == exit_types[i]
