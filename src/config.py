@@ -423,6 +423,94 @@ class TelegramSettings(BaseEnvSettings):
         return self
 
 
+class ExitStrategySettings(BaseEnvSettings):
+    """Exit strategy configuration settings.
+
+    退出策略配置，包括止盈、止损、时间退出和信号反转退出。
+
+    Story 10.2: 退出策略配置
+
+    Attributes:
+        take_profit_enabled: 是否启用止盈
+        take_profit_pct: 止盈百分比阈值 (大于 0，如 0.50 = 50%)
+        stop_loss_enabled: 是否启用止损
+        stop_loss_pct: 止损百分比阈值 (小于 0，如 -0.30 = -30%)
+        time_exit_enabled: 是否启用时间退出
+        time_exit_hours: 时间退出小时数
+        signal_exit_enabled: 是否启用信号反转退出
+        exit_check_interval_minutes: 退出检查间隔 (分钟)
+
+    Example:
+        >>> from src.config import settings
+        >>> settings.exit_strategy.take_profit_enabled
+        True
+        >>> settings.exit_strategy.take_profit_pct
+        0.50
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # 止盈配置
+    take_profit_enabled: bool = Field(
+        default=True,
+        alias="TAKE_PROFIT_ENABLED",
+        description="Enable take profit exit strategy",
+    )
+    take_profit_pct: float = Field(
+        default=0.50,
+        alias="TAKE_PROFIT_PCT",
+        gt=0,
+        description="Take profit percentage threshold (e.g., 0.50 = 50% profit)",
+    )
+
+    # 止损配置
+    stop_loss_enabled: bool = Field(
+        default=True,
+        alias="STOP_LOSS_ENABLED",
+        description="Enable stop loss exit strategy",
+    )
+    stop_loss_pct: float = Field(
+        default=-0.30,
+        alias="STOP_LOSS_PCT",
+        lt=0,
+        ge=-1,
+        description="Stop loss percentage threshold (e.g., -0.30 = -30% loss)",
+    )
+
+    # 时间退出配置
+    time_exit_enabled: bool = Field(
+        default=False,
+        alias="TIME_EXIT_ENABLED",
+        description="Enable time-based exit strategy",
+    )
+    time_exit_hours: int = Field(
+        default=72,
+        alias="TIME_EXIT_HOURS",
+        gt=0,
+        description="Hours after which to exit position",
+    )
+
+    # 信号退出配置
+    signal_exit_enabled: bool = Field(
+        default=True,
+        alias="SIGNAL_EXIT_ENABLED",
+        description="Enable signal reversal exit (when LLM suggests opposite)",
+    )
+
+    # 退出检查间隔
+    exit_check_interval_minutes: int = Field(
+        default=5,
+        alias="EXIT_CHECK_INTERVAL_MINUTES",
+        gt=0,
+        description="Interval in minutes for checking exit conditions",
+    )
+
+
 class MarketFilterSettings(BaseEnvSettings):
     """Market filter parameters configuration."""
 
@@ -601,6 +689,7 @@ class Settings(BaseEnvSettings):
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     task_schedule: TaskScheduleSettings = Field(default_factory=TaskScheduleSettings)
     telegram: TelegramSettings = Field(default_factory=TelegramSettings)
+    exit_strategy: ExitStrategySettings = Field(default_factory=ExitStrategySettings)
 
     # Convenience properties for common settings
     @property

@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError as PydanticValidationError
 
 from src.config import (
+    ExitStrategySettings,
     LLMSettings,
     MarketFilterSettings,
     PolymarketSettings,
@@ -1002,3 +1003,153 @@ class TestSettingsTelegram:
             settings = Settings()
             assert settings.telegram.bot_token == "env_token"
             assert settings.telegram.chat_id == "987654321"
+
+
+class TestExitStrategySettings:
+    """Tests for ExitStrategySettings class.
+
+    Story 10.2: 退出策略配置
+    """
+
+    def test_default_values(self) -> None:
+        """Test default values are set correctly."""
+        # Clear Exit Strategy env vars to test defaults
+        for key in [
+            "TAKE_PROFIT_ENABLED",
+            "TAKE_PROFIT_PCT",
+            "STOP_LOSS_ENABLED",
+            "STOP_LOSS_PCT",
+            "TIME_EXIT_ENABLED",
+            "TIME_EXIT_HOURS",
+            "SIGNAL_EXIT_ENABLED",
+            "EXIT_CHECK_INTERVAL_MINUTES",
+        ]:
+            os.environ.pop(key, None)
+        settings = ExitStrategySettings()
+        # 止盈配置
+        assert settings.take_profit_enabled is True
+        assert settings.take_profit_pct == 0.50
+        # 止损配置
+        assert settings.stop_loss_enabled is True
+        assert settings.stop_loss_pct == -0.30
+        # 时间退出配置
+        assert settings.time_exit_enabled is False
+        assert settings.time_exit_hours == 72
+        # 信号退出配置
+        assert settings.signal_exit_enabled is True
+        # 退出检查间隔
+        assert settings.exit_check_interval_minutes == 5
+
+    def test_custom_values_via_env(self) -> None:
+        """Test custom values can be set via environment variables."""
+        with patch.dict(
+            os.environ,
+            {
+                "TAKE_PROFIT_ENABLED": "false",
+                "TAKE_PROFIT_PCT": "0.80",
+                "STOP_LOSS_ENABLED": "false",
+                "STOP_LOSS_PCT": "-0.50",
+                "TIME_EXIT_ENABLED": "true",
+                "TIME_EXIT_HOURS": "48",
+                "SIGNAL_EXIT_ENABLED": "false",
+                "EXIT_CHECK_INTERVAL_MINUTES": "10",
+            },
+        ):
+            settings = ExitStrategySettings()
+            assert settings.take_profit_enabled is False
+            assert settings.take_profit_pct == 0.80
+            assert settings.stop_loss_enabled is False
+            assert settings.stop_loss_pct == -0.50
+            assert settings.time_exit_enabled is True
+            assert settings.time_exit_hours == 48
+            assert settings.signal_exit_enabled is False
+            assert settings.exit_check_interval_minutes == 10
+
+    def test_take_profit_pct_must_be_positive(self) -> None:
+        """Test take_profit_pct rejects non-positive values."""
+        with patch.dict(os.environ, {"TAKE_PROFIT_PCT": "0"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+        with patch.dict(os.environ, {"TAKE_PROFIT_PCT": "-0.1"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+    def test_stop_loss_pct_must_be_negative(self) -> None:
+        """Test stop_loss_pct rejects non-negative values."""
+        with patch.dict(os.environ, {"STOP_LOSS_PCT": "0"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+        with patch.dict(os.environ, {"STOP_LOSS_PCT": "0.1"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+    def test_stop_loss_pct_cannot_be_below_minus_1(self) -> None:
+        """Test stop_loss_pct rejects values below -1."""
+        with patch.dict(os.environ, {"STOP_LOSS_PCT": "-1.5"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+    def test_stop_loss_pct_accepts_minus_1(self) -> None:
+        """Test stop_loss_pct accepts -1 (100% loss)."""
+        with patch.dict(os.environ, {"STOP_LOSS_PCT": "-1.0"}):
+            settings = ExitStrategySettings()
+            assert settings.stop_loss_pct == -1.0
+
+    def test_time_exit_hours_must_be_positive(self) -> None:
+        """Test time_exit_hours rejects non-positive values."""
+        with patch.dict(os.environ, {"TIME_EXIT_HOURS": "0"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+        with patch.dict(os.environ, {"TIME_EXIT_HOURS": "-1"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+    def test_exit_check_interval_must_be_positive(self) -> None:
+        """Test exit_check_interval_minutes rejects non-positive values."""
+        with patch.dict(os.environ, {"EXIT_CHECK_INTERVAL_MINUTES": "0"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+        with patch.dict(os.environ, {"EXIT_CHECK_INTERVAL_MINUTES": "-5"}):
+            with pytest.raises(PydanticValidationError):
+                ExitStrategySettings()
+
+
+class TestSettingsExitStrategy:
+    """Tests for Settings with ExitStrategySettings (Story 10.2)."""
+
+    def test_settings_contains_exit_strategy(self) -> None:
+        """Test Settings contains exit_strategy settings."""
+        settings = Settings()
+        assert hasattr(settings, "exit_strategy")
+        assert isinstance(settings.exit_strategy, ExitStrategySettings)
+
+    def test_settings_exit_strategy_defaults(self) -> None:
+        """Test Settings exit_strategy default values."""
+        settings = Settings()
+        assert settings.exit_strategy.take_profit_enabled is True
+        assert settings.exit_strategy.take_profit_pct == 0.50
+        assert settings.exit_strategy.stop_loss_enabled is True
+        assert settings.exit_strategy.stop_loss_pct == -0.30
+        assert settings.exit_strategy.time_exit_enabled is False
+        assert settings.exit_strategy.time_exit_hours == 72
+        assert settings.exit_strategy.signal_exit_enabled is True
+        assert settings.exit_strategy.exit_check_interval_minutes == 5
+
+    def test_settings_exit_strategy_env_override(self) -> None:
+        """Test Settings exit_strategy environment variable override."""
+        with patch.dict(
+            os.environ,
+            {
+                "TAKE_PROFIT_PCT": "1.0",
+                "STOP_LOSS_PCT": "-0.50",
+                "TIME_EXIT_ENABLED": "true",
+            },
+        ):
+            settings = Settings()
+            assert settings.exit_strategy.take_profit_pct == 1.0
+            assert settings.exit_strategy.stop_loss_pct == -0.50
+            assert settings.exit_strategy.time_exit_enabled is True
