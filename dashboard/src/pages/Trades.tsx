@@ -16,6 +16,7 @@ import {
 import { AlertCircle, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { tradesApi } from "@/api/trades";
 import type { TradeMode, SyncStatus, SyncResult } from "@/api/types";
+import { ExitTypeBadge } from "@/components/trades/ExitTypeBadge";
 
 type ModeFilter = "all" | "paper" | "live";
 type TypeFilter = "all" | "buy" | "sell";
@@ -281,6 +282,7 @@ const Trades = () => {
                     <TableHead className="text-muted-foreground text-right hidden md:table-cell">价格</TableHead>
                     <TableHead className="text-muted-foreground text-right hidden md:table-cell">份额</TableHead>
                     <TableHead className="text-muted-foreground text-center hidden sm:table-cell">状态</TableHead>
+                    <TableHead className="text-muted-foreground text-center hidden md:table-cell">退出类型</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -305,6 +307,9 @@ const Trades = () => {
                       </TableCell>
                       <TableCell className="text-center hidden sm:table-cell">
                         {t.status === "FILLED" ? "✅" : (t.status === "CANCELLED" || t.status === "FAILED") ? "❌" : "⏳"}
+                      </TableCell>
+                      <TableCell className="text-center hidden md:table-cell">
+                        <ExitTypeBadge exitType={t.exit_type} />
                       </TableCell>
                     </TableRow>
                   ))}

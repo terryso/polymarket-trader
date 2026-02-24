@@ -83,6 +83,8 @@ class Trade(BaseModel):
     Represents a trade record with all associated metadata.
     All fields align with the database schema in the trades table.
 
+    Story 10.6: Added exit_type field for tracking exit reason.
+
     Attributes:
         id: Unique trade identifier (auto-generated)
         market_id: Reference to the market
@@ -94,6 +96,7 @@ class Trade(BaseModel):
         status: Current trade status
         llm_prediction_id: Reference to LLM prediction (if any)
         position_id: Reference to position (if any)
+        exit_type: Type of exit (take_profit, stop_loss, time_exit, signal_exit, manual)
         created_at: Trade creation timestamp
 
     Example:
@@ -127,6 +130,9 @@ class Trade(BaseModel):
     position_id: int | None = Field(default=None, description="Position reference")
     polymarket_order_id: str | None = Field(
         default=None, description="Polymarket order ID (for synced trades)"
+    )
+    exit_type: str | None = Field(
+        default=None, description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)"
     )
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
 

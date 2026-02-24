@@ -4,12 +4,14 @@ This module provides REST API endpoints for position operations.
 
 Story 7.3: 持仓与交易 API
 Story 5.7: 同步实际持仓
+Story 10.6: Dashboard 退出策略管理 - 手动退出持仓
 
 Endpoints:
     GET /api/positions - Get list of open positions
     GET /api/positions/{position_id} - Get position details
     POST /api/positions/sync - Sync positions from Polymarket
     GET /api/positions/sync/status - Get sync status
+    POST /api/positions/{position_id}/exit - Manually exit a position
 
 Usage:
     from src.dashboard.routes.positions import router
@@ -21,12 +23,18 @@ from __future__ import annotations
 __all__ = ["router"]
 
 import logging
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.config import settings
 from src.models.api_response import ApiResponse, ErrorDetail, ErrorCode
+from src.models.position import PositionStatus
 from src.models.position_response import PositionListItem, PositionResponse
+from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.storage.repositories.position_repo import PositionRepository
+from src.storage.repositories.trade_repo import TradeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -248,4 +256,184 @@ async def sync_positions() -> ApiResponse[PositionSyncResultResponse]:
             success=False,
             data=response,
             error=ErrorDetail(code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"),
+        )
+
+
+# ==================== Story 10.6: 手动退出持仓 ====================
+
+
+class ManualExitResponse(BaseModel):
+    """Manual exit response model.
+
+    Attributes:
+        success: Whether the exit was successful
+        position_id: ID of the position
+        market_id: Market ID
+        shares_sold: Number of shares sold
+        avg_price: Average price at which shares were sold
+        total_value: Total value of the sale
+        realized_pnl: Realized profit/loss (optional)
+        exit_type: Type of exit (always "manual" for this endpoint)
+    """
+
+    success: bool
+    position_id: int
+    market_id: str
+    shares_sold: float
+    avg_price: float
+    total_value: float
+    realized_pnl: float | None = None
+    exit_type: str = "manual"
+
+
+def get_trade_repository() -> TradeRepository:
+    """Get TradeRepository instance.
+
+    Returns:
+        TradeRepository instance
+    """
+    return TradeRepository()
+
+
+@router.post(
+    "/{position_id}/exit",
+    response_model=ApiResponse[ManualExitResponse],
+    summary="Manually exit a position",
+    description="Sell all shares of a position at current market price. This is a simplified paper trading exit - for live trading, use the trading bot directly.",
+)
+async def manual_exit_position(
+    position_id: int,
+    position_repo: PositionRepository = Depends(get_position_repository),
+    trade_repo: TradeRepository = Depends(get_trade_repository),
+) -> ApiResponse[ManualExitResponse]:
+    """Manually exit a position.
+
+    This endpoint provides a simplified manual exit for paper trading mode.
+    It marks the position as closed and creates a sell trade record.
+
+    For live trading, the actual order execution should be handled by
+    the trading bot using LiveTradingExecutor.
+
+    Args:
+        position_id: Position ID to exit
+        position_repo: PositionRepository dependency
+        trade_repo: TradeRepository dependency
+
+    Returns:
+        Exit result with sale details
+
+    Raises:
+        HTTPException: If position not found (404) or not open (400)
+
+    Example:
+        >>> # POST /api/positions/1/exit
+        >>> # Response: {"success": true, "data": {...}}
+    """
+    logger.info(f"💰 Manual exit requested for position {position_id}")
+
+    # Get position
+    position = await position_repo.get_by_id(position_id)
+    if position is None:
+        logger.warning(f"💰 Position not found: {position_id}")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error": {
+                    "code": ErrorCode.NOT_FOUND,
+                    "message": f"Position not found: {position_id}",
+                },
+            },
+        )
+
+    # Check position status
+    if position.status != PositionStatus.OPEN:
+        logger.warning(f"💰 Position {position_id} is not open (status: {position.status})")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error": {
+                    "code": ErrorCode.VALIDATION_ERROR,
+                    "message": f"Position {position_id} is not open (status: {position.status.value})",
+                },
+            },
+        )
+
+    try:
+        # Calculate exit values
+        # Use current_value if available, otherwise use avg_price * shares
+        exit_price = position.avg_price  # Simplified: use avg_price as exit price
+        if position.current_value is not None and position.shares > 0:
+            exit_price = position.current_value / position.shares
+
+        total_value = position.shares * exit_price
+
+        # Calculate realized PnL
+        realized_pnl = None
+        if position.initial_value is not None:
+            realized_pnl = total_value - position.initial_value
+
+        # Determine trade type based on position outcome
+        from src.models.position import PositionOutcome
+        if position.outcome == PositionOutcome.YES:
+            trade_type = TradeType.SELL_YES
+        else:
+            trade_type = TradeType.SELL_NO
+
+        # Create sell trade record
+        trade = Trade(
+            id=0,
+            market_id=position.market_id,
+            trade_type=trade_type,
+            mode=TradeMode.PAPER,  # Manual exit via dashboard is always paper mode
+            amount=total_value,
+            price=exit_price,
+            shares=position.shares,
+            status=TradeStatus.FILLED,
+            position_id=position.id,
+            exit_type="manual",  # Story 10.6: Mark as manual exit
+        )
+        saved_trade = await trade_repo.save(trade)
+        logger.info(f"💰 Created sell trade: id={saved_trade.id}")
+
+        # Update position status to closed
+        position.status = PositionStatus.CLOSED
+        position.closed_at = datetime.now(timezone.utc)
+        position.current_value = total_value
+        position.pnl = realized_pnl if realized_pnl is not None else position.pnl
+        updated_position = await position_repo.update(position)
+        logger.info(f"💰 Position {position_id} marked as closed")
+
+        # Build response
+        response = ManualExitResponse(
+            success=True,
+            position_id=position_id,
+            market_id=position.market_id,
+            shares_sold=position.shares,
+            avg_price=exit_price,
+            total_value=total_value,
+            realized_pnl=realized_pnl,
+            exit_type="manual",
+        )
+
+        logger.info(
+            f"💰 Manual exit successful for position {position_id}: "
+            f"shares={position.shares:.2f}, value=${total_value:.2f}, "
+            f"pnl=${realized_pnl:.2f}" if realized_pnl is not None else ""
+        )
+
+        return ApiResponse(success=True, data=response, error=None)
+
+    except Exception as e:
+        logger.error(f"💰 Manual exit error for position {position_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error": {
+                    "code": ErrorCode.INTERNAL_ERROR,
+                    "message": str(e),
+                },
+            },
         )
