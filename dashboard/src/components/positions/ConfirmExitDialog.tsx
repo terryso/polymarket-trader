@@ -40,8 +40,9 @@ export function ConfirmExitDialog({
   // Calculate current value and PnL percentage
   const currentValue = position.current_value ?? position.shares * position.avg_price;
   const pnl = position.pnl ?? 0;
-  const pnlPct = position.pnl !== null && position.pnl !== undefined
-    ? ((position.pnl / (currentValue - position.pnl)) * 100)
+  const cost = currentValue - pnl;
+  const pnlPct = position.pnl !== null && position.pnl !== undefined && cost !== 0
+    ? ((position.pnl / cost) * 100)
     : 0;
 
   return (

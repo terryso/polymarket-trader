@@ -10,7 +10,7 @@
  * Story 10.6: Dashboard 退出策略管理
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,7 @@ export function ExitStrategySettings() {
   const [formState, setFormState] = useState<FormState | null>(null);
 
   // Initialize form state when config loads
-  useState(() => {
+  useEffect(() => {
     if (config && !formState) {
       setFormState({
         take_profit_enabled: config.take_profit_enabled,
@@ -58,7 +58,7 @@ export function ExitStrategySettings() {
         signal_exit_enabled: config.signal_exit_enabled,
       });
     }
-  });
+  }, [config, formState]);
 
   // Update mutation
   const mutation = useMutation({

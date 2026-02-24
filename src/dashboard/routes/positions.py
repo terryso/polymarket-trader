@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.config import settings
-from src.models.api_response import ApiResponse, ErrorDetail, ErrorCode
+from src.models.api_response import ApiResponse, ErrorCode, ErrorDetail
 from src.models.position import PositionStatus
 from src.models.position_response import PositionListItem, PositionResponse
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
@@ -255,7 +255,9 @@ async def sync_positions() -> ApiResponse[PositionSyncResultResponse]:
         return ApiResponse(
             success=False,
             data=response,
-            error=ErrorDetail(code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"),
+            error=ErrorDetail(
+                code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"
+            ),
         )
 
 
@@ -348,7 +350,9 @@ async def manual_exit_position(
 
     # Check position status
     if position.status != PositionStatus.OPEN:
-        logger.warning(f"💰 Position {position_id} is not open (status: {position.status})")
+        logger.warning(
+            f"💰 Position {position_id} is not open (status: {position.status})"
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -376,6 +380,7 @@ async def manual_exit_position(
 
         # Determine trade type based on position outcome
         from src.models.position import PositionOutcome
+
         if position.outcome == PositionOutcome.YES:
             trade_type = TradeType.SELL_YES
         else:
@@ -420,7 +425,9 @@ async def manual_exit_position(
         logger.info(
             f"💰 Manual exit successful for position {position_id}: "
             f"shares={position.shares:.2f}, value=${total_value:.2f}, "
-            f"pnl=${realized_pnl:.2f}" if realized_pnl is not None else ""
+            f"pnl=${realized_pnl:.2f}"
+            if realized_pnl is not None
+            else ""
         )
 
         return ApiResponse(success=True, data=response, error=None)

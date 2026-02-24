@@ -30,8 +30,8 @@ from pydantic import BaseModel
 
 from src.models.api_response import (
     ApiResponse,
-    ErrorDetail,
     ErrorCode,
+    ErrorDetail,
     PaginatedResponse,
     PaginationMeta,
 )
@@ -296,5 +296,7 @@ async def sync_trades() -> ApiResponse[SyncResultResponse]:
         return ApiResponse(
             success=False,
             data=response,
-            error=ErrorDetail(code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"),
+            error=ErrorDetail(
+                code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"
+            ),
         )
