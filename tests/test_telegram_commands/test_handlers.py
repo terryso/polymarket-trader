@@ -1598,7 +1598,7 @@ class TestHistoryFormatter:
                 "id": 2,
                 "market_id": "market-2",
                 "market_title": "BTC > $100k?",
-                "trade_type": TradeType.SELL,
+                "trade_type": TradeType.SELL_YES,
                 "mode": TradeMode.PAPER,
                 "amount": 8.0,
                 "price": 0.55,

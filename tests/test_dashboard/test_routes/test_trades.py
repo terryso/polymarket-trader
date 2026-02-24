@@ -421,7 +421,7 @@ class TestGetTrade:
         trade_no_refs = Trade(
             id=6,
             market_id="market-006",
-            trade_type=TradeType.SELL,
+            trade_type=TradeType.SELL_YES,
             mode=TradeMode.PAPER,
             amount=50.0,
             price=0.80,

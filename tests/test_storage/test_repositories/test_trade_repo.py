@@ -257,7 +257,7 @@ class TestTradeRepository:
                 id=1, market_id="market-a", trade_type="BUY_YES", amount=50.0
             ),
             self._create_mock_row(
-                id=2, market_id="market-a", trade_type="SELL", amount=20.0
+                id=2, market_id="market-a", trade_type="SELL_YES", amount=20.0
             ),
         ]
 
@@ -495,7 +495,8 @@ class TestTradeRepository:
         trade_types = [
             ("BUY_YES", TradeType.BUY_YES),
             ("BUY_NO", TradeType.BUY_NO),
-            ("SELL", TradeType.SELL),
+            ("SELL_YES", TradeType.SELL_YES),
+            ("SELL_NO", TradeType.SELL_NO),
         ]
 
         for trade_type_str, expected_type in trade_types:

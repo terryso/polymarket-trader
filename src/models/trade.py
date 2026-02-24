@@ -36,12 +36,14 @@ class TradeType(str, Enum):
     Attributes:
         BUY_YES: Buy YES outcome shares
         BUY_NO: Buy NO outcome shares
-        SELL: Sell existing shares
+        SELL_YES: Sell YES outcome shares
+        SELL_NO: Sell NO outcome shares
     """
 
     BUY_YES = "BUY_YES"
     BUY_NO = "BUY_NO"
-    SELL = "SELL"
+    SELL_YES = "SELL_YES"
+    SELL_NO = "SELL_NO"
 
 
 class TradeMode(str, Enum):

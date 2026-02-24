@@ -1,4 +1,4 @@
-# generated: 2026-02-19
+# generated: 2026-02-24
 # project: polymarket-trader
 # project_key: NOKEY
 # tracking_system: file-system
@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-19
+generated: 2026-02-24
 project: polymarket-trader
 project_key: NOKEY
 tracking_system: file-system
@@ -134,3 +134,13 @@ development_status:
   9-11-cmd-remote-control: done
   9-12-message-queue-rate-limiting: done
   epic-9-retrospective: optional
+
+  # Epic 10: 持仓退出策略 (NEW)
+  epic-10: in-progress
+  10-1-sell-executor: done
+  10-2-exit-strategy-config: backlog
+  10-3-exit-condition-checker: backlog
+  10-4-exit-strategy-scheduling: backlog
+  10-5-exit-notification-integration: backlog
+  10-6-dashboard-exit-strategy-management: backlog
+  epic-10-retrospective: optional

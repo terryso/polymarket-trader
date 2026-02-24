@@ -23,11 +23,12 @@ class TestTradeType:
         """Test all trade type values exist."""
         assert TradeType.BUY_YES.value == "BUY_YES"
         assert TradeType.BUY_NO.value == "BUY_NO"
-        assert TradeType.SELL.value == "SELL"
+        assert TradeType.SELL_YES.value == "SELL_YES"
+        assert TradeType.SELL_NO.value == "SELL_NO"
 
     def test_type_count(self) -> None:
         """Test total number of trade types."""
-        assert len(TradeType) == 3
+        assert len(TradeType) == 4
 
     def test_type_is_str_enum(self) -> None:
         """Test TradeType is string enum."""

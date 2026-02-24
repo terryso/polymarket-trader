@@ -71,6 +71,17 @@ This document provides the complete epic and story breakdown for Polymarket Trad
 | **AR11** | 日期时间格式：ISO 8601 | 架构决策 |
 | **AR12** | 数据库 Schema：markets, predictions, trades, positions, statistics, system_state 表 | 架构决策 |
 
+### Exit Strategy Requirements (Epic 10)
+
+| ID | 需求描述 | 优先级 |
+|----|----------|--------|
+| **ES1** | 系统能够在 Polymarket 上执行卖出操作，随时变现持有的 shares | P0 |
+| **ES2** | 止盈策略：盈利达到配置百分比时自动卖出锁定利润 | P0 |
+| **ES3** | 止损策略：亏损达到配置百分比时自动卖出控制损失 | P0 |
+| **ES4** | 时间退出策略：持仓超过配置时间后自动退出 | P1 |
+| **ES5** | 信号退出策略：LLM 重新分析给出相反建议时退出 | P1 |
+| **ES6** | 退出策略完全自动化运行，定期检查所有持仓 | P0 |
+
 ### FR Coverage Map
 
 | FR | Epic | 描述 |
@@ -1850,14 +1861,325 @@ Edge: 20%
 
 ---
 
+## Epic 10: 持仓退出策略
+
+**目标:** 实现根据盈利情况自动卖出持仓的功能，提高资金利用率。
+
+**用户价值:** 作为用户，我希望系统能够根据止盈/止损条件自动卖出持仓，以便在合适的时机锁定利润或控制损失，提高资金周转率。
+
+**背景:** 当前系统只实现了买入功能（BUY_YES/BUY_NO），持仓需要等到预测市场结算才能兑现。但 Polymarket 支持随时卖出持有的 shares，这允许：
+- 价格上涨时提前获利了结
+- 价格下跌时止损控制风险
+- 释放资金用于新的交易机会
+
+---
+
+### Story 10.1: 卖出执行器
+
+**As a** 用户,
+**I want** 系统能够在 Polymarket 上执行卖出操作,
+**So that** 我可以在任何时候变现持有的 shares.
+
+**Acceptance Criteria:**
+
+**Given** Epic 5 Paper Trading 已完成
+**When** 实现 `src/trading/live_trading.py` 扩展卖出功能
+**Then** 在 `LiveTradingExecutor` 添加方法:
+```python
+async def sell_position(
+    self,
+    position: Position,
+    market: Market,
+    shares: float | None = None,  # None = 全部卖出
+    reason: str = "manual",  # manual, take_profit, stop_loss, signal
+) -> SellResult:
+    """
+    卖出持仓
+
+    Args:
+        position: 要卖出的持仓
+        market: 持仓对应的市场
+        shares: 卖出份额 (None = 全部)
+        reason: 卖出原因
+
+    Returns:
+        SellResult 包含交易记录和盈亏
+    """
+```
+**And** 卖出执行流程:
+1. 获取当前市场价格 (YES/NO price)
+2. 计算卖出份额 (默认全部)
+3. 调用 Polymarket CLOB API 下卖单 (`side="SELL"`)
+4. 创建 Trade 记录 (trade_type=SELL_YES/SELL_NO)
+5. 更新 Position 状态和盈亏
+6. 更新 ThreadSafeState 资金
+7. 发送通知
+**And** 在 `src/models/trade.py` 添加交易类型:
+- `SELL_YES` - 卖出 YES shares
+- `SELL_NO` - 卖出 NO shares
+**And** 返回 `SellResult` 包含:
+- `trade: Trade` - 交易记录
+- `position: Position` - 更新后的持仓
+- `realized_pnl: float` - 已实现盈亏
+- `success: bool` - 是否成功
+- `error_message: str | None` - 错误信息
+
+---
+
+### Story 10.2: 退出策略配置
+
+**As a** 用户,
+**I want** 配置止盈、止损等退出策略参数,
+**So that** 系统能够根据我的风险偏好自动决定何时卖出.
+
+**Acceptance Criteria:**
+
+**Given** Epic 1 配置系统已完成
+**When** 扩展 `src/config.py` 添加退出策略配置
+**Then** 添加以下配置项:
+```python
+# 退出策略配置
+class ExitStrategyConfig:
+    # 止盈配置
+    TAKE_PROFIT_ENABLED: bool = True
+    TAKE_PROFIT_PCT: float = 0.50  # 盈利 50% 时止盈
+
+    # 止损配置
+    STOP_LOSS_ENABLED: bool = True
+    STOP_LOSS_PCT: float = -0.30  # 亏损 30% 时止损
+
+    # 时间退出配置
+    TIME_EXIT_ENABLED: bool = False
+    TIME_EXIT_HOURS: int = 72  # 持仓超过 72 小时自动退出
+
+    # 价格反转退出配置
+    SIGNAL_EXIT_ENABLED: bool = True
+    # 当 LLM 重新分析给出相反建议时退出
+
+    # 退出检查间隔
+    EXIT_CHECK_INTERVAL_MINUTES: int = 5
+```
+**And** 所有参数支持通过环境变量覆盖
+**And** 更新 `.env.example` 添加退出策略配置示例
+**And** 参数验证:
+- `TAKE_PROFIT_PCT` 必须大于 0
+- `STOP_LOSS_PCT` 必须小于 0
+- `TIME_EXIT_HOURS` 必须大于 0
+
+---
+
+### Story 10.3: 退出条件检查器
+
+**As a** 用户,
+**I want** 系统能够自动检查持仓是否满足退出条件,
+**So that** 在合适的时机自动触发卖出.
+
+**Acceptance Criteria:**
+
+**Given** 退出策略配置已实现
+**When** 实现 `src/trading/exit_checker.py`
+**Then** 创建 `ExitChecker` 类:
+```python
+class ExitChecker:
+    """检查持仓是否满足退出条件"""
+
+    async def check_exit_conditions(
+        self,
+        position: Position,
+        market: Market,
+    ) -> ExitCheckResult:
+        """
+        检查单个持仓是否应该退出
+
+        Returns:
+            ExitCheckResult 包含:
+            - should_exit: bool - 是否应该退出
+            - reason: str - 退出原因
+            - priority: int - 优先级 (止损 > 止盈 > 时间 > 信号)
+        """
+```
+**And** 实现以下检查方法:
+- `_check_take_profit(position, market)` - 检查止盈条件
+- `_check_stop_loss(position, market)` - 检查止损条件
+- `_check_time_exit(position)` - 检查时间退出条件
+- `_check_signal_exit(position, market)` - 检查信号反转条件
+**And** 退出条件计算:
+```python
+# PnL 百分比计算
+pnl_pct = (current_value - initial_value) / initial_value
+
+# 止盈触发
+if pnl_pct >= TAKE_PROFIT_PCT:
+    return ExitCheckResult(should_exit=True, reason="take_profit")
+
+# 止损触发
+if pnl_pct <= STOP_LOSS_PCT:
+    return ExitCheckResult(should_exit=True, reason="stop_loss")
+
+# 时间退出
+hours_held = (now - position.opened_at).total_seconds() / 3600
+if hours_held >= TIME_EXIT_HOURS:
+    return ExitCheckResult(should_exit=True, reason="time_exit")
+```
+**And** 支持批量检查所有持仓
+**And** 记录检查日志 (包含 emoji 🔍)
+
+---
+
+### Story 10.4: 退出策略调度
+
+**As a** 用户,
+**I want** 系统能够定期自动检查并执行退出策略,
+**So that** 退出策略完全自动化运行.
+
+**Acceptance Criteria:**
+
+**Given** 退出条件检查器已实现
+**When** 在 `src/core/scheduler.py` 添加退出检查任务
+**Then** 添加定时任务 `check_exit_strategies`:
+- 频率: 每 5 分钟 (可配置)
+- 任务流程:
+```python
+async def check_exit_strategies():
+    # 1. 获取所有未平仓位
+    positions = await position_manager.get_open_positions()
+
+    # 2. 对每个持仓检查退出条件
+    for position in positions:
+        market = await market_repo.get_market(position.market_id)
+
+        # 检查退出条件
+        result = await exit_checker.check_exit_conditions(position, market)
+
+        if result.should_exit:
+            # 执行卖出
+            await live_executor.sell_position(
+                position=position,
+                market=market,
+                reason=result.reason
+            )
+```
+**And** 任务失败处理:
+- 单个持仓退出失败不影响其他持仓
+- 记录失败日志并重试 (最多 3 次)
+- 连续失败触发告警
+**And** 在主入口 `src/main.py` 集成退出策略调度
+**And** 记录任务执行统计 (检查数、退出数、失败数)
+
+---
+
+### Story 10.5: 退出通知集成
+
+**As a** 用户,
+**I want** 在持仓自动退出时收到 Telegram 通知,
+**So that** 我能实时了解系统的退出操作和盈亏结果.
+
+**Acceptance Criteria:**
+
+**Given** Epic 9 Telegram 通知已实现
+**When** 在 `src/notifications/telegram_notifier.py` 添加退出通知
+**Then** 创建 `send_exit_notification` 方法:
+```python
+async def send_exit_notification(
+    self,
+    position: Position,
+    market: Market,
+    trade: Trade,
+    reason: str,
+    realized_pnl: float,
+) -> bool:
+    """
+    发送退出通知
+
+    Args:
+        position: 退出的持仓
+        market: 市场
+        trade: 卖出交易记录
+        reason: 退出原因
+        realized_pnl: 已实现盈亏
+    """
+```
+**And** 通知格式:
+```
+🔚 *持仓退出*
+市场: Will Trump win 2028?
+方向: SELL YES
+份额: 15.38 @ $0.75
+成本: $10.00 | 收入: $11.54
+盈亏: +$1.54 (+15.4%)
+原因: 止盈触发
+状态: ✅ 成功
+```
+**And** 在 `LiveTradingExecutor.sell_position` 中集成通知
+**And** 退出原因显示:
+- `take_profit` → "止盈触发"
+- `stop_loss` → "止损触发"
+- `time_exit` → "时间退出"
+- `signal_exit` → "信号反转"
+- `manual` → "手动退出"
+**And** 发送失败不阻断卖出流程
+
+---
+
+### Story 10.6: Dashboard 退出策略管理
+
+**As a** 用户,
+**I want** 在 Dashboard 上查看和配置退出策略,
+**So that** 我能够方便地调整退出参数和查看历史退出记录.
+
+**Acceptance Criteria:**
+
+**Given** Epic 7 Dashboard 已实现
+**When** 扩展 Dashboard 添加退出策略功能
+**Then** 在设置页面添加退出策略配置:
+- 止盈开关和百分比
+- 止损开关和百分比
+- 时间退出开关和小时数
+- 信号退出开关
+**And** 在持仓页面添加:
+- 每个持仓的当前 PnL 百分比
+- 距离止盈/止损的距离
+- "手动退出" 按钮 (调用卖出 API)
+**And** 添加后端 API:
+- `GET /api/settings/exit-strategy` - 获取退出策略配置
+- `PUT /api/settings/exit-strategy` - 更新退出策略配置
+- `POST /api/positions/{id}/exit` - 手动退出指定持仓
+**And** 在交易历史中标记退出类型 (止盈/止损/时间/信号/手动)
+
+---
+
+## Epic 10 总结
+
+### Story 优先级
+
+| Story | 描述 | 优先级 | 依赖 |
+|-------|------|--------|------|
+| 10.1 | 卖出执行器 | P0 | Epic 5 |
+| 10.2 | 退出策略配置 | P0 | Epic 1 |
+| 10.3 | 退出条件检查器 | P0 | 10.2 |
+| 10.4 | 退出策略调度 | P0 | 10.1, 10.3 |
+| 10.5 | 退出通知集成 | P1 | Epic 9, 10.1 |
+| 10.6 | Dashboard 退出策略管理 | P2 | Epic 7, 10.2 |
+
+### 退出策略类型
+
+| 策略 | 触发条件 | 优先级 | 说明 |
+|------|----------|--------|------|
+| 止损 | PnL <= -30% | 最高 | 控制损失 |
+| 止盈 | PnL >= +50% | 高 | 锁定利润 |
+| 时间退出 | 持仓 >= 72h | 中 | 资金周转 |
+| 信号退出 | LLM 建议反转 | 低 | 策略调整 |
+
+---
+
 ## Summary
 
 ### Statistics
 
 | Metric | Count |
 |--------|-------|
-| **Total Epics** | 9 |
-| **Total Stories** | 57 |
+| **Total Epics** | 10 |
+| **Total Stories** | 63 |
 | **FR Coverage** | 12/12 (100%) |
 | **NFR Coverage** | 10/10 (100%) |
 | **AR Coverage** | 12/12 (100%) |
@@ -1875,3 +2197,4 @@ Edge: 20%
 | Epic 7: Dashboard 后端 API 集成 | 8 | FR11, FR12, AR2, AR10 |
 | Epic 8: 系统调度与自动化运行 | 6 | NFR1, NFR2, NFR10, AR4 |
 | Epic 9: Telegram 通知与远程控制 | 12 | (新增功能) |
+| Epic 10: 持仓退出策略 | 6 | (新增功能) |

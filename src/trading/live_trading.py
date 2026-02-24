@@ -9,21 +9,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from src.config import settings
 from src.exceptions import TradingError, ValidationError
 from src.models.position import PositionOutcome
 from src.models.prediction import Recommendation
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.storage.repositories.trade_repo import TradeRepository
-from src.trading.paper_trading import PaperTradeResult
 from src.utils.logger import get_logger
 
 if TYPE_CHECKING:
-    from py_clob_client.clob_types import MarketOrderArgs
-
     from src.api.polymarket import PolymarketClient
     from src.core.state import ThreadSafeState
     from src.models.market import Market
+    from src.models.position import Position
     from src.models.prediction import PredictionResult
     from src.trading.position_manager import PositionManager
 
@@ -46,6 +43,27 @@ class LiveTradeResult:
     trade: Trade | None = None
     position: "Position | None" = None
     order_id: str | None = None
+    success: bool = True
+    error_message: str | None = None
+
+
+@dataclass
+class SellResult:
+    """Result of a sell position execution.
+
+    Story 10.1: 卖出执行器
+
+    Attributes:
+        trade: The executed sell trade record
+        position: The updated position after sell
+        realized_pnl: Realized profit/loss from this sale
+        success: Whether the sell was successful
+        error_message: Error message if sell failed
+    """
+
+    trade: Trade | None = None
+    position: "Position | None" = None
+    realized_pnl: float = 0.0
     success: bool = True
     error_message: str | None = None
 
@@ -144,7 +162,74 @@ class LiveTradingExecutor:
         Raises:
             ValidationError: If price not available
         """
-        if trade_type == TradeType.BUY_YES:
+        if trade_type in (TradeType.BUY_YES, TradeType.SELL_YES):
+            if market.yes_price is None:
+                raise ValidationError(f"Market {market.id} does not have YES price")
+            return market.yes_price
+        else:
+            if market.no_price is None:
+                raise ValidationError(f"Market {market.id} does not have NO price")
+            return market.no_price
+
+    def _get_sell_token_id(self, position: "Position", market: "Market") -> str:
+        """Get the token ID for selling a position.
+
+        Story 10.1: 卖出执行器
+
+        Args:
+            position: Position to sell
+            market: Market for the position
+
+        Returns:
+            Token ID for the outcome
+
+        Raises:
+            ValidationError: If token IDs not available
+        """
+        if not market.clob_token_ids or len(market.clob_token_ids) < 2:
+            raise ValidationError(
+                f"Market {market.id} does not have CLOB token IDs"
+            )
+
+        # Sell using the token corresponding to the position outcome
+        # clob_token_ids[0] = YES token, clob_token_ids[1] = NO token
+        if position.outcome == PositionOutcome.YES:
+            return market.clob_token_ids[0]
+        else:
+            return market.clob_token_ids[1]
+
+    def _get_sell_trade_type(self, position: "Position") -> TradeType:
+        """Determine trade type based on position outcome.
+
+        Story 10.1: 卖出执行器
+
+        Args:
+            position: Position to sell
+
+        Returns:
+            TradeType.SELL_YES or TradeType.SELL_NO
+        """
+        if position.outcome == PositionOutcome.YES:
+            return TradeType.SELL_YES
+        else:
+            return TradeType.SELL_NO
+
+    def _get_sell_price(self, position: "Position", market: "Market") -> float:
+        """Get the current sell price for a position.
+
+        Story 10.1: 卖出执行器
+
+        Args:
+            position: Position to sell
+            market: Market for the position
+
+        Returns:
+            Current sell price (0-1)
+
+        Raises:
+            ValidationError: If price not available
+        """
+        if position.outcome == PositionOutcome.YES:
             if market.yes_price is None:
                 raise ValidationError(f"Market {market.id} does not have YES price")
             return market.yes_price
@@ -314,6 +399,189 @@ class LiveTradingExecutor:
             self._logger.error(f"Unexpected error in live trade: {e}")
             return LiveTradeResult(
                 trade=None,
+                success=False,
+                error_message=f"Unexpected error: {e}",
+            )
+
+    async def sell_position(
+        self,
+        position: "Position",
+        market: "Market",
+        shares: float | None = None,
+        reason: str = "manual",
+    ) -> SellResult:
+        """Sell a position on Polymarket.
+
+        Story 10.1: 卖出执行器
+
+        Places a sell order on Polymarket CLOB and records the trade.
+        Supports both full and partial position sells.
+
+        Args:
+            position: Position to sell
+            market: Market for the position
+            shares: Number of shares to sell (None = sell all)
+            reason: Reason for sell (manual, take_profit, stop_loss, signal)
+
+        Returns:
+            SellResult with trade, position, and realized PnL
+
+        Example:
+            >>> result = await executor.sell_position(position, market)
+            >>> if result.success:
+            ...     print(f"Realized PnL: ${result.realized_pnl:.2f}")
+        """
+        from py_clob_client.clob_types import OrderArgs
+
+        try:
+            # 1. Validate position
+            if position.status != "OPEN":
+                return SellResult(
+                    trade=None,
+                    position=position,
+                    success=False,
+                    error_message=f"Position {position.id} is not open (status={position.status})",
+                )
+
+            # 2. Determine shares to sell
+            if shares is None:
+                shares_to_sell = position.shares  # Full sell
+            else:
+                if shares <= 0:
+                    return SellResult(
+                        trade=None,
+                        position=position,
+                        success=False,
+                        error_message=f"Invalid shares amount: {shares}",
+                    )
+                if shares > position.shares:
+                    return SellResult(
+                        trade=None,
+                        position=position,
+                        success=False,
+                        error_message=f"Cannot sell {shares} shares, position only has {position.shares}",
+                    )
+                shares_to_sell = shares
+
+            # 3. Get sell parameters
+            token_id = self._get_sell_token_id(position, market)
+            price = self._get_sell_price(position, market)
+            trade_type = self._get_sell_trade_type(position)
+
+            # Calculate proceeds
+            sell_proceeds = shares_to_sell * price
+
+            # Calculate realized PnL for this sale
+            # PnL = (sell_price - avg_price) * shares_sold
+            realized_pnl = (price - position.avg_price) * shares_to_sell
+
+            self._logger.info(
+                f"Placing sell order: {trade_type.value} {shares_to_sell:.4f} shares "
+                f"@ ${price:.4f} = ${sell_proceeds:.2f} (reason={reason})"
+            )
+
+            # 4. Place sell order on Polymarket
+            order_args = OrderArgs(
+                token_id=token_id,
+                price=price,
+                size=shares_to_sell,
+                side="SELL",
+            )
+
+            result = self._client._client.create_and_post_order(order_args)
+            self._logger.info(f"Sell order result: {result}")
+
+            # Extract order ID from result
+            if isinstance(result, dict):
+                order_id = result.get("orderID") or result.get("order_id") or result.get("id")
+                success = result.get("success", False)
+                if not success:
+                    error_msg = result.get("errorMsg", "Unknown error")
+                    raise TradingError(f"Sell order failed: {error_msg}")
+            elif isinstance(result, str):
+                order_id = result
+            else:
+                order_id = str(result)
+
+            self._logger.info(f"Sell order placed successfully: {order_id}")
+
+            # 5. Create Trade record
+            trade = Trade(
+                id=0,
+                market_id=position.market_id,
+                trade_type=trade_type,
+                mode=TradeMode.LIVE,
+                amount=sell_proceeds,
+                price=price,
+                shares=shares_to_sell,
+                status=TradeStatus.FILLED,
+                position_id=position.id,
+                polymarket_order_id=order_id,
+            )
+
+            # 6. Save trade
+            saved_trade = await self._trade_repo.save(trade)
+            self._logger.info(f"Sell trade saved: id={saved_trade.id}, order_id={order_id}")
+
+            # 7. Update or close position
+            is_full_sell = shares_to_sell >= position.shares
+
+            if is_full_sell:
+                # Close position completely
+                updated_position = await self._position_manager.close_position(
+                    position_id=position.id,
+                    final_price=price,
+                    market=market,
+                )
+                self._logger.info(
+                    f"Position closed: id={position.id}, realized_pnl=${realized_pnl:.2f}"
+                )
+            else:
+                # Partial sell - update position shares and value
+                remaining_shares = position.shares - shares_to_sell
+                remaining_value = remaining_shares * price
+
+                # Update position directly in repository
+                position.shares = remaining_shares
+                position.current_value = remaining_value
+                position.pnl = remaining_value - (remaining_shares * position.avg_price)
+
+                updated_position = await self._position_manager._repo.update(position)
+
+                self._logger.info(
+                    f"Position reduced: id={position.id}, "
+                    f"remaining_shares={remaining_shares:.4f}, "
+                    f"realized_pnl=${realized_pnl:.2f}"
+                )
+
+            # 8. Update state capital (add proceeds from sale)
+            await self._state.update_capital(sell_proceeds)
+
+            self._logger.info(
+                f"💰 Sell completed: trade_id={saved_trade.id}, "
+                f"proceeds=${sell_proceeds:.2f}, realized_pnl=${realized_pnl:.2f}"
+            )
+
+            return SellResult(
+                trade=saved_trade,
+                position=updated_position,
+                realized_pnl=realized_pnl,
+                success=True,
+            )
+
+        except (ValidationError, TradingError) as e:
+            self._logger.error(f"Sell position failed: {e}")
+            return SellResult(
+                trade=None,
+                position=position,
+                success=False,
+                error_message=str(e),
+            )
+        except Exception as e:
+            self._logger.error(f"Unexpected error in sell position: {e}")
+            return SellResult(
+                trade=None,
+                position=position,
                 success=False,
                 error_message=f"Unexpected error: {e}",
             )
