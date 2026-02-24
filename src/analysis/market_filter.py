@@ -256,7 +256,7 @@ class MarketFilter:
     def _hard_exclude_by_deadline(self, markets: list[Market]) -> list[Market]:
         """Hard exclude markets with deadline too close.
 
-        Markets with deadline < HARD_EXCLUDE_DEADLINE_HOURS are excluded immediately.
+        Markets with deadline < min_deadline_hours are excluded immediately.
 
         Args:
             markets: List of markets to filter
@@ -278,11 +278,11 @@ class MarketFilter:
             else:
                 time_remaining = market.deadline - now
                 hours_remaining = time_remaining.total_seconds() / 3600
-                if hours_remaining < self.HARD_EXCLUDE_DEADLINE_HOURS:
+                if hours_remaining < self._min_deadline_hours:
                     excluded_count += 1
                     logger.debug(
                         f"{OPERATION_EMOJIS['data']} ⚠️ Excluded (deadline < "
-                        f"{self.HARD_EXCLUDE_DEADLINE_HOURS} hours): {market.id}"
+                        f"{self._min_deadline_hours} hours): {market.id}"
                     )
                 else:
                     result.append(market)
@@ -290,7 +290,7 @@ class MarketFilter:
         if excluded_count > 0:
             logger.info(
                 f"{OPERATION_EMOJIS['data']} Hard excluded {excluded_count} "
-                f"markets by deadline (< {self.HARD_EXCLUDE_DEADLINE_HOURS} hours)"
+                f"markets by deadline (< {self._min_deadline_hours} hours)"
             )
 
         return result
@@ -376,7 +376,7 @@ class MarketFilter:
 
         Only markets with deadline <= max_deadline_hours pass.
         Markets with deadline > max_deadline_hours are filtered out.
-        If max_deadline_hours is None, all markets pass.
+        If max_deadline_hours is None or 0, all markets pass (no limit).
 
         Args:
             markets: List of markets to filter
@@ -384,8 +384,8 @@ class MarketFilter:
         Returns:
             List of markets passing max deadline filter
         """
-        # If no max deadline configured, pass all markets
-        if self._max_deadline_hours is None or not isinstance(self._max_deadline_hours, (int, float)):
+        # If no max deadline configured (None or 0), pass all markets
+        if self._max_deadline_hours is None or self._max_deadline_hours == 0:
             return markets
 
         result = []

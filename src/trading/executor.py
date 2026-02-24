@@ -190,30 +190,78 @@ class TradingExecutor:
             Prediction ID if saved successfully, None otherwise
         """
         try:
-            from src.models.prediction import Prediction
-            from src.storage.repositories.market_repo import MarketRepository
+            import json
 
-            # Ensure market exists in database before saving prediction
-            # This is required for the foreign key constraint
-            market_repo = MarketRepository()
-            existing_market = await market_repo.get_market(market.id)
-            if existing_market is None:
-                self._logger.warning(
-                    f"Market {market.id} not found in database, saving it first"
-                )
-                await market_repo.save_market(market)
+            from src.storage.database import get_connection
 
-            record = Prediction(
-                market_id=market.id,
-                predicted_probability=prediction.predicted_probability,
-                confidence=prediction.confidence,
-                reasoning=prediction.reasoning,
-                key_assumptions=prediction.key_assumptions,
-                model_used=getattr(prediction, "model_used", "unknown"),
-                recommendation=prediction.recommendation.value,
-                edge=prediction.edge,
+            # Serialize data outside of connection context
+            assumptions_json = (
+                json.dumps(prediction.key_assumptions)
+                if prediction.key_assumptions
+                else None
             )
-            prediction_id = await self._get_prediction_repo().save_prediction(record)
+            recommendation_str = (
+                prediction.recommendation.value if prediction.recommendation else None
+            )
+            deadline_str = market.deadline.isoformat() if market.deadline else None
+
+            # Use a single connection to ensure atomicity with foreign key constraints
+            async with get_connection() as conn:
+                # 1. Ensure market exists (required for foreign key constraint)
+                # Only insert if not exists to preserve existing market data
+                await conn.execute(
+                    """
+                    INSERT OR IGNORE INTO markets (id, title, category, liquidity, deadline)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        market.id,
+                        market.title,
+                        market.category or "Unknown",
+                        market.liquidity or 0.0,
+                        deadline_str,
+                    ),
+                )
+
+                # 2. Delete existing prediction for this market (upsert logic)
+                # First, set NULL for any trades referencing this prediction
+                # (trades.llm_prediction_id has FK to predictions.id without ON DELETE SET NULL)
+                await conn.execute(
+                    """
+                    UPDATE trades SET llm_prediction_id = NULL
+                    WHERE llm_prediction_id IN (
+                        SELECT id FROM predictions WHERE market_id = ?
+                    )
+                    """,
+                    (market.id,),
+                )
+                await conn.execute(
+                    "DELETE FROM predictions WHERE market_id = ?",
+                    (market.id,),
+                )
+
+                # 3. Insert new prediction
+                cursor = await conn.execute(
+                    """
+                    INSERT INTO predictions (
+                        market_id, predicted_probability, confidence,
+                        reasoning, key_assumptions, model_used, recommendation, edge
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        market.id,
+                        prediction.predicted_probability,
+                        prediction.confidence,
+                        prediction.reasoning,
+                        assumptions_json,
+                        getattr(prediction, "model_used", "unknown"),
+                        recommendation_str,
+                        prediction.edge,
+                    ),
+                )
+                prediction_id = cursor.lastrowid or 0
+                # Note: commit is handled by context manager
+
             self._logger.debug(f"Saved prediction {prediction_id} for market {market.id}")
             return prediction_id
         except Exception as e:

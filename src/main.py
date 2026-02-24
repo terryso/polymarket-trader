@@ -36,6 +36,7 @@ from src.storage.database import close_db, init_db
 from src.utils.logger import get_logger, setup_logging
 
 if TYPE_CHECKING:
+    from src.api.telegram import TelegramClient
     from src.core.alerting import AlertManager
     from src.core.scheduler import Scheduler
     from src.core.state import ThreadSafeState
@@ -79,9 +80,11 @@ class Application:
         self.state: ThreadSafeState | None = None
         self.scheduler: Scheduler | None = None
         self.alert_manager: AlertManager | None = None
+        self.telegram_client: "TelegramClient | None" = None
         self._shutdown_event: asyncio.Event | None = None
         self._dashboard_task: asyncio.Task | None = None
         self._dashboard_server: Server | None = None
+        self._telegram_task: asyncio.Task | None = None
 
     async def initialize(self) -> None:
         """Initialize all application components.
@@ -153,6 +156,22 @@ class Application:
         self.scheduler = Scheduler()
         logger.info("Scheduler initialized")
 
+        # 5. Initialize Telegram client
+        from src.api.telegram import TelegramClient
+
+        if settings.telegram.enabled:
+            try:
+                self.telegram_client = TelegramClient()
+                await self.telegram_client.initialize()
+                if self.telegram_client.is_enabled and self.state:
+                    await self.telegram_client.setup_commands(self.state)
+                    logger.info("Telegram client initialized with command handlers")
+            except Exception as e:
+                logger.warning(f"Telegram initialization failed: {e}")
+                self.telegram_client = None
+        else:
+            logger.info("Telegram disabled in configuration")
+
     async def start_dashboard(self) -> None:
         """Start the FastAPI Dashboard as a background task.
 
@@ -202,9 +221,22 @@ class Application:
             from src.trading.position_manager import PositionManager
             from src.trading.risk_control import RiskController
 
-            # Fetch active markets using Gamma API (has liquidity data)
+            # Fetch active markets using Gamma API with pagination
+            # Use server-side deadline filtering to only get markets with enough time remaining
+            # This is more efficient than fetching all and filtering locally
+            from datetime import datetime, timedelta, timezone
+
             client = PolymarketClient()
-            gamma_markets = client.get_active_markets(limit=50)
+            min_deadline_hours = settings.market_filter.min_deadline_hours
+            end_date_min = datetime.now(timezone.utc) + timedelta(hours=min_deadline_hours)
+
+            gamma_markets = client.get_all_active_markets(
+                total_limit=200,
+                page_size=50,
+                order_by="volume24hr",  # Sort by volume (most liquid first)
+                ascending=False,
+                end_date_min=end_date_min,  # Server-side deadline filter
+            )
             logger.info(f"Fetched {len(gamma_markets)} active markets for initial analysis")
 
             if not gamma_markets:
@@ -367,9 +399,21 @@ class Application:
                 from src.trading.position_manager import PositionManager
                 from src.trading.risk_control import RiskController
 
-                # Fetch active markets using Gamma API
+                # Fetch active markets using Gamma API with pagination
+                # Use server-side deadline filtering to only get markets with enough time remaining
+                from datetime import datetime, timedelta, timezone
+
                 client = PolymarketClient()
-                gamma_markets = client.get_active_markets(limit=50)
+                min_deadline_hours = app_settings.market_filter.min_deadline_hours
+                end_date_min = datetime.now(timezone.utc) + timedelta(hours=min_deadline_hours)
+
+                gamma_markets = client.get_all_active_markets(
+                    total_limit=200,
+                    page_size=50,
+                    order_by="volume24hr",  # Sort by volume (most liquid first)
+                    ascending=False,
+                    end_date_min=end_date_min,  # Server-side deadline filter
+                )
                 logger.info(f"Fetched {len(gamma_markets)} active markets")
 
                 if not gamma_markets or not self.state:
@@ -596,6 +640,13 @@ class Application:
                 self.scheduler.start()
                 logger.info("Scheduler started")
 
+            # Start Telegram polling
+            if self.telegram_client and self.telegram_client.is_enabled:
+                self._telegram_task = asyncio.create_task(
+                    self.telegram_client.start_polling()
+                )
+                logger.info("Telegram bot started polling")
+
             # Run initial analysis in background (non-blocking)
             asyncio.create_task(self.run_initial_analysis())
             logger.info("Initial analysis started in background")
@@ -644,6 +695,19 @@ class Application:
             except asyncio.CancelledError:
                 pass
             logger.info("Dashboard shutdown complete")
+
+        # 2.5 Shutdown Telegram
+        if self._telegram_task:
+            self._telegram_task.cancel()
+            try:
+                await self._telegram_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("Telegram polling stopped")
+
+        if self.telegram_client:
+            await self.telegram_client.shutdown()
+            logger.info("Telegram client shutdown complete")
 
         # 3. Persist state
         if self.state:

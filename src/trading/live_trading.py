@@ -37,12 +37,14 @@ class LiveTradeResult:
 
     Attributes:
         trade: The executed trade record
+        position: The opened position (if any)
         order_id: Polymarket order ID
         success: Whether the trade was successful
         error_message: Error message if trade failed
     """
 
     trade: Trade | None = None
+    position: "Position | None" = None
     order_id: str | None = None
     success: bool = True
     error_message: str | None = None
@@ -296,6 +298,7 @@ class LiveTradingExecutor:
 
             return LiveTradeResult(
                 trade=saved_trade,
+                position=position,
                 order_id=order_id,
                 success=True,
             )

@@ -108,9 +108,10 @@ class RecoveryManager:
         Performs the following steps:
         1. Load saved state from database
         2. Merge with default values
-        3. Validate position consistency
-        4. Check state consistency
-        5. Return recovery result
+        3. Sync capital from Polymarket (LIVE mode only)
+        4. Validate position consistency
+        5. Check state consistency
+        6. Return recovery result
 
         Returns:
             RecoveryResult with recovered state, warnings, and errors
@@ -130,6 +131,23 @@ class RecoveryManager:
 
             # 2. Merge with defaults
             result.recovered_state = self._merge_with_defaults(saved_state)
+
+            # 3. Sync capital from Polymarket in LIVE mode
+            if settings.trading_mode == "live":
+                actual_capital = await self._sync_capital_from_polymarket()
+                if actual_capital is not None:
+                    old_capital = result.recovered_state.get("current_capital", 0)
+                    result.recovered_state["current_capital"] = actual_capital
+                    # Reset reduced_mode if capital is now above threshold
+                    if actual_capital >= settings.risk.capital_threshold:
+                        result.recovered_state["reduced_mode"] = False
+                    logger.info(
+                        f"Capital synced from Polymarket: ${actual_capital:.2f} "
+                        f"(was ${old_capital:.2f})"
+                    )
+                    result.warnings.append(
+                        f"Capital synced from Polymarket: ${actual_capital:.2f}"
+                    )
 
             # 3. Validate positions if repository available
             if self.position_repo:
@@ -184,6 +202,38 @@ class RecoveryManager:
             merged["current_capital"] = self.initial_capital
 
         return merged
+
+    async def _sync_capital_from_polymarket(self) -> float | None:
+        """Sync capital from Polymarket wallet balance.
+
+        Fetches the actual USDC balance from Polymarket and returns it.
+        This ensures the system's capital tracking matches reality after
+        manual trades or external changes.
+
+        Returns:
+            Actual USDC balance from Polymarket, or None if fetch failed
+        """
+        try:
+            import asyncio
+
+            from src.api.polymarket import PolymarketClient
+
+            client = PolymarketClient()
+            try:
+                # Use asyncio.to_thread since get_wallet_balance is sync
+                balance_result = await asyncio.to_thread(client.get_wallet_balance)
+                if balance_result.is_success:
+                    balance = balance_result.usdc_balance
+                    logger.info(f"Fetched Polymarket wallet balance: ${balance:.2f} USDC")
+                    return balance
+                else:
+                    logger.warning(f"Failed to get wallet balance: {balance_result.error}")
+                    return None
+            finally:
+                client.close()
+        except Exception as e:
+            logger.warning(f"Failed to sync capital from Polymarket: {e}")
+            return None
 
     async def _validate_positions(self, state: dict[str, Any]) -> list[str]:
         """Validate position data consistency.

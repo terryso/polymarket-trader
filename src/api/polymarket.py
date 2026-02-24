@@ -352,10 +352,13 @@ class PolymarketClient:
     def get_active_markets(
         self,
         limit: int = 100,
+        offset: int = 0,
         min_liquidity: float | None = None,
         min_volume_24h: float | None = None,
         order_by: str = "volume24hr",
         ascending: bool = False,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
     ) -> list[GammaMarket]:
         """Get active markets using Gamma API with filtering.
 
@@ -364,10 +367,13 @@ class PolymarketClient:
 
         Args:
             limit: Maximum number of markets to return (default: 100)
+            offset: Offset for pagination (default: 0)
             min_liquidity: Minimum liquidity filter (default: None)
             min_volume_24h: Minimum 24h volume filter (default: None)
             order_by: Field to order by (default: "volume24hr")
             ascending: Sort ascending if True (default: False, highest first)
+            end_date_min: Minimum deadline/end date filter (default: None)
+            end_date_max: Maximum deadline/end date filter (default: None)
 
         Returns:
             List of GammaMarket instances with active order books
@@ -378,9 +384,15 @@ class PolymarketClient:
 
         Example:
             >>> client = PolymarketClient()
-            >>> markets = client.get_active_markets(limit=10, min_volume_24h=100000)
-            >>> for m in markets:
-            ...     print(f"{m.question}: ${m.volume_24h:,.0f}")
+            >>> # Get markets expiring in next 24 hours
+            >>> from datetime import datetime, timedelta
+            >>> end_min = datetime.utcnow()
+            >>> end_max = datetime.utcnow() + timedelta(hours=24)
+            >>> markets = client.get_active_markets(
+            ...     limit=10,
+            ...     end_date_min=end_min,
+            ...     end_date_max=end_max
+            ... )
         """
         self._logger.info(
             f"{OPERATION_EMOJIS['network']} Fetching active markets from Gamma API"
@@ -388,6 +400,7 @@ class PolymarketClient:
 
         params: dict[str, Any] = {
             "limit": limit,
+            "offset": offset,
             "active": "true",
             "closed": "false",
             "order": order_by,
@@ -398,6 +411,11 @@ class PolymarketClient:
             params["liquidity_num_min"] = min_liquidity
         if min_volume_24h is not None:
             params["volume_num_min"] = min_volume_24h
+        if end_date_min is not None:
+            # Gamma API expects Unix timestamp in seconds
+            params["end_date_min"] = int(end_date_min.timestamp())
+        if end_date_max is not None:
+            params["end_date_max"] = int(end_date_max.timestamp())
 
         try:
             client = self._get_http_client()
@@ -441,6 +459,83 @@ class PolymarketClient:
                 endpoint="get_active_markets",
                 original_exception=e,
             )
+
+    def get_all_active_markets(
+        self,
+        total_limit: int = 200,
+        page_size: int = 50,
+        min_liquidity: float | None = None,
+        min_volume_24h: float | None = None,
+        order_by: str = "volume24hr",
+        ascending: bool = False,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+    ) -> list[GammaMarket]:
+        """Get all active markets using pagination.
+
+        Automatically fetches multiple pages to get more markets than
+        a single API call allows.
+
+        Args:
+            total_limit: Maximum total markets to return (default: 200)
+            page_size: Number of markets per page (default: 50)
+            min_liquidity: Minimum liquidity filter (default: None)
+            min_volume_24h: Minimum 24h volume filter (default: None)
+            order_by: Field to order by (default: "volume24hr")
+            ascending: Sort ascending if True (default: False, highest first)
+            end_date_min: Minimum deadline/end date filter (default: None)
+            end_date_max: Maximum deadline/end date filter (default: None)
+
+        Returns:
+            List of all GammaMarket instances fetched across pages
+
+        Raises:
+            NetworkError: If API request fails
+            RequestTimeoutError: If request times out
+
+        Example:
+            >>> from datetime import datetime, timedelta
+            >>> # Get markets with at least 1 hour and at most 7 days until deadline
+            >>> end_min = datetime.utcnow() + timedelta(hours=1)
+            >>> end_max = datetime.utcnow() + timedelta(days=7)
+            >>> markets = client.get_all_active_markets(
+            ...     total_limit=100,
+            ...     end_date_min=end_min,
+            ...     end_date_max=end_max,
+            ... )
+        """
+        all_markets: list[GammaMarket] = []
+        offset = 0
+
+        while len(all_markets) < total_limit:
+            remaining = total_limit - len(all_markets)
+            current_limit = min(page_size, remaining)
+
+            markets = self.get_active_markets(
+                limit=current_limit,
+                offset=offset,
+                min_liquidity=min_liquidity,
+                min_volume_24h=min_volume_24h,
+                order_by=order_by,
+                ascending=ascending,
+                end_date_min=end_date_min,
+                end_date_max=end_date_max,
+            )
+
+            if not markets:
+                break
+
+            all_markets.extend(markets)
+            offset += len(markets)
+
+            # Stop if we got fewer markets than requested (end of data)
+            if len(markets) < current_limit:
+                break
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['network']} Fetched total {len(all_markets)} active markets across {offset // page_size + 1} pages"
+        )
+        return all_markets[:total_limit]
 
     def _parse_gamma_market(self, data: dict[str, Any]) -> GammaMarket:
         """Parse Gamma API response into GammaMarket.
@@ -917,30 +1012,83 @@ class PolymarketClient:
         )
 
         try:
-            # Step 1: Get asset IDs from trade history
-            # Note: get_trades() may return incomplete data, but we only need
-            # the asset IDs to query on-chain balances (the source of truth)
+            # Step 1: Get asset IDs from API trade history
             trades_response = self._client.get_trades()
-
-            if not trades_response:
-                self._logger.info(
-                    f"{OPERATION_EMOJIS['network']} No trades found, returning empty balances"
-                )
-                return BalanceResult(balances=[], error=None)
 
             # Build asset info map from trades
             asset_info_map: dict[str, dict] = {}
-            for trade in trades_response:
-                asset_id = str(trade.get("asset_id", ""))
-                if asset_id and asset_id not in asset_info_map:
-                    asset_info_map[asset_id] = {
-                        "outcome": str(trade.get("outcome", "YES")).upper(),
-                        "market_id": trade.get("market", ""),
-                    }
 
-            self._logger.info(
-                f"{OPERATION_EMOJIS['network']} Found {len(asset_info_map)} unique assets from trade history"
-            )
+            if trades_response:
+                for trade in trades_response:
+                    asset_id = str(trade.get("asset_id", ""))
+                    if asset_id and asset_id not in asset_info_map:
+                        asset_info_map[asset_id] = {
+                            "outcome": str(trade.get("outcome", "YES")).upper(),
+                            "market_id": trade.get("market", ""),
+                        }
+
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['network']} Found {len(asset_info_map)} unique assets from API trade history"
+                )
+
+            # Step 1.5: Also get token IDs from local database trades
+            # This ensures we don't miss any positions from orders placed through the bot
+            # that might not appear in the API's get_trades() response
+            try:
+                import aiosqlite
+                import asyncio
+
+                async def get_local_market_ids() -> set[str]:
+                    market_ids = set()
+                    db_path = "data/polymarket.db"
+                    try:
+                        async with aiosqlite.connect(db_path) as conn:
+                            cursor = await conn.execute(
+                                "SELECT DISTINCT market_id FROM trades WHERE mode = 'LIVE'"
+                            )
+                            rows = await cursor.fetchall()
+                            market_ids = {row[0] for row in rows if row[0]}
+                    except Exception as e:
+                        self._logger.warning(f"Failed to get local market IDs: {e}")
+                    return market_ids
+
+                local_market_ids = asyncio.get_event_loop().run_until_complete(
+                    get_local_market_ids()
+                )
+
+                if local_market_ids:
+                    self._logger.info(
+                        f"{OPERATION_EMOJIS['network']} Found {len(local_market_ids)} markets from local trades"
+                    )
+
+                    # Get token IDs from CLOB API for these markets
+                    for market_id in local_market_ids:
+                        try:
+                            market_data = self._client.get_market(market_id)
+                            if market_data:
+                                tokens = market_data.get("tokens", [])
+                                for token_info in tokens:
+                                    token_id = token_info.get("token_id")
+                                    outcome = token_info.get("outcome", "YES")
+                                    if token_id and str(token_id) not in asset_info_map:
+                                        asset_info_map[str(token_id)] = {
+                                            "outcome": str(outcome).upper(),
+                                            "market_id": market_id,
+                                        }
+                        except Exception as e:
+                            self._logger.debug(f"Failed to get tokens for market {market_id[:10]}...: {e}")
+
+                    self._logger.info(
+                        f"{OPERATION_EMOJIS['network']} Total {len(asset_info_map)} unique assets after combining sources"
+                    )
+            except Exception as e:
+                self._logger.warning(f"Failed to enrich asset info from local trades: {e}")
+
+            if not asset_info_map:
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['network']} No assets found, returning empty balances"
+                )
+                return BalanceResult(balances=[], error=None)
 
             # Step 2: Query on-chain ERC-1155 balances for each asset
             wallet = settings.polymarket.proxy_wallet

@@ -50,6 +50,7 @@ class TestMarketFilter:
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
         settings.market_filter.min_deadline_hours = 1
+        settings.market_filter.max_deadline_hours = 0  # 0 means no max deadline limit
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = []
         return settings
@@ -272,6 +273,7 @@ class TestMarketFilter:
         settings.market_filter = MagicMock()
         settings.market_filter.min_liquidity = 10000.0
         settings.market_filter.min_deadline_hours = 1
+        settings.market_filter.max_deadline_hours = 0  # 0 means no max deadline limit
         settings.market_filter.excluded_keywords = ["price", "USD", "tomorrow"]
         settings.market_filter.controversial_keywords = ["controversial", "sensitive"]
 
