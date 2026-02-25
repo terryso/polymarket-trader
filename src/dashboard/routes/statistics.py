@@ -121,8 +121,9 @@ async def get_overview(
     # Get open positions and calculate position values
     open_positions = await position_repo.get_open_positions()
     open_positions_count = len(open_positions)
-    position_value = sum(p.current_value for p in open_positions)
-    position_pnl = sum(p.pnl for p in open_positions)
+    # Handle None values in current_value and pnl
+    position_value = sum(p.current_value or 0 for p in open_positions)
+    position_pnl = sum(p.pnl or 0 for p in open_positions)
 
     # Fetch real wallet balance from Polymarket
     wallet_balance: float | None = None
