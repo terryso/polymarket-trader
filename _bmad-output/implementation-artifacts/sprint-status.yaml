@@ -136,7 +136,7 @@ development_status:
   epic-9-retrospective: optional
 
   # Epic 10: 持仓退出策略 (NEW)
-  epic-10: in-progress
+  epic-10: done
   10-1-sell-executor: done
   10-2-exit-strategy-config: done
   10-3-exit-condition-checker: done

@@ -406,6 +406,18 @@ def _register_exception_handlers(app: FastAPI) -> None:
         Returns:
             JSONResponse with error details
         """
+        # Import asyncio locally to check for CancelledError
+        import asyncio
+
+        # Don't log CancelledError as an error - it's normal during shutdown
+        if isinstance(exc, asyncio.CancelledError):
+            logger.debug("Request cancelled (likely during shutdown)")
+            # Return a simple response, though it may not be sent
+            return JSONResponse(
+                status_code=499,  # Client Closed Request (non-standard but commonly used)
+                content={"detail": "Request cancelled"},
+            )
+
         logger.exception(f"❌ Unexpected error: {exc}")
         return JSONResponse(
             status_code=500,

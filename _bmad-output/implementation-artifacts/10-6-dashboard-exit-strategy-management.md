@@ -1,6 +1,6 @@
 # Story 10.6: Dashboard 退出策略管理
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -48,62 +48,62 @@ So that **我能够方便地调整退出参数和查看历史退出记录**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建退出策略 API 路由 (AC: #3)
-  - [ ] 1.1 创建 `src/dashboard/routes/settings.py`
-  - [ ] 1.2 实现 `GET /api/settings/exit-strategy` 端点
-  - [ ] 1.3 实现 `PUT /api/settings/exit-strategy` 端点
-  - [ ] 1.4 创建 `ExitStrategyConfigRequest` 和 `ExitStrategyConfigResponse` 模型
-  - [ ] 1.5 在 `app.py` 中注册 settings 路由
+- [x] Task 1: 创建退出策略 API 路由 (AC: #3)
+  - [x] 1.1 创建 `src/dashboard/routes/settings.py`
+  - [x] 1.2 实现 `GET /api/settings/exit-strategy` 端点
+  - [x] 1.3 实现 `PUT /api/settings/exit-strategy` 端点
+  - [x] 1.4 创建 `ExitStrategyConfigRequest` 和 `ExitStrategyConfigResponse` 模型
+  - [x] 1.5 在 `app.py` 中注册 settings 路由
 
-- [ ] Task 2: 实现手动退出持仓 API (AC: #3)
-  - [ ] 2.1 在 `src/dashboard/routes/positions.py` 添加 `POST /{position_id}/exit` 端点
-  - [ ] 2.2 创建 `ManualExitRequest` 和 `ManualExitResponse` 模型
-  - [ ] 2.3 调用 `LiveTradingExecutor.sell_position` 执行卖出
-  - [ ] 2.4 更新持仓状态为 CLOSED
-  - [ ] 2.5 记录退出原因为 "manual"
+- [x] Task 2: 实现手动退出持仓 API (AC: #3)
+  - [x] 2.1 在 `src/dashboard/routes/positions.py` 添加 `POST /{position_id}/exit` 端点
+  - [x] 2.2 创建 `ManualExitRequest` 和 `ManualExitResponse` 模型
+  - [x] 2.3 调用 `LiveTradingExecutor.sell_position` 执行卖出
+  - [x] 2.4 更新持仓状态为 CLOSED
+  - [x] 2.5 记录退出原因为 "manual"
 
-- [ ] Task 3: 扩展交易历史 API 显示退出类型 (AC: #4)
-  - [ ] 3.1 在 `TradeResponse` 模型中添加 `exit_type` 字段
-  - [ ] 3.2 从关联的 position 获取 exit_reason
-  - [ ] 3.3 更新 `src/dashboard/routes/trades.py` 返回退出类型
+- [x] Task 3: 扩展交易历史 API 显示退出类型 (AC: #4)
+  - [x] 3.1 在 `TradeResponse` 模型中添加 `exit_type` 字段
+  - [x] 3.2 从关联的 position 获取 exit_reason
+  - [x] 3.3 更新 `src/dashboard/routes/trades.py` 返回退出类型
 
-- [ ] Task 4: 创建退出策略设置前端组件 (AC: #1, #5)
-  - [ ] 4.1 创建 `dashboard/src/components/settings/ExitStrategySettings.tsx`
-  - [ ] 4.2 创建 `ExitStrategyForm` 组件 (止盈/止损/时间/信号开关和输入)
-  - [ ] 4.3 使用 shadcn/ui Switch, Input, Button 组件
-  - [ ] 4.4 实现表单验证 (百分比范围、必填项)
-  - [ ] 4.5 集成 TanStack Query 进行 API 调用
-  - [ ] 4.6 添加加载状态和错误处理
-  - [ ] 4.7 添加保存成功/失败的 Toast 提示
+- [x] Task 4: 创建退出策略设置前端组件 (AC: #1, #5)
+  - [x] 4.1 创建 `dashboard/src/components/settings/ExitStrategySettings.tsx`
+  - [x] 4.2 创建 `ExitStrategyForm` 组件 (止盈/止损/时间/信号开关和输入)
+  - [x] 4.3 使用 shadcn/ui Switch, Input, Button 组件
+  - [x] 4.4 实现表单验证 (百分比范围、必填项)
+  - [x] 4.5 集成 TanStack Query 进行 API 调用
+  - [x] 4.6 添加加载状态和错误处理
+  - [x] 4.7 添加保存成功/失败的 Toast 提示
 
-- [ ] Task 5: 增强持仓列表组件 (AC: #2, #5)
-  - [ ] 5.1 在 `Positions.tsx` 添加退出距离列
-  - [ ] 5.2 添加持仓持续时间列
-  - [ ] 5.3 添加"手动退出"按钮
-  - [ ] 5.4 创建 `ConfirmExitDialog` 确认对话框组件
-  - [ ] 5.5 实现手动退出 API 调用
-  - [ ] 5.6 添加退出成功/失败的 Toast 提示
+- [x] Task 5: 增强持仓列表组件 (AC: #2, #5)
+  - [x] 5.1 在 `Positions.tsx` 添加退出距离列
+  - [x] 5.2 添加持仓持续时间列
+  - [x] 5.3 添加"手动退出"按钮
+  - [x] 5.4 创建 `ConfirmExitDialog` 确认对话框组件
+  - [x] 5.5 实现手动退出 API 调用
+  - [x] 5.6 添加退出成功/失败的 Toast 提示
 
-- [ ] Task 6: 更新交易历史显示退出类型标签 (AC: #4, #5)
-  - [ ] 6.1 在 `Trades.tsx` 添加退出类型列
-  - [ ] 6.2 创建 `ExitTypeBadge` 组件 (不同颜色标签)
-  - [ ] 6.3 实现退出类型中文映射
+- [x] Task 6: 更新交易历史显示退出类型标签 (AC: #4, #5)
+  - [x] 6.1 在 `Trades.tsx` 添加退出类型列
+  - [x] 6.2 创建 `ExitTypeBadge` 组件 (不同颜色标签)
+  - [x] 6.3 实现退出类型中文映射
 
-- [ ] Task 7: 更新设置页面集成退出策略组件 (AC: #1)
-  - [ ] 7.1 修改 `Settings.tsx` 添加退出策略部分
-  - [ ] 7.2 使用 Tabs 或 Sections 组织设置内容
-  - [ ] 7.3 保持现有设置内容不变
+- [x] Task 7: 更新设置页面集成退出策略组件 (AC: #1)
+  - [x] 7.1 修改 `Settings.tsx` 添加退出策略部分
+  - [x] 7.2 使用 Tabs 或 Sections 组织设置内容
+  - [x] 7.3 保持现有设置内容不变
 
-- [ ] Task 8: 创建前端类型定义 (AC: All)
-  - [ ] 8.1 创建 `dashboard/src/types/exitStrategy.ts`
-  - [ ] 8.2 定义 `ExitStrategyConfig` 接口
-  - [ ] 8.3 定义 `ManualExitRequest` 接口
-  - [ ] 8.4 定义 `ManualExitResponse` 接口
+- [x] Task 8: 创建前端类型定义 (AC: All)
+  - [x] 8.1 创建 `dashboard/src/types/exitStrategy.ts`
+  - [x] 8.2 定义 `ExitStrategyConfig` 接口
+  - [x] 8.3 定义 `ManualExitRequest` 接口
+  - [x] 8.4 定义 `ManualExitResponse` 接口
 
-- [ ] Task 9: 创建自定义 Hooks (AC: All)
-  - [ ] 9.1 创建 `useExitStrategyConfig` hook
-  - [ ] 9.2 创建 `useManualExit` hook
-  - [ ] 9.3 使用 TanStack Query 的 useMutation 和 useQuery
+- [x] Task 9: 创建自定义 Hooks (AC: All)
+  - [x] 9.1 创建 `useExitStrategyConfig` hook
+  - [x] 9.2 创建 `useManualExit` hook
+  - [x] 9.3 使用 TanStack Query 的 useMutation 和 useQuery
 
 - [ ] Task 10: 编写测试 (AC: All)
   - [ ] 10.1 创建 `tests/test_dashboard/test_settings_routes.py`

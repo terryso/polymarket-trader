@@ -75,7 +75,8 @@ class DatabaseManager:
     Attributes:
         _config: Database configuration
         _db_path: String path to database file
-        _lock: Async lock for thread-safe operations
+        _lock: Async lock for thread-safe operations (per event loop)
+        _lock_loop_id: Event loop ID for the current lock
     """
 
     def __init__(self, config: DatabaseConfig) -> None:
@@ -86,7 +87,30 @@ class DatabaseManager:
         """
         self._config = config
         self._db_path = str(config.db_path)
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
+        self._lock_loop_id: int | None = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create lock for current event loop.
+
+        This ensures the lock is always bound to the current event loop,
+        which is necessary when using asyncio.run() in scheduled tasks.
+
+        Returns:
+            asyncio.Lock bound to current event loop
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            loop_id = id(loop)
+            if self._lock is None or self._lock_loop_id != loop_id:
+                self._lock = asyncio.Lock()
+                self._lock_loop_id = loop_id
+            return self._lock
+        except RuntimeError:
+            # No running loop, create a new lock
+            if self._lock is None:
+                self._lock = asyncio.Lock()
+            return self._lock
 
     @asynccontextmanager
     async def get_connection(self) -> AsyncIterator[aiosqlite.Connection]:
@@ -98,26 +122,33 @@ class DatabaseManager:
         Raises:
             DatabaseError: If connection fails
         """
-        async with self._lock:
-            conn: aiosqlite.Connection | None = None
-            try:
+        conn: aiosqlite.Connection | None = None
+        try:
+            async with self._get_lock():
                 conn = await aiosqlite.connect(self._db_path)
                 # Enable foreign key constraints (must be set for each connection)
                 await conn.execute("PRAGMA foreign_keys = ON")
                 yield conn
                 # Auto-commit on successful exit from context
                 await conn.commit()
-            except aiosqlite.Error as e:
-                # Log with more context about what operation failed
-                logger.error(f"❌ Database error: {e}")
-                raise DatabaseError(
-                    f"Database operation failed: {e}",
-                    operation="execute",
-                    original_exception=e,
-                ) from e
-            finally:
-                if conn is not None:
+        except asyncio.CancelledError:
+            # Gracefully handle cancellation during shutdown
+            logger.debug("Database operation cancelled")
+            raise  # Re-raise to propagate cancellation
+        except aiosqlite.Error as e:
+            # Log with more context about what operation failed
+            logger.error(f"❌ Database error: {e}")
+            raise DatabaseError(
+                f"Database operation failed: {e}",
+                operation="execute",
+                original_exception=e,
+            ) from e
+        finally:
+            if conn is not None:
+                try:
                     await conn.close()
+                except Exception:
+                    pass  # Ignore errors during cleanup
 
     async def init_db(self) -> None:
         """Initialize database schema.

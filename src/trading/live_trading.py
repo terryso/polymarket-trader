@@ -264,24 +264,35 @@ class LiveTradingExecutor:
 
         Story 10.1: 卖出执行器
 
+        To ensure quick execution in CLOB, sell price is set slightly below
+        the current market price to match with existing buy orders.
+
         Args:
             position: Position to sell
             market: Market for the position
 
         Returns:
-            Current sell price (0-1)
+            Current sell price (0-1) with small discount for quick execution
 
         Raises:
             ValidationError: If price not available
         """
+        # Discount factor to ensure quick sell execution in CLOB
+        # Sell slightly below market price to match with buy orders
+        SELL_PRICE_DISCOUNT = 0.02  # 2% discount
+
         if position.outcome == PositionOutcome.YES:
             if market.yes_price is None:
                 raise ValidationError(f"Market {market.id} does not have YES price")
-            return market.yes_price
+            # Apply discount for quick execution, minimum price is 0.01
+            sell_price = market.yes_price * (1 - SELL_PRICE_DISCOUNT)
+            return max(sell_price, 0.01)
         else:
             if market.no_price is None:
                 raise ValidationError(f"Market {market.id} does not have NO price")
-            return market.no_price
+            # Apply discount for quick execution, minimum price is 0.01
+            sell_price = market.no_price * (1 - SELL_PRICE_DISCOUNT)
+            return max(sell_price, 0.01)
 
     def _calculate_shares(self, amount: float, price: float) -> float:
         """Calculate number of shares from amount and price.
