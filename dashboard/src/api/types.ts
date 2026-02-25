@@ -11,8 +11,11 @@
 // ============================================================================
 
 export interface OverviewStats {
-  current_capital: number;
   initial_capital: number;
+  wallet_balance: number | null;
+  position_value: number;
+  position_pnl: number;
+  current_capital: number;
   total_pnl: number;
   total_pnl_pct: number;
   win_rate: number;
@@ -22,7 +25,6 @@ export interface OverviewStats {
   open_positions: number;
   trading_enabled: boolean;
   mode: string;
-  wallet_balance: number | null;
   wallet_balance_error: string | null;
 }
 

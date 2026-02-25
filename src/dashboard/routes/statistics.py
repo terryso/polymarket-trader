@@ -118,15 +118,11 @@ async def get_overview(
     losing_trades = total_trades - winning_trades
     win_rate = winning_trades / total_trades if total_trades > 0 else 0.0
 
-    # Get open positions count
+    # Get open positions and calculate position values
     open_positions = await position_repo.get_open_positions()
     open_positions_count = len(open_positions)
-
-    # Calculate P&L
-    initial_capital = settings.initial_capital
-    current_capital = state_snapshot.current_capital
-    total_pnl = current_capital - initial_capital
-    total_pnl_pct = total_pnl / initial_capital if initial_capital > 0 else 0.0
+    position_value = sum(p.current_value for p in open_positions)
+    position_pnl = sum(p.pnl for p in open_positions)
 
     # Fetch real wallet balance from Polymarket
     wallet_balance: float | None = None
@@ -142,9 +138,24 @@ async def get_overview(
         logger.warning(f"Failed to fetch wallet balance: {e}")
         wallet_balance_error = str(e)
 
+    # Calculate current capital and total P&L
+    # current_capital = wallet_balance + position_value
+    initial_capital = settings.initial_capital
+    if wallet_balance is not None:
+        current_capital = wallet_balance + position_value
+    else:
+        # Fallback to state capital if wallet balance unavailable
+        current_capital = state_snapshot.current_capital + position_value
+
+    total_pnl = current_capital - initial_capital
+    total_pnl_pct = total_pnl / initial_capital if initial_capital > 0 else 0.0
+
     overview = OverviewStats(
-        current_capital=current_capital,
         initial_capital=initial_capital,
+        wallet_balance=wallet_balance,
+        position_value=position_value,
+        position_pnl=position_pnl,
+        current_capital=current_capital,
         total_pnl=total_pnl,
         total_pnl_pct=total_pnl_pct,
         win_rate=win_rate,
@@ -154,7 +165,6 @@ async def get_overview(
         open_positions=open_positions_count,
         trading_enabled=state_snapshot.trading_enabled,
         mode=settings.trading_mode.upper(),
-        wallet_balance=wallet_balance,
         wallet_balance_error=wallet_balance_error,
     )
 

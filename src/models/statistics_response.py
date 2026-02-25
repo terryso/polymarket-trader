@@ -19,9 +19,12 @@ class OverviewStats(BaseModel):
     Aggregated view of trading system status and performance.
 
     Attributes:
-        current_capital: Current capital in USD
-        initial_capital: Starting capital in USD
-        total_pnl: Total profit/loss in USD
+        initial_capital: Starting capital in USD (from .env)
+        wallet_balance: Real USDC balance from wallet (None if fetch failed)
+        position_value: Total current value of open positions
+        position_pnl: Unrealized PnL from open positions
+        current_capital: Current capital = wallet_balance + position_value
+        total_pnl: Total profit/loss = current_capital - initial_capital
         total_pnl_pct: Total profit/loss as percentage
         win_rate: Overall win rate (0-1)
         total_trades: Total number of trades
@@ -30,12 +33,16 @@ class OverviewStats(BaseModel):
         open_positions: Number of open positions
         trading_enabled: Whether trading is enabled
         mode: Current trading mode
-        wallet_balance: Real USDC balance from wallet (None if fetch failed)
         wallet_balance_error: Error message if wallet balance fetch failed
     """
 
-    current_capital: float = Field(..., description="Current capital (USD)")
     initial_capital: float = Field(..., description="Initial capital (USD)")
+    wallet_balance: float | None = Field(
+        None, description="Real USDC balance from wallet"
+    )
+    position_value: float = Field(0.0, description="Total position value (USD)")
+    position_pnl: float = Field(0.0, description="Unrealized PnL from positions")
+    current_capital: float = Field(..., description="Current capital (USD)")
     total_pnl: float = Field(..., description="Total P&L (USD)")
     total_pnl_pct: float = Field(..., description="Total P&L percentage")
     win_rate: float = Field(..., description="Win rate (0-1)")
@@ -45,9 +52,6 @@ class OverviewStats(BaseModel):
     open_positions: int = Field(..., description="Open positions count")
     trading_enabled: bool = Field(..., description="Trading enabled")
     mode: str = Field(..., description="Trading mode (PAPER/LIVE)")
-    wallet_balance: float | None = Field(
-        None, description="Real USDC balance from wallet"
-    )
     wallet_balance_error: str | None = Field(
         None, description="Error message if wallet balance fetch failed"
     )

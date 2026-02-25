@@ -5,7 +5,7 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { useOverview, useSystemStatus } from "@/hooks/useStatistics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { DollarSign, TrendingUp, Target, Activity, AlertCircle, Wallet } from "lucide-react";
+import { DollarSign, TrendingUp, Target, Activity, AlertCircle, Wallet, PiggyBank, BarChart3 } from "lucide-react";
 
 const Index = () => {
   const { data: overview, isLoading: overviewLoading, error: overviewError } = useOverview();
@@ -58,12 +58,10 @@ const Index = () => {
   }
 
   // Calculate derived values
-  const todayPnL = status?.daily_pnl ?? 0;
-  const todayPnLPercent = overview?.initial_capital
-    ? (todayPnL / overview.initial_capital) * 100
-    : 0;
-  const statusColor =
-    status?.trading_enabled ? "profit" : "muted";
+  const totalPnL = overview?.total_pnl ?? 0;
+  const totalPnLPercent = (overview?.total_pnl_pct ?? 0) * 100;
+  const positionPnL = overview?.position_pnl ?? 0;
+  const statusColor = status?.trading_enabled ? "profit" : "muted";
 
   // Format uptime
   const formatUptime = (hours: number | null | undefined): string => {
@@ -73,18 +71,11 @@ const Index = () => {
     return `${h}h ${m}m`;
   };
 
-  // Format wallet balance
-  const formatWalletBalance = (balance: number | null | undefined): string => {
-    if (balance === null || balance === undefined) return "-";
-    return `$${balance.toFixed(2)}`;
+  // Format currency
+  const formatCurrency = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return "-";
+    return `$${value.toFixed(2)}`;
   };
-
-  // Calculate wallet vs system capital difference
-  const walletVsSystemDiff = overview?.wallet_balance !== null &&
-    overview?.wallet_balance !== undefined &&
-    overview?.current_capital
-    ? overview.wallet_balance - overview.current_capital
-    : null;
 
   return (
     <DashboardLayout>
@@ -94,37 +85,47 @@ const Index = () => {
           <p className="text-sm text-muted-foreground mt-1">系统运行概览</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Capital Overview Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <StatCard
+            icon={<PiggyBank className="h-4 w-4" />}
+            title="初始资本"
+            value={formatCurrency(overview?.initial_capital)}
+            subtitle="投入金额"
+            subtitleColor="muted"
+            testId="stat-initial-capital"
+          />
           <StatCard
             icon={<Wallet className="h-4 w-4" />}
             title="钱包余额"
-            value={formatWalletBalance(overview?.wallet_balance)}
+            value={formatCurrency(overview?.wallet_balance)}
             subtitle="真实 USDC"
             subtitleColor="muted"
             testId="stat-wallet-balance"
           />
           <StatCard
+            icon={<BarChart3 className="h-4 w-4" />}
+            title="持仓价值"
+            value={formatCurrency(overview?.position_value)}
+            subtitle={positionPnL >= 0 ? `+$${positionPnL.toFixed(2)}` : `-$${Math.abs(positionPnL).toFixed(2)}`}
+            subtitleColor={positionPnL >= 0 ? "profit" : "loss"}
+            testId="stat-position-value"
+          />
+          <StatCard
             icon={<DollarSign className="h-4 w-4" />}
-            title="系统记账"
-            value={`$${(overview?.current_capital ?? 0).toFixed(2)}`}
-            subtitle={todayPnLPercent >= 0 ? `+${todayPnLPercent.toFixed(1)}%` : `${todayPnLPercent.toFixed(1)}%`}
-            subtitleColor={todayPnLPercent >= 0 ? "profit" : "loss"}
-            testId="stat-total-capital"
+            title="当前资本"
+            value={formatCurrency(overview?.current_capital)}
+            subtitle="钱包 + 持仓"
+            subtitleColor="muted"
+            testId="stat-current-capital"
           />
           <StatCard
             icon={<TrendingUp className="h-4 w-4" />}
-            title="今日 PnL"
-            value={`${todayPnL >= 0 ? "+" : ""}$${todayPnL.toFixed(2)}`}
-            subtitle={todayPnLPercent >= 0 ? `+${todayPnLPercent.toFixed(1)}%` : `${todayPnLPercent.toFixed(1)}%`}
-            subtitleColor={todayPnL >= 0 ? "profit" : "loss"}
-            testId="stat-today-pnl"
-          />
-          <StatCard
-            icon={<Target className="h-4 w-4" />}
-            title="胜率"
-            value={`${((overview?.win_rate ?? 0) * 100).toFixed(1)}%`}
-            subtitle={overview ? `${overview.winning_trades}/${overview.total_trades}` : "-"}
-            testId="stat-win-rate"
+            title="总盈亏"
+            value={`${totalPnL >= 0 ? "+" : ""}$${totalPnL.toFixed(2)}`}
+            subtitle={`${totalPnLPercent >= 0 ? "+" : ""}${totalPnLPercent.toFixed(1)}%`}
+            subtitleColor={totalPnL >= 0 ? "profit" : "loss"}
+            testId="stat-total-pnl"
           />
           <StatCard
             icon={<Activity className="h-4 w-4" />}
@@ -133,6 +134,33 @@ const Index = () => {
             subtitle={formatUptime(status?.uptime_hours)}
             subtitleColor={statusColor as "profit" | "loss" | "muted"}
             testId="stat-system-status"
+          />
+        </div>
+
+        {/* Secondary Stats Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard
+            icon={<Target className="h-4 w-4" />}
+            title="胜率"
+            value={`${((overview?.win_rate ?? 0) * 100).toFixed(1)}%`}
+            subtitle={overview ? `${overview.winning_trades}/${overview.total_trades} 胜` : "-"}
+            testId="stat-win-rate"
+          />
+          <StatCard
+            icon={<BarChart3 className="h-4 w-4" />}
+            title="持仓数量"
+            value={`${overview?.open_positions ?? 0}`}
+            subtitle="个仓位"
+            subtitleColor="muted"
+            testId="stat-open-positions"
+          />
+          <StatCard
+            icon={<Activity className="h-4 w-4" />}
+            title="交易模式"
+            value={overview?.mode === "LIVE" ? "🔴 实盘" : "🟢 模拟"}
+            subtitle={overview?.mode ?? "-"}
+            subtitleColor="muted"
+            testId="stat-trading-mode"
           />
         </div>
 

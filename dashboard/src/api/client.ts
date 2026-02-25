@@ -12,7 +12,7 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 // API base URL from environment variable
 // Default to empty string to use relative paths (proxy in dev, same origin in prod)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const API_TIMEOUT = 30000; // 30 seconds
+const API_TIMEOUT = 60000; // 60 seconds (increased for sync operations)
 
 // Error response type from backend
 export interface ApiError {

@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => ({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+        timeout: 120000, // 2 minutes timeout for long-running operations like sync
       },
     },
   },

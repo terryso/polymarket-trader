@@ -291,9 +291,13 @@ class TestGetOverview:
 
             response = client.get("/api/statistics/overview")
             data = response.json()
-            assert data["data"]["current_capital"] == 200.0
+            # current_capital = wallet_balance (150) + position_value (55) = 205
+            assert data["data"]["current_capital"] == 205.0
             assert data["data"]["initial_capital"] == 200.0
-            assert data["data"]["total_pnl"] == 0.0
+            # total_pnl = current_capital (205) - initial_capital (200) = 5
+            assert data["data"]["total_pnl"] == 5.0
+            assert data["data"]["position_value"] == 55.0
+            assert data["data"]["position_pnl"] == 5.0
             assert data["data"]["open_positions"] == 1
             assert data["data"]["trading_enabled"] is True
             assert data["data"]["wallet_balance"] == 150.0
