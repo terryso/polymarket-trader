@@ -76,6 +76,7 @@ class BalanceItem:
         shares: Number of shares held
         asset_id: Token/asset ID
         market_title: Optional market title for display
+        avg_price: Average price paid for the position (calculated from order history)
     """
 
     condition_id: str
@@ -83,6 +84,7 @@ class BalanceItem:
     shares: float
     asset_id: str | None = None
     market_title: str | None = None
+    avg_price: float | None = None
 
 
 @dataclass
@@ -412,10 +414,10 @@ class PolymarketClient:
         if min_volume_24h is not None:
             params["volume_num_min"] = min_volume_24h
         if end_date_min is not None:
-            # Gamma API expects Unix timestamp in seconds
-            params["end_date_min"] = int(end_date_min.timestamp())
+            # Gamma API expects ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)
+            params["end_date_min"] = end_date_min.strftime("%Y-%m-%dT%H:%M:%SZ")
         if end_date_max is not None:
-            params["end_date_max"] = int(end_date_max.timestamp())
+            params["end_date_max"] = end_date_max.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         try:
             client = self._get_http_client()
@@ -558,8 +560,11 @@ class PolymarketClient:
                 clob_token_ids = []
 
         # Parse end date
+        # Prefer endDate over endDateIso because endDate has full datetime
+        # endDateIso is just a date (e.g., "2025-12-19") which gets parsed as midnight
+        # endDate has full datetime (e.g., "2025-12-19T16:40:00Z")
         end_date: datetime | None = None
-        end_date_str = data.get("endDateIso") or data.get("endDate")
+        end_date_str = data.get("endDate") or data.get("endDateIso")
         if end_date_str:
             end_date = self._parse_datetime(end_date_str)
 
@@ -1018,14 +1023,29 @@ class PolymarketClient:
             # Build asset info map from trades
             asset_info_map: dict[str, dict] = {}
 
+            # Also calculate average price per asset from trade history
+            # Key: asset_id, Value: {"total_cost": float, "total_shares": float}
+            asset_price_info: dict[str, dict[str, float]] = {}
+
             if trades_response:
                 for trade in trades_response:
                     asset_id = str(trade.get("asset_id", ""))
-                    if asset_id and asset_id not in asset_info_map:
-                        asset_info_map[asset_id] = {
-                            "outcome": str(trade.get("outcome", "YES")).upper(),
-                            "market_id": trade.get("market", ""),
-                        }
+                    if asset_id:
+                        if asset_id not in asset_info_map:
+                            asset_info_map[asset_id] = {
+                                "outcome": str(trade.get("outcome", "YES")).upper(),
+                                "market_id": trade.get("market", ""),
+                            }
+
+                        # Calculate average price (only for BUY orders)
+                        side = trade.get("side", "").upper()
+                        if side == "BUY":
+                            price = float(trade.get("price", 0))
+                            size = float(trade.get("size", 0))
+                            if asset_id not in asset_price_info:
+                                asset_price_info[asset_id] = {"total_cost": 0.0, "total_shares": 0.0}
+                            asset_price_info[asset_id]["total_cost"] += price * size
+                            asset_price_info[asset_id]["total_shares"] += size
 
                 self._logger.info(
                     f"{OPERATION_EMOJIS['network']} Found {len(asset_info_map)} unique assets from API trade history"
@@ -1101,17 +1121,26 @@ class PolymarketClient:
 
                     # Only include non-zero positions
                     if on_chain_balance > 0.0001:
+                        # Calculate average price from trade history
+                        avg_price = None
+                        if asset_id in asset_price_info:
+                            price_info = asset_price_info[asset_id]
+                            if price_info["total_shares"] > 0:
+                                avg_price = price_info["total_cost"] / price_info["total_shares"]
+
                         balance = BalanceItem(
                             condition_id=info["market_id"],
                             outcome=info["outcome"],
                             shares=on_chain_balance,
                             asset_id=asset_id,
                             market_title=None,
+                            avg_price=avg_price,
                         )
                         balances.append(balance)
                         self._logger.debug(
                             f"{OPERATION_EMOJIS['network']} Position: {info['outcome']} "
                             f"{on_chain_balance:.6f} shares (asset: {asset_id[:10]}...)"
+                            f"{' avg_price=' + f'{avg_price:.4f}' if avg_price else ''}"
                         )
                     else:
                         self._logger.debug(

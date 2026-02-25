@@ -66,6 +66,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
     logger.info("✅ Database initialized")
 
+    # Load state from storage to ensure correct capital values
+    from src.core.state import get_state_manager
+    state = get_state_manager()
+    result = await state.load_from_storage()
+    if result.success:
+        logger.info("✅ State loaded from storage")
+    else:
+        logger.warning("⚠️ Failed to load state from storage, using defaults")
+
     yield
 
     # Shutdown

@@ -232,16 +232,26 @@ class Application:
 
             client = PolymarketClient()
             min_deadline_hours = settings.market_filter.min_deadline_hours
+            max_deadline_hours = settings.market_filter.max_deadline_hours
             end_date_min = datetime.now(timezone.utc) + timedelta(
                 hours=min_deadline_hours
             )
+
+            # Calculate max deadline for server-side filtering
+            # If max_deadline_hours is 0 or None, don't set end_date_max (no limit)
+            end_date_max = None
+            if max_deadline_hours and max_deadline_hours > 0:
+                end_date_max = datetime.now(timezone.utc) + timedelta(
+                    hours=max_deadline_hours
+                )
 
             gamma_markets = client.get_all_active_markets(
                 total_limit=200,
                 page_size=50,
                 order_by="volume24hr",  # Sort by volume (most liquid first)
                 ascending=False,
-                end_date_min=end_date_min,  # Server-side deadline filter
+                end_date_min=end_date_min,  # Server-side min deadline filter
+                end_date_max=end_date_max,  # Server-side max deadline filter
             )
             logger.info(
                 f"Fetched {len(gamma_markets)} active markets for initial analysis"
@@ -415,16 +425,26 @@ class Application:
 
                 client = PolymarketClient()
                 min_deadline_hours = app_settings.market_filter.min_deadline_hours
+                max_deadline_hours = app_settings.market_filter.max_deadline_hours
                 end_date_min = datetime.now(timezone.utc) + timedelta(
                     hours=min_deadline_hours
                 )
+
+                # Calculate max deadline for server-side filtering
+                # If max_deadline_hours is 0 or None, don't set end_date_max (no limit)
+                end_date_max = None
+                if max_deadline_hours and max_deadline_hours > 0:
+                    end_date_max = datetime.now(timezone.utc) + timedelta(
+                        hours=max_deadline_hours
+                    )
 
                 gamma_markets = client.get_all_active_markets(
                     total_limit=200,
                     page_size=50,
                     order_by="volume24hr",  # Sort by volume (most liquid first)
                     ascending=False,
-                    end_date_min=end_date_min,  # Server-side deadline filter
+                    end_date_min=end_date_min,  # Server-side min deadline filter
+                    end_date_max=end_date_max,  # Server-side max deadline filter
                 )
                 logger.info(f"Fetched {len(gamma_markets)} active markets")
 

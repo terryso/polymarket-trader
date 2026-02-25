@@ -151,7 +151,31 @@ class ThreadSafeState:
         self._open_positions_count: int = 0
         self._trading_enabled: bool = True
         self._reduced_mode: bool = False
-        self._lock: asyncio.Lock = asyncio.Lock()
+        # Lock is created lazily to handle different event loops
+        self._lock: asyncio.Lock | None = None
+        self._lock_loop_id: int | None = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create lock for current event loop.
+
+        This ensures the lock is always bound to the current event loop,
+        which is necessary when using asyncio.run() in scheduled tasks.
+
+        Returns:
+            asyncio.Lock bound to current event loop
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            loop_id = id(loop)
+            if self._lock is None or self._lock_loop_id != loop_id:
+                self._lock = asyncio.Lock()
+                self._lock_loop_id = loop_id
+            return self._lock
+        except RuntimeError:
+            # No running loop, create a new lock
+            if self._lock is None:
+                self._lock = asyncio.Lock()
+            return self._lock
 
     async def get_state(self) -> StateSnapshot:
         """Get current state snapshot.
@@ -167,7 +191,7 @@ class ThreadSafeState:
             >>> snapshot.current_capital
             200.0
         """
-        async with self._lock:
+        async with self._get_lock():
             return StateSnapshot(
                 current_capital=self._capital,
                 daily_pnl=self._daily_pnl,
@@ -191,7 +215,7 @@ class ThreadSafeState:
             >>> await state.update_capital(10.0)  # Gain $10
             >>> await state.update_capital(-5.0)  # Loss $5
         """
-        async with self._lock:
+        async with self._get_lock():
             self._capital += amount
             self._daily_pnl += amount
             logger.info(
@@ -211,7 +235,7 @@ class ThreadSafeState:
             >>> await state.record_trade_result(True)   # Win, reset losses
             >>> await state.record_trade_result(False)  # Loss, increment
         """
-        async with self._lock:
+        async with self._get_lock():
             if is_win:
                 self._consecutive_losses = 0
                 logger.info("Trade result: WIN, consecutive losses reset to 0")
@@ -230,7 +254,7 @@ class ThreadSafeState:
         Example:
             >>> await state.reset_daily()
         """
-        async with self._lock:
+        async with self._get_lock():
             self._daily_pnl = 0.0
             self._consecutive_losses = 0
             logger.info("Daily state reset: daily_pnl=0, consecutive_losses=0")
@@ -246,7 +270,7 @@ class ThreadSafeState:
         Example:
             >>> await state.set_trading_enabled(False)  # Disable trading
         """
-        async with self._lock:
+        async with self._get_lock():
             self._trading_enabled = enabled
             status = "enabled" if enabled else "DISABLED"
             logger.info(f"Trading {status}")
@@ -262,7 +286,7 @@ class ThreadSafeState:
         Example:
             >>> await state.set_mode(paper_trading=True)  # Switch to Paper
         """
-        async with self._lock:
+        async with self._get_lock():
             # Update settings (runtime)
             settings.trading_mode = "paper" if paper_trading else "live"
             mode = "PAPER" if paper_trading else "LIVE"
@@ -280,7 +304,7 @@ class ThreadSafeState:
         Example:
             >>> await state.set_reduced_mode(True)  # Enter reduced mode
         """
-        async with self._lock:
+        async with self._get_lock():
             self._reduced_mode = reduced
             status = "ENTERING" if reduced else "EXITING"
             logger.warning(f"{status} reduced mode")
@@ -293,7 +317,7 @@ class ThreadSafeState:
         Example:
             >>> await state.increment_open_positions()
         """
-        async with self._lock:
+        async with self._get_lock():
             self._open_positions_count += 1
             logger.info(f"Open positions: {self._open_positions_count}")
 
@@ -305,7 +329,7 @@ class ThreadSafeState:
         Example:
             >>> await state.decrement_open_positions()
         """
-        async with self._lock:
+        async with self._get_lock():
             self._open_positions_count = max(0, self._open_positions_count - 1)
             logger.info(f"Open positions: {self._open_positions_count}")
 
@@ -369,7 +393,7 @@ class ThreadSafeState:
         result = await recovery_manager.recover()
 
         if result.success:
-            async with self._lock:
+            async with self._get_lock():
                 self._capital = result.recovered_state.get(
                     "current_capital", self._capital
                 )
@@ -459,14 +483,38 @@ def get_state_manager() -> ThreadSafeState:
     Returns the global state manager instance, creating it if necessary.
     For persistence, use ThreadSafeState.restore() instead.
 
+    Note: The state is initialized with default values. To load persisted
+    state, call load_from_storage() after getting the manager.
+
     Returns:
         ThreadSafeState: The state manager instance
 
     Example:
         >>> state = get_state_manager()
+        >>> await state.load_from_storage()  # Load persisted state
         >>> snapshot = await state.get_state()
     """
     global _state_manager
     if _state_manager is None:
         _state_manager = ThreadSafeState()
+    return _state_manager
+
+
+async def get_state_manager_with_recovery() -> ThreadSafeState:
+    """Get state manager singleton instance with recovery.
+
+    Returns the global state manager instance, creating it if necessary.
+    If creating a new instance, it will load persisted state from storage.
+
+    Returns:
+        ThreadSafeState: The state manager instance with recovered state
+
+    Example:
+        >>> state = await get_state_manager_with_recovery()
+        >>> snapshot = await state.get_state()
+    """
+    global _state_manager
+    if _state_manager is None:
+        _state_manager = ThreadSafeState()
+        await _state_manager.load_from_storage()
     return _state_manager

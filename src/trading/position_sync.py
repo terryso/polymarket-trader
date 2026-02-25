@@ -266,14 +266,17 @@ class PositionSyncService:
             return "updated"
         else:
             # Create new position
+            # Use avg_price from balance if available, otherwise default to 0.5
+            avg_price = balance.avg_price if balance.avg_price is not None else 0.5
+
             new_position = Position(
                 id=0,  # Will be assigned by database
                 market_id=balance.condition_id,
                 outcome=PositionOutcome(outcome_value),
                 shares=balance.shares,
-                avg_price=0.5,  # Default, actual price unknown from balance API
-                initial_value=balance.shares * 0.5,
-                current_value=balance.shares * 0.5,
+                avg_price=avg_price,
+                initial_value=balance.shares * avg_price,
+                current_value=balance.shares * avg_price,
                 pnl=0.0,
                 status=PositionStatus.OPEN,
                 opened_at=datetime.now(),

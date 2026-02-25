@@ -38,12 +38,14 @@ class TradeType(str, Enum):
         BUY_NO: Buy NO outcome shares
         SELL_YES: Sell YES outcome shares
         SELL_NO: Sell NO outcome shares
+        SELL: Generic sell (deprecated, for backwards compatibility)
     """
 
     BUY_YES = "BUY_YES"
     BUY_NO = "BUY_NO"
     SELL_YES = "SELL_YES"
     SELL_NO = "SELL_NO"
+    SELL = "SELL"  # Backwards compatibility for old trades
 
 
 class TradeMode(str, Enum):

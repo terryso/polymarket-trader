@@ -138,16 +138,25 @@ class LiveTradingExecutor:
         Raises:
             ValidationError: If token IDs not available
         """
-        if not market.clob_token_ids or len(market.clob_token_ids) < 2:
+        # Try to get token IDs from market object first
+        if market.clob_token_ids and len(market.clob_token_ids) >= 2:
+            # clob_token_ids[0] = YES token, clob_token_ids[1] = NO token
+            if trade_type == TradeType.BUY_YES:
+                return market.clob_token_ids[0]
+            else:
+                return market.clob_token_ids[1]
+
+        # Fallback: Fetch token IDs from Polymarket API
+        token_ids = self._fetch_clob_token_ids(market.id)
+        if not token_ids or len(token_ids) < 2:
             raise ValidationError(
-                f"Market {market.id} does not have CLOB token IDs"
+                f"Market {market.id} does not have CLOB token IDs (not in DB and fetch failed)"
             )
 
-        # clob_token_ids[0] = YES token, clob_token_ids[1] = NO token
         if trade_type == TradeType.BUY_YES:
-            return market.clob_token_ids[0]
+            return token_ids[0]
         else:
-            return market.clob_token_ids[1]
+            return token_ids[1]
 
     def _get_price(self, market: "Market", trade_type: TradeType) -> float:
         """Get the current price for the trade.
@@ -186,17 +195,53 @@ class LiveTradingExecutor:
         Raises:
             ValidationError: If token IDs not available
         """
-        if not market.clob_token_ids or len(market.clob_token_ids) < 2:
+        # Try to get token IDs from market object first
+        if market.clob_token_ids and len(market.clob_token_ids) >= 2:
+            # Sell using the token corresponding to the position outcome
+            # clob_token_ids[0] = YES token, clob_token_ids[1] = NO token
+            if position.outcome == PositionOutcome.YES:
+                return market.clob_token_ids[0]
+            else:
+                return market.clob_token_ids[1]
+
+        # Fallback: Fetch token IDs from Polymarket API
+        token_ids = self._fetch_clob_token_ids(market.id)
+        if not token_ids or len(token_ids) < 2:
             raise ValidationError(
-                f"Market {market.id} does not have CLOB token IDs"
+                f"Market {market.id} does not have CLOB token IDs (not in DB and fetch failed)"
             )
 
-        # Sell using the token corresponding to the position outcome
-        # clob_token_ids[0] = YES token, clob_token_ids[1] = NO token
         if position.outcome == PositionOutcome.YES:
-            return market.clob_token_ids[0]
+            return token_ids[0]
         else:
-            return market.clob_token_ids[1]
+            return token_ids[1]
+
+    def _fetch_clob_token_ids(self, market_id: str) -> list[str] | None:
+        """Fetch CLOB token IDs from Polymarket API.
+
+        Args:
+            market_id: Market condition ID
+
+        Returns:
+            List of token IDs [YES, NO] or None if fetch failed
+        """
+        try:
+            # Use the CLOB client to get market data
+            market_data = self._client._client.get_market(market_id)
+            if market_data:
+                tokens = market_data.get("tokens", [])
+                if len(tokens) >= 2:
+                    # tokens[0] = YES, tokens[1] = NO
+                    return [tokens[0].get("token_id"), tokens[1].get("token_id")]
+            self._logger.warning(
+                f"Failed to fetch CLOB token IDs for market {market_id[:10]}..."
+            )
+            return None
+        except Exception as e:
+            self._logger.warning(
+                f"Error fetching CLOB token IDs for market {market_id[:10]}...: {e}"
+            )
+            return None
 
     def _get_sell_trade_type(self, position: "Position") -> TradeType:
         """Determine trade type based on position outcome.

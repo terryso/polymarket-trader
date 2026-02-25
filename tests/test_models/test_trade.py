@@ -25,10 +25,11 @@ class TestTradeType:
         assert TradeType.BUY_NO.value == "BUY_NO"
         assert TradeType.SELL_YES.value == "SELL_YES"
         assert TradeType.SELL_NO.value == "SELL_NO"
+        assert TradeType.SELL.value == "SELL"  # Backwards compatibility
 
     def test_type_count(self) -> None:
         """Test total number of trade types."""
-        assert len(TradeType) == 4
+        assert len(TradeType) == 5  # 4 specific types + SELL for backwards compatibility
 
     def test_type_is_str_enum(self) -> None:
         """Test TradeType is string enum."""
