@@ -18,7 +18,7 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["Position", "PositionStatus", "PositionOutcome"]
+__all__ = ["Position", "PositionStatus", "PositionOutcome", "CacheFreshness"]
 
 from datetime import datetime
 from enum import Enum
@@ -53,6 +53,24 @@ class PositionOutcome(str, Enum):
 
     YES = "YES"
     NO = "NO"
+
+
+class CacheFreshness(str, Enum):
+    """Cache freshness enumeration.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Defines the freshness state of cached position data.
+
+    Attributes:
+        FRESH: Cache is valid and within TTL
+        STALE: Cache is expired but API failed, using old data
+        EXPIRED: Cache is expired and no data available
+    """
+
+    FRESH = "fresh"
+    STALE = "stale"
+    EXPIRED = "expired"
 
 
 class Position(BaseModel):

@@ -148,9 +148,17 @@ class TelegramClient:
             ) from e
 
     async def shutdown(self) -> None:
-        """Shutdown the Telegram application."""
+        """Shutdown the Telegram application.
+
+        Important: Must stop updater polling before shutting down the application,
+        otherwise the process may hang on Ctrl+C.
+        """
         if self._application:
             try:
+                # First stop the updater if it's polling
+                await self.stop_polling()
+
+                # Then shutdown the application
                 await self._application.shutdown()
                 self._logger.info(
                     f"{TELEGRAM_EMOJIS['success']} Telegram client shutdown"

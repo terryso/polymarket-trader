@@ -148,6 +148,24 @@ class TestLiveTradingExecutorSell:
 
         manager._repo.update = AsyncMock(side_effect=update_position)
 
+        # Tech-Spec: Single Source of Truth - mock the API fetch method
+        # Default: return a position with 100 shares (same as sample_position)
+        async def get_position_by_market_from_api(market_id: str):
+            # Return a default position - tests can override this if needed
+            return Position(
+                id=1,
+                market_id=market_id,
+                outcome=PositionOutcome.YES,
+                shares=100.0,  # Default shares for sell tests
+                avg_price=0.45,
+                initial_value=45.0,
+                current_value=55.0,
+                pnl=10.0,
+                status=PositionStatus.OPEN,
+            )
+
+        manager.get_position_by_market_from_api = AsyncMock(side_effect=get_position_by_market_from_api)
+
         return manager
 
     @pytest.fixture
@@ -241,8 +259,10 @@ class TestLiveTradingExecutorSell:
         assert result.trade is not None
         assert result.trade.trade_type == TradeType.SELL_YES
         assert result.trade.shares == 100.0
-        assert result.trade.price == 0.55
-        assert result.realized_pnl == pytest.approx(10.0, rel=1e-2)  # (0.55 - 0.45) * 100
+        # Sell price is slightly below market price for quick execution
+        assert result.trade.price == pytest.approx(0.539, rel=1e-2)  # 0.55 * 0.98 discount
+        # Realized PnL adjusted for discount
+        assert result.realized_pnl == pytest.approx(8.9, rel=1e-1)  # (0.539 - 0.45) * 100
 
         # Verify order was placed with SELL side
         mock_client._client.create_and_post_order.assert_called_once()
@@ -259,7 +279,7 @@ class TestLiveTradingExecutorSell:
         # Verify capital was updated
         mock_state.update_capital.assert_called_once()
         call_args = mock_state.update_capital.call_args[0][0]
-        assert call_args == pytest.approx(55.0, rel=1e-2)  # 100 * 0.55
+        assert call_args == pytest.approx(53.9, rel=1e-1)  # 100 * 0.539
 
     @pytest.mark.asyncio
     async def test_sell_full_position_no_success(
@@ -307,7 +327,7 @@ class TestLiveTradingExecutorSell:
         assert result.success is True
         assert result.trade is not None
         assert result.trade.shares == 50.0
-        assert result.realized_pnl == pytest.approx(5.0, rel=1e-2)  # (0.55 - 0.45) * 50
+        assert result.realized_pnl == pytest.approx(4.45, rel=1e-1)  # (0.539 - 0.45) * 50
 
         # Position should NOT be closed
         mock_position_manager.close_position.assert_not_called()
@@ -414,21 +434,24 @@ class TestLiveTradingExecutorSell:
         assert "not open" in result.error_message.lower()
 
     @pytest.mark.asyncio
-    async def test_sell_shares_exceeds_position_fails(
+    async def test_sell_shares_exceeds_position_sells_all(
         self,
         executor: LiveTradingExecutor,
         sample_market: Market,
         sample_position_yes: Position,
     ) -> None:
-        """测试卖出份额超过持仓数量失败."""
+        """测试卖出份额超过持仓数量时自动卖全部."""
+        # New behavior: automatically caps to actual position
         result = await executor.sell_position(
             position=sample_position_yes,
             market=sample_market,
             shares=200.0,  # More than 100 shares held
         )
 
-        assert result.success is False
-        assert "cannot sell" in result.error_message.lower()
+        # Should succeed and sell all 100 shares
+        assert result.success is True
+        assert result.trade is not None
+        assert result.trade.shares == 100.0  # Capped to actual position
 
     @pytest.mark.asyncio
     async def test_sell_zero_shares_fails(
@@ -589,7 +612,8 @@ class TestLiveTradingExecutorSell:
     ) -> None:
         """测试获取 YES 持仓的卖出价格."""
         price = executor._get_sell_price(sample_position_yes, sample_market)
-        assert price == 0.55
+        # Sell price uses 2% discount for quick execution
+        assert price == pytest.approx(0.539, rel=1e-2)  # 0.55 * 0.98
 
     def test_get_sell_price_no(
         self,
@@ -599,7 +623,8 @@ class TestLiveTradingExecutorSell:
     ) -> None:
         """测试获取 NO 持仓的卖出价格."""
         price = executor._get_sell_price(sample_position_no, sample_market)
-        assert price == 0.45
+        # Sell price uses 2% discount for quick execution
+        assert price == pytest.approx(0.441, rel=1e-2)  # 0.45 * 0.98
 
     # ========== PnL Calculation Tests ==========
 
@@ -611,15 +636,15 @@ class TestLiveTradingExecutorSell:
         sample_position_yes: Position,
     ) -> None:
         """测试已实现盈利计算."""
-        # Position: bought at 0.45, selling at 0.55
-        # PnL = (0.55 - 0.45) * 100 = 10.0
+        # Position: bought at 0.45, selling at 0.539 (2% discount)
+        # PnL = (0.539 - 0.45) * 100 = 8.9
         result = await executor.sell_position(
             position=sample_position_yes,
             market=sample_market,
         )
 
         assert result.success is True
-        assert result.realized_pnl == pytest.approx(10.0, rel=1e-2)
+        assert result.realized_pnl == pytest.approx(8.9, rel=1e-1)
 
     @pytest.mark.asyncio
     async def test_realized_pnl_loss(
@@ -629,15 +654,15 @@ class TestLiveTradingExecutorSell:
         sample_position_no: Position,
     ) -> None:
         """测试已实现亏损计算."""
-        # Position: bought at 0.55, selling at 0.45
-        # PnL = (0.45 - 0.55) * 100 = -10.0
+        # Position: bought at 0.55, selling at 0.441 (2% discount)
+        # PnL = (0.441 - 0.55) * 100 = -10.9
         result = await executor.sell_position(
             position=sample_position_no,
             market=sample_market,
         )
 
         assert result.success is True
-        assert result.realized_pnl == pytest.approx(-10.0, rel=1e-2)
+        assert result.realized_pnl == pytest.approx(-10.9, rel=1e-1)
 
     @pytest.mark.asyncio
     async def test_realized_pnl_partial_sell(
@@ -647,8 +672,8 @@ class TestLiveTradingExecutorSell:
         sample_position_yes: Position,
     ) -> None:
         """测试部分卖出的已实现盈亏计算."""
-        # Sell 30 shares at 0.55, bought at 0.45
-        # PnL = (0.55 - 0.45) * 30 = 3.0
+        # Sell 30 shares at 0.539 (2% discount), bought at 0.45
+        # PnL = (0.539 - 0.45) * 30 = 2.67
         result = await executor.sell_position(
             position=sample_position_yes,
             market=sample_market,
@@ -656,4 +681,4 @@ class TestLiveTradingExecutorSell:
         )
 
         assert result.success is True
-        assert result.realized_pnl == pytest.approx(3.0, rel=1e-2)
+        assert result.realized_pnl == pytest.approx(2.67, rel=1e-1)

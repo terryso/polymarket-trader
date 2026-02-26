@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.models.position import Position, PositionOutcome, PositionStatus
+from src.models.position import CacheFreshness, Position, PositionOutcome, PositionStatus
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 
 
@@ -85,6 +85,10 @@ def mock_position_repo() -> MagicMock:
 @pytest.fixture
 def client(mock_position_repo: MagicMock) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
+    # Reset PositionCacheService singleton to ensure clean state
+    from src.trading.position_sync import PositionCacheService
+    PositionCacheService._reset_instance()
+
     # Patch init_db and close_db to avoid database operations
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
@@ -104,6 +108,9 @@ def client(mock_position_repo: MagicMock) -> Generator[TestClient, None, None]:
 
             # Clean up
             app.dependency_overrides.clear()
+
+            # Reset singleton after test
+            PositionCacheService._reset_instance()
 
 
 class TestListPositions:
@@ -134,19 +141,23 @@ class TestListPositions:
 
         assert data["success"] is True
 
-    def test_list_positions_returns_data_list(
+    def test_list_positions_returns_data_with_cache_info(
         self,
         client: TestClient,
         mock_position_repo: MagicMock,
     ) -> None:
-        """Test list positions returns data as list."""
+        """Test list positions returns data with cache information."""
         mock_position_repo.get_open_positions.return_value = []
 
         response = client.get("/api/positions")
         data = response.json()
 
         assert "data" in data
-        assert isinstance(data["data"], list)
+        assert "positions" in data["data"]
+        assert "cache_freshness" in data["data"]
+        assert "cache_age_seconds" in data["data"]
+        assert "total_count" in data["data"]
+        assert isinstance(data["data"]["positions"], list)
 
     def test_list_positions_with_data(
         self,
@@ -155,23 +166,42 @@ class TestListPositions:
         sample_positions: list[Position],
     ) -> None:
         """Test list positions returns positions correctly."""
-        mock_position_repo.get_open_positions.return_value = sample_positions
+        from src.models.position import CacheFreshness
 
-        response = client.get("/api/positions")
-        data = response.json()
+        # Mock the PositionCacheService - patch at module level where it's imported
+        with patch("src.trading.position_sync.PositionCacheService") as mock_cache_service:
+            mock_instance = MagicMock()
+            mock_instance.get_positions = AsyncMock(
+                return_value=(sample_positions, CacheFreshness.FRESH)
+            )
+            mock_instance.get_cache_status = AsyncMock(
+                return_value=MagicMock(
+                    cache_updated_at=datetime(2026, 2, 15, 10, 30, 0),
+                    cache_age_seconds=30,
+                    cache_freshness=CacheFreshness.FRESH,
+                    is_refreshing=False,
+                    can_refresh=True,
+                    last_error=None,
+                    total_positions=2,
+                )
+            )
+            mock_cache_service.return_value = mock_instance
 
-        assert response.status_code == 200
-        assert data["success"] is True
-        assert len(data["data"]) == 2
+            response = client.get("/api/positions")
+            data = response.json()
 
-        # Check first position
-        first_position = data["data"][0]
-        assert first_position["id"] == 1
-        assert first_position["market_id"] == "market-001"
-        assert first_position["outcome"] == "YES"
-        assert first_position["shares"] == 222.22
-        assert first_position["avg_price"] == 0.45
-        assert first_position["status"] == "OPEN"
+            assert response.status_code == 200
+            assert data["success"] is True
+            assert len(data["data"]["positions"]) == 2
+
+            # Check first position
+            first_position = data["data"]["positions"][0]
+            assert first_position["id"] == 1
+            assert first_position["market_id"] == "market-001"
+            assert first_position["outcome"] == "YES"
+            assert first_position["shares"] == 222.22
+            assert first_position["avg_price"] == 0.45
+            assert first_position["status"] == "OPEN"
 
     def test_list_positions_empty(
         self,
@@ -186,7 +216,8 @@ class TestListPositions:
 
         assert response.status_code == 200
         assert data["success"] is True
-        assert len(data["data"]) == 0
+        assert len(data["data"]["positions"]) == 0
+        assert data["data"]["total_count"] == 0
 
 
 class TestGetPosition:

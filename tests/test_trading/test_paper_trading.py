@@ -64,6 +64,8 @@ class TestPaperTradingExecutor:
             )
 
         manager.open_position.side_effect = make_position
+        # Tech-Spec: Single Source of Truth - mock the API fetch method
+        manager.get_position_by_market_from_api = AsyncMock(return_value=None)
         return manager
 
     @pytest.fixture
@@ -385,6 +387,9 @@ class TestPaperTradingExecutor:
         from src.exceptions import TradingError
 
         mock_position_manager = AsyncMock()
+        # Tech-Spec: First check for existing position via API
+        mock_position_manager.get_position_by_market_from_api = AsyncMock(return_value=None)
+        # Then open_position throws
         mock_position_manager.open_position.side_effect = TradingError(
             "Position already exists"
         )

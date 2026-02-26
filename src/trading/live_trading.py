@@ -2,6 +2,8 @@
 
 This module provides the LiveTradingExecutor class that executes real trades
 on Polymarket using the CLOB API.
+
+Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from src.models.position import PositionOutcome
 from src.models.prediction import Recommendation
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.storage.repositories.trade_repo import TradeRepository
-from src.utils.logger import get_logger
+from src.utils.logger import OPERATION_EMOJIS, get_logger
 
 if TYPE_CHECKING:
     from src.api.polymarket import PolymarketClient
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
     from src.models.market import Market
     from src.models.position import Position
     from src.models.prediction import PredictionResult
+    from src.trading.position_cache import PositionCacheService
     from src.trading.position_manager import PositionManager
 
 
@@ -74,11 +77,16 @@ class LiveTradingExecutor:
     This executor places real orders on Polymarket using the CLOB API.
     It creates Trade records with mode=LIVE and links them to positions.
 
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+        - Added cache_service for marking cache stale after trades
+        - Uses get_position_by_market_from_api for trade validation
+
     Attributes:
         _client: PolymarketClient instance for API calls
         _trade_repo: Repository for trade records
         _position_manager: Manager for position lifecycle
         _state: Thread-safe state for capital tracking
+        _cache_service: Optional cache service for marking stale
 
     Example:
         >>> executor = LiveTradingExecutor(client, trade_repo, position_manager, state)
@@ -93,6 +101,7 @@ class LiveTradingExecutor:
         trade_repo: TradeRepository,
         position_manager: "PositionManager",
         state: "ThreadSafeState",
+        cache_service: "PositionCacheService | None" = None,
     ) -> None:
         """Initialize live trading executor.
 
@@ -101,11 +110,13 @@ class LiveTradingExecutor:
             trade_repo: Repository for trade records
             position_manager: Manager for position lifecycle
             state: Thread-safe state for capital tracking
+            cache_service: Optional cache service for marking stale after trades
         """
         self._client = client
         self._trade_repo = trade_repo
         self._position_manager = position_manager
         self._state = state
+        self._cache_service = cache_service
         self._logger = get_logger(__name__)
         self._logger.info("LiveTradingExecutor initialized")
 
@@ -319,6 +330,10 @@ class LiveTradingExecutor:
 
         Places a real order on Polymarket CLOB and records the trade.
 
+        Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+            - Uses get_position_by_market_from_api for fresh position validation
+            - Marks cache stale after successful trade
+
         Args:
             market: Market to trade
             prediction: LLM prediction with recommendation
@@ -333,12 +348,13 @@ class LiveTradingExecutor:
             TradingError: If trade execution fails
         """
         try:
-            # 0. Check for existing open position (prevent duplicate trades)
-            existing_position = await self._position_manager.get_position_by_market(market.id)
+            # 0. Check for existing open position from API (prevent duplicate trades)
+            # Tech-Spec: Use API to check for positions (fresh data)
+            existing_position = await self._position_manager.get_position_by_market_from_api(market.id)
             if existing_position:
                 self._logger.warning(
-                    f"Skipping trade: open position already exists for market {market.id} "
-                    f"(position_id={existing_position.id})"
+                    f"{OPERATION_EMOJIS['warning']} Skipping trade: open position already exists "
+                    f"for market {market.id} (shares={existing_position.shares:.2f})"
                 )
                 return LiveTradeResult(
                     trade=None,
@@ -432,8 +448,13 @@ class LiveTradingExecutor:
             # 8. Update state capital
             await self._state.update_capital(-amount)
 
+            # 9. Mark cache as stale (Tech-Spec: Single Source of Truth)
+            if self._cache_service:
+                await self._cache_service.mark_stale()
+                self._logger.debug(f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade")
+
             self._logger.info(
-                f"Live trade completed: trade_id={saved_trade.id}, "
+                f"{OPERATION_EMOJIS['success']} Live trade completed: trade_id={saved_trade.id}, "
                 f"position_id={position.id}, order_id={order_id}"
             )
 
@@ -445,14 +466,14 @@ class LiveTradingExecutor:
             )
 
         except (ValidationError, TradingError) as e:
-            self._logger.error(f"Live trade failed: {e}")
+            self._logger.error(f"{OPERATION_EMOJIS['error']} Live trade failed: {e}")
             return LiveTradeResult(
                 trade=None,
                 success=False,
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"Unexpected error in live trade: {e}")
+            self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in live trade: {e}")
             return LiveTradeResult(
                 trade=None,
                 success=False,
@@ -469,6 +490,9 @@ class LiveTradingExecutor:
         """Sell a position on Polymarket.
 
         Story 10.1: 卖出执行器
+        Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+            - Gets latest shares from API before selling
+            - Marks cache stale after successful sell
 
         Places a sell order on Polymarket CLOB and records the trade.
         Supports both full and partial position sells.
@@ -490,6 +514,23 @@ class LiveTradingExecutor:
         from py_clob_client.clob_types import OrderArgs
 
         try:
+            # 0. Get fresh position data from API (Tech-Spec: Single Source of Truth)
+            api_position = await self._position_manager.get_position_by_market_from_api(market.id)
+            if api_position is None:
+                return SellResult(
+                    trade=None,
+                    position=position,
+                    success=False,
+                    error_message=f"No position found on API for market {market.id}",
+                )
+
+            # Use API shares for actual sell amount
+            actual_shares = api_position.shares
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} API position: {actual_shares:.4f} shares "
+                f"(local: {position.shares:.4f})"
+            )
+
             # 1. Validate position
             if position.status != "OPEN":
                 return SellResult(
@@ -499,9 +540,9 @@ class LiveTradingExecutor:
                     error_message=f"Position {position.id} is not open (status={position.status})",
                 )
 
-            # 2. Determine shares to sell
+            # 2. Determine shares to sell (use API shares)
             if shares is None:
-                shares_to_sell = position.shares  # Full sell
+                shares_to_sell = actual_shares  # Full sell using API shares
             else:
                 if shares <= 0:
                     return SellResult(
@@ -510,14 +551,14 @@ class LiveTradingExecutor:
                         success=False,
                         error_message=f"Invalid shares amount: {shares}",
                     )
-                if shares > position.shares:
-                    return SellResult(
-                        trade=None,
-                        position=position,
-                        success=False,
-                        error_message=f"Cannot sell {shares} shares, position only has {position.shares}",
+                if shares > actual_shares:
+                    self._logger.warning(
+                        f"{OPERATION_EMOJIS['warning']} Requested {shares:.4f} shares but API shows "
+                        f"{actual_shares:.4f}, will sell {actual_shares:.4f}"
                     )
-                shares_to_sell = shares
+                    shares_to_sell = actual_shares  # Cap to actual shares
+                else:
+                    shares_to_sell = shares
 
             # 3. Get sell parameters
             token_id = self._get_sell_token_id(position, market)
@@ -580,7 +621,7 @@ class LiveTradingExecutor:
             self._logger.info(f"Sell trade saved: id={saved_trade.id}, order_id={order_id}")
 
             # 7. Update or close position
-            is_full_sell = shares_to_sell >= position.shares
+            is_full_sell = shares_to_sell >= actual_shares
 
             if is_full_sell:
                 # Close position completely
@@ -594,7 +635,7 @@ class LiveTradingExecutor:
                 )
             else:
                 # Partial sell - update position shares and value
-                remaining_shares = position.shares - shares_to_sell
+                remaining_shares = actual_shares - shares_to_sell
                 remaining_value = remaining_shares * price
 
                 # Update position directly in repository
@@ -613,8 +654,13 @@ class LiveTradingExecutor:
             # 8. Update state capital (add proceeds from sale)
             await self._state.update_capital(sell_proceeds)
 
+            # 9. Mark cache as stale (Tech-Spec: Single Source of Truth)
+            if self._cache_service:
+                await self._cache_service.mark_stale()
+                self._logger.debug(f"{OPERATION_EMOJIS['data']} Cache marked as stale after sell")
+
             self._logger.info(
-                f"💰 Sell completed: trade_id={saved_trade.id}, "
+                f"{OPERATION_EMOJIS['success']} Sell completed: trade_id={saved_trade.id}, "
                 f"proceeds=${sell_proceeds:.2f}, realized_pnl=${realized_pnl:.2f}"
             )
 
@@ -626,7 +672,7 @@ class LiveTradingExecutor:
             )
 
         except (ValidationError, TradingError) as e:
-            self._logger.error(f"Sell position failed: {e}")
+            self._logger.error(f"{OPERATION_EMOJIS['error']} Sell position failed: {e}")
             return SellResult(
                 trade=None,
                 position=position,
@@ -634,7 +680,7 @@ class LiveTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"Unexpected error in sell position: {e}")
+            self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in sell position: {e}")
             return SellResult(
                 trade=None,
                 position=position,

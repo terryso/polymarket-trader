@@ -44,6 +44,9 @@ OPERATION_EMOJIS: dict[str, str] = {
     "analysis": "🧠",
     "data": "📊",
     "network": "🌐",
+    "warning": "⚠️",
+    "success": "✅",
+    "error": "❌",
 }
 
 

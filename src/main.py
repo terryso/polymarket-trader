@@ -246,7 +246,7 @@ class Application:
                 )
 
             gamma_markets = client.get_all_active_markets(
-                total_limit=200,
+                total_limit=50,
                 page_size=50,
                 order_by="volume24hr",  # Sort by volume (most liquid first)
                 ascending=False,
@@ -871,11 +871,13 @@ class Application:
         3. Write PID file
         4. Start Dashboard
         5. Register scheduled tasks
-        6. Run initial market analysis
+        6. Prewarm position cache (Tech-Spec: Single Source of Truth)
         7. Start scheduler
-        8. Register signal handlers
-        9. Wait for shutdown signal
-        10. Perform graceful shutdown
+        8. Run initial market analysis
+        9. Start Telegram polling
+        10. Register signal handlers
+        11. Wait for shutdown signal
+        12. Perform graceful shutdown
 
         Raises:
             BotError: If another instance is already running.
@@ -896,6 +898,13 @@ class Application:
 
             # Register scheduled tasks
             await self.register_scheduled_tasks()
+
+            # Prewarm position cache (Tech-Spec: Single Source of Truth)
+            # Run in background to not block startup
+            from src.core.tasks import prewarm_position_cache
+
+            asyncio.create_task(prewarm_position_cache())
+            logger.info("Position cache prewarming started in background")
 
             # Start scheduler
             if self.scheduler:
@@ -953,8 +962,8 @@ class Application:
         if self._dashboard_task:
             self._dashboard_task.cancel()
             try:
-                await self._dashboard_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._dashboard_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             logger.info("Dashboard shutdown complete")
 
@@ -962,25 +971,31 @@ class Application:
         if self._telegram_task:
             self._telegram_task.cancel()
             try:
-                await self._telegram_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._telegram_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             logger.info("Telegram polling stopped")
 
         if self.telegram_client:
-            await self.telegram_client.shutdown()
+            try:
+                await asyncio.wait_for(self.telegram_client.shutdown(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("Telegram shutdown timed out")
             logger.info("Telegram client shutdown complete")
 
         # 3. Persist state
         if self.state:
             try:
-                await self.state.persist()
+                await asyncio.wait_for(self.state.persist(), timeout=5.0)
                 logger.info("State persisted to database")
-            except Exception as e:
+            except (Exception, asyncio.TimeoutError) as e:
                 logger.warning(f"Failed to persist state during shutdown: {e}")
 
         # 4. Close database connections
-        await close_db()
+        try:
+            await asyncio.wait_for(close_db(), timeout=5.0)
+        except asyncio.TimeoutError:
+            logger.warning("Database close timed out")
         logger.info("Database connections closed")
 
         # 5. Remove PID file
@@ -1027,26 +1042,23 @@ class Application:
             PID_FILE.unlink()
             logger.debug("PID file removed")
 
-    def _setup_signal_handlers(self) -> None:
-        """Setup signal handlers for graceful shutdown."""
-        loop = asyncio.get_running_loop()
-
-        def make_handler(sig: signal.Signals) -> None:
-            """Create a signal handler that triggers shutdown."""
-            asyncio.create_task(self._handle_signal(sig))
-
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, make_handler, sig)
-
     async def _handle_signal(self, sig: signal.Signals) -> None:
         """Handle shutdown signal.
 
         Args:
-            sig: The signal that was received.
+            sig: Signal that was received (SIGTERM, SIGINT, etc.)
         """
         logger.info(f"Received signal {sig.name}, initiating graceful shutdown...")
+        # Set the shutdown event directly
         if self._shutdown_event:
             self._shutdown_event.set()
+
+    def _setup_signal_handlers(self) -> None:
+        """Setup signal handlers for graceful shutdown."""
+        loop = asyncio.get_running_loop()
+
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, self._handle_signal, sig)
 
 
 def parse_args() -> argparse.Namespace:

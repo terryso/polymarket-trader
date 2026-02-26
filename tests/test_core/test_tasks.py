@@ -55,9 +55,9 @@ class TestTaskManager:
             state=mock_state,
         )
 
-        # Should have registered 6 jobs
-        assert len(job_ids) == 6
-        assert mock_scheduler.add_job.call_count == 6
+        # Should have registered 7 jobs (6 original + 1 position cache refresh)
+        assert len(job_ids) == 7
+        assert mock_scheduler.add_job.call_count == 7
 
     def test_register_all_tasks_with_optional_deps(self) -> None:
         """Test registering all tasks with optional dependencies."""
@@ -84,7 +84,7 @@ class TestTaskManager:
             statistics_repo=mock_repo,
         )
 
-        assert len(job_ids) == 6
+        assert len(job_ids) == 7
 
 
 class TestRegisterFetchMarketsJob:
@@ -292,8 +292,8 @@ class TestRegisterAllTasks:
             state=mock_state,
         )
 
-        assert len(job_ids) == 6
-        assert mock_scheduler.add_job.call_count == 6
+        assert len(job_ids) == 7
+        assert mock_scheduler.add_job.call_count == 7
 
 
 class TestFetchMarketsTask:

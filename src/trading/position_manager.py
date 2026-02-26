@@ -7,6 +7,7 @@ Also provides PnL calculation functionality for simulated positions.
 Story 4.5: 持仓管理
 Story 5.4: 模拟持仓 PnL 计算
 Story 9.3: 交易事件通知集成
+Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
 
 Example:
     >>> from src.trading.position_manager import PositionManager
@@ -34,15 +35,18 @@ from __future__ import annotations
 
 __all__ = ["PositionManager", "PnLResult", "TotalPnLResult"]
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from src.config import settings
 from src.exceptions import TradingError, ValidationError
 from src.models.position import Position, PositionOutcome, PositionStatus
-from src.utils.logger import get_logger
+from src.utils.logger import OPERATION_EMOJIS, get_logger
 
 if TYPE_CHECKING:
+    from src.api.polymarket import PolymarketClient
     from src.core.state import ThreadSafeState
     from src.models.market import Market
     from src.notifications.telegram_notifier import TelegramNotifier
@@ -565,3 +569,135 @@ class PositionManager:
         )
 
         return updated_positions
+
+    # ========================================================================
+    # API Fetch Methods (Single Source of Truth)
+    # Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+    # ========================================================================
+
+    async def fetch_positions_from_api(self) -> list[Position]:
+        """Fetch positions directly from Polymarket API (no cache).
+
+        This method bypasses the cache and fetches fresh data from the API.
+        Paper mode returns local database positions.
+
+        Used for trading decisions where fresh data is critical.
+
+        Returns:
+            List of current positions from API (or local database in Paper mode)
+
+        Raises:
+            TradingError: If API call fails in Live mode
+
+        Example:
+            >>> positions = await manager.fetch_positions_from_api()
+            >>> print(f"Current positions: {len(positions)}")
+        """
+        # Paper mode: return local database positions
+        if settings.trading_mode == "paper":
+            self._logger.info(
+                f"{OPERATION_EMOJIS['data']} Paper mode: returning local positions"
+            )
+            return await self._repo.get_open_positions()
+
+        # Live mode: fetch from API
+        from src.api.polymarket import PolymarketClient
+
+        client = None
+        try:
+            client = PolymarketClient()
+
+            # Fetch balances using asyncio.to_thread for sync API call
+            balance_result = await asyncio.to_thread(client.get_balances)
+
+            if not balance_result.is_success:
+                raise TradingError(
+                    f"Failed to fetch positions from API: {balance_result.error}"
+                )
+
+            # Convert balances to Position objects
+            positions: list[Position] = []
+            for balance in balance_result.balances:
+                if balance.shares <= 0:
+                    continue
+
+                # Normalize outcome
+                outcome_value = balance.outcome.upper()
+                if outcome_value not in ("YES", "NO"):
+                    outcome_value = "YES"
+
+                avg_price = balance.avg_price if balance.avg_price is not None else 0.5
+                current_value = balance.shares * avg_price
+
+                position = Position(
+                    id=0,  # Not from database
+                    market_id=balance.condition_id,
+                    outcome=PositionOutcome(outcome_value),
+                    shares=balance.shares,
+                    avg_price=avg_price,
+                    initial_value=current_value,  # We don't have initial value from API
+                    current_value=current_value,
+                    pnl=0.0,
+                    status=PositionStatus.OPEN,
+                    opened_at=datetime.now(timezone.utc),
+                )
+                positions.append(position)
+
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Fetched {len(positions)} positions from API"
+            )
+            return positions
+
+        except Exception as e:
+            error_msg = str(e)
+            self._logger.error(
+                f"{OPERATION_EMOJIS['network']} Failed to fetch positions: {error_msg}"
+            )
+            raise TradingError(f"Failed to fetch positions from API: {error_msg}") from e
+
+        finally:
+            if client:
+                client.close()
+
+    async def get_position_by_market_from_api(self, market_id: str) -> Position | None:
+        """Fetch position for a specific market from API (no cache).
+
+        This method bypasses the cache and fetches fresh data from the API.
+        Paper mode queries the local database.
+
+        Used for trading decisions where fresh data is critical.
+
+        Args:
+            market_id: Market identifier (condition_id)
+
+        Returns:
+            Position if exists, None otherwise
+
+        Example:
+            >>> position = await manager.get_position_by_market_from_api("btc-100k")
+            >>> if position:
+            ...     print(f"Holdings: {position.shares} shares")
+        """
+        # Paper mode: query local database
+        if settings.trading_mode == "paper":
+            self._logger.debug(
+                f"{OPERATION_EMOJIS['data']} Paper mode: querying local position for {market_id}"
+            )
+            return await self._repo.get_by_market(market_id, PositionStatus.OPEN)
+
+        # Live mode: fetch from API
+        positions = await self.fetch_positions_from_api()
+
+        # Find the position for this market
+        for position in positions:
+            if position.market_id == market_id and position.status == PositionStatus.OPEN:
+                self._logger.debug(
+                    f"{OPERATION_EMOJIS['data']} Found API position for {market_id}: "
+                    f"{position.shares} shares"
+                )
+                return position
+
+        self._logger.debug(
+            f"{OPERATION_EMOJIS['data']} No API position found for {market_id}"
+        )
+        return None

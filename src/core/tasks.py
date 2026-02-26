@@ -36,6 +36,8 @@ __all__ = [
     "register_validate_predictions_job",
     "register_reset_daily_state_job",
     "register_persist_state_job",
+    "register_refresh_position_cache_job",
+    "prewarm_position_cache",
 ]
 
 import asyncio
@@ -148,6 +150,9 @@ class TaskManager:
 
         # Register state persistence task
         job_ids.append(register_persist_state_job(scheduler, state))
+
+        # Register position cache refresh task (Tech-Spec: Single Source of Truth)
+        job_ids.append(register_refresh_position_cache_job(scheduler))
 
         self._logger.info(f"All jobs registered: {job_ids}")
         return job_ids
@@ -743,6 +748,143 @@ async def _persist_state_task(state: "ThreadSafeState") -> None:
             f"Job 'persist_state' failed after {elapsed:.2f}s: {e}",
             exc_info=True,
         )
+
+
+# ==================== Tech-Spec: 持仓缓存刷新任务 ====================
+
+
+def register_refresh_position_cache_job(
+    scheduler: Scheduler,
+    interval_seconds: int | None = None,
+) -> str:
+    """Register the position cache refresh task.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    This task periodically refreshes the position cache from Polymarket API
+    to ensure data freshness for the dashboard.
+
+    Args:
+        scheduler: The scheduler instance
+        interval_seconds: Refresh interval in seconds.
+            Default: settings.position_cache.ttl * 5 (5x TTL for optimal balance)
+            Should be greater than position_cache.ttl (default 60s)
+
+    Returns:
+        The registered job ID
+
+    Example:
+        >>> job_id = register_refresh_position_cache_job(scheduler)
+    """
+    # Use settings-based default interval (5x TTL)
+    if interval_seconds is None:
+        interval_seconds = settings.position_cache.ttl * 5
+
+    trigger = IntervalTrigger(seconds=interval_seconds)
+
+    job_id = scheduler.add_job(
+        func=_refresh_position_cache_task_sync,
+        trigger=trigger,
+        id="refresh_position_cache",
+        name="Refresh Position Cache",
+    )
+
+    logger.info(
+        f"Job 'refresh_position_cache' registered with interval: {interval_seconds}s"
+    )
+
+    return job_id
+
+
+def _refresh_position_cache_task_sync() -> None:
+    """Synchronous wrapper for position cache refresh task.
+
+    Handles event loop management properly to avoid asyncio.run() issues
+    in scheduled contexts.
+    """
+    try:
+        # Check if there's already a running event loop
+        loop = asyncio.get_running_loop()
+        # If we're here, there's a running loop - create task
+        asyncio.create_task(_refresh_position_cache_task())
+    except RuntimeError:
+        # No running loop - create one
+        asyncio.run(_refresh_position_cache_task())
+
+
+async def _refresh_position_cache_task() -> None:
+    """Execute position cache refresh task.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Refreshes position cache from Polymarket API.
+    """
+    start_time = time.time()
+    logger.debug("Job 'refresh_position_cache' started")
+
+    try:
+        from src.trading.position_sync import PositionCacheService
+
+        cache_service = PositionCacheService()
+        result = await cache_service.refresh_cache()
+
+        elapsed = time.time() - start_time
+        if result.is_success:
+            logger.debug(
+                f"Job 'refresh_position_cache' completed: "
+                f"{result.new_positions} new, {result.updated_positions} updated, "
+                f"{result.closed_positions} closed in {elapsed:.2f}s"
+            )
+        else:
+            logger.warning(
+                f"Job 'refresh_position_cache' completed with error: {result.error}"
+            )
+
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(
+            f"Job 'refresh_position_cache' failed after {elapsed:.2f}s: {e}",
+            exc_info=True,
+        )
+
+
+async def prewarm_position_cache() -> bool:
+    """Prewarm position cache on application startup.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    This function should be called during application initialization
+    to populate the position cache with fresh data.
+
+    Returns:
+        True if prewarming succeeded, False otherwise
+    """
+    logger.info("🔄 Prewarming position cache...")
+
+    try:
+        from src.trading.position_sync import PositionCacheService
+
+        cache_service = PositionCacheService()
+        result = await cache_service.refresh_cache()
+
+        if result.is_success:
+            logger.info(
+                f"✅ Position cache prewarmed: "
+                f"{result.new_positions} new, {result.updated_positions} updated, "
+                f"{result.total_fetched} fetched"
+            )
+            return True
+        else:
+            # Prewarming failed, but app can still run with empty cache
+            logger.warning(
+                f"⚠️ Position cache prewarming failed: {result.error}. "
+                "App will continue with empty cache."
+            )
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ Position cache prewarming error: {e}")
+        return False
 
 
 # Module-level singleton

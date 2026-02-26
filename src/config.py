@@ -511,6 +511,46 @@ class ExitStrategySettings(BaseEnvSettings):
     )
 
 
+class PositionCacheSettings(BaseEnvSettings):
+    """Position cache configuration settings.
+
+    持仓缓存配置，用于控制缓存 TTL 和刷新间隔。
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Attributes:
+        ttl: 缓存 TTL（秒），默认 60 秒
+        min_refresh_interval: 最小刷新间隔（秒），默认 10 秒
+
+    Example:
+        >>> from src.config import settings
+        >>> settings.position_cache.ttl
+        60
+        >>> settings.position_cache.min_refresh_interval
+        10
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    ttl: int = Field(
+        default=60,
+        alias="POSITION_CACHE_TTL",
+        gt=0,
+        description="Position cache TTL in seconds",
+    )
+    min_refresh_interval: int = Field(
+        default=10,
+        alias="POSITION_CACHE_MIN_INTERVAL",
+        gt=0,
+        description="Minimum interval between cache refreshes in seconds",
+    )
+
+
 class MarketFilterSettings(BaseEnvSettings):
     """Market filter parameters configuration."""
 
@@ -690,6 +730,7 @@ class Settings(BaseEnvSettings):
     task_schedule: TaskScheduleSettings = Field(default_factory=TaskScheduleSettings)
     telegram: TelegramSettings = Field(default_factory=TelegramSettings)
     exit_strategy: ExitStrategySettings = Field(default_factory=ExitStrategySettings)
+    position_cache: PositionCacheSettings = Field(default_factory=PositionCacheSettings)
 
     # Convenience properties for common settings
     @property

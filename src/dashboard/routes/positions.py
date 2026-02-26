@@ -5,12 +5,15 @@ This module provides REST API endpoints for position operations.
 Story 7.3: 持仓与交易 API
 Story 5.7: 同步实际持仓
 Story 10.6: Dashboard 退出策略管理 - 手动退出持仓
+Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
 
 Endpoints:
-    GET /api/positions - Get list of open positions
+    GET /api/positions - Get list of open positions (with cache)
     GET /api/positions/{position_id} - Get position details
-    POST /api/positions/sync - Sync positions from Polymarket
-    GET /api/positions/sync/status - Get sync status
+    POST /api/positions/refresh - Refresh position cache from Polymarket
+    GET /api/positions/cache/status - Get cache status
+    POST /api/positions/sync - (Deprecated) Sync positions from Polymarket
+    GET /api/positions/sync/status - (Deprecated) Get sync status
     POST /api/positions/{position_id}/exit - Manually exit a position
 
 Usage:
@@ -25,12 +28,12 @@ __all__ = ["router"]
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from src.config import settings
 from src.models.api_response import ApiResponse, ErrorCode, ErrorDetail
-from src.models.position import PositionStatus
+from src.models.position import CacheFreshness, PositionStatus
 from src.models.position_response import PositionListItem, PositionResponse
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.storage.repositories.position_repo import PositionRepository
@@ -50,30 +53,78 @@ def get_position_repository() -> PositionRepository:
     return PositionRepository()
 
 
+# ==================== Tech-Spec: 持仓缓存响应模型 ====================
+
+
+class PositionListItemWithCache(PositionListItem):
+    """Position list item with cache freshness info."""
+
+    pass
+
+
+class PositionListResponse(BaseModel):
+    """Position list response with cache info.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Attributes:
+        positions: List of position items with market and share info
+        cache_freshness: Current cache freshness state (FRESH/STALE/EXPIRED)
+        cache_age_seconds: Age of cached data in seconds (0 if no cache)
+        total_count: Total number of positions returned
+    """
+
+    positions: list[PositionListItem]
+    cache_freshness: CacheFreshness
+    cache_age_seconds: int = 0
+    total_count: int
+
+
 @router.get(
     "",
-    response_model=ApiResponse[list[PositionListItem]],
+    response_model=ApiResponse[PositionListResponse],
     summary="Get open positions",
-    description="Retrieve a list of all open positions.",
+    description="Retrieve a list of all open positions with cache status.",
 )
 async def list_positions(
-    repo: PositionRepository = Depends(get_position_repository),
-) -> ApiResponse[list[PositionListItem]]:
-    """Get list of open positions.
+    force_refresh: bool = Query(
+        False,
+        description=(
+            "Force refresh from API. "
+            "When true, bypasses TTL cache but still respects min_refresh_interval. "
+            "Use sparingly to avoid API rate limiting."
+        ),
+    ),
+) -> ApiResponse[PositionListResponse]:
+    """Get list of open positions with cache.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+        - Uses PositionCacheService for data
+        - Returns cache_freshness indicator
+        - Cache TTL: controlled by POSITION_CACHE_TTL (default 60s)
+        - Min refresh interval: controlled by POSITION_CACHE_MIN_INTERVAL (default 10s)
 
     Args:
-        repo: PositionRepository dependency
+        force_refresh: When True, forces API refresh (bypasses TTL, respects min_interval)
 
     Returns:
-        List of open positions
+        List of open positions with cache status
 
     Example:
         >>> # GET /api/positions
-        >>> # Response: {"success": true, "data": [...]}
+        >>> # Response: {"success": true, "data": {"positions": [...], "cache_freshness": "fresh"}}
+        >>> # GET /api/positions?force_refresh=true
+        >>> # Forces refresh from API (use sparingly)
     """
-    logger.info("💰 Listing open positions")
+    from src.trading.position_sync import PositionCacheService
 
-    positions = await repo.get_open_positions()
+    logger.info(f"📊 Listing open positions (force_refresh={force_refresh})")
+
+    cache_service = PositionCacheService()
+    positions, freshness = await cache_service.get_positions(force_refresh=force_refresh)
+
+    # Get cache status for additional info
+    cache_status = await cache_service.get_cache_status()
 
     items = [
         PositionListItem(
@@ -90,8 +141,18 @@ async def list_positions(
         for p in positions
     ]
 
-    logger.info(f"💰 Found {len(items)} open positions")
-    return ApiResponse(success=True, data=items, error=None)
+    response = PositionListResponse(
+        positions=items,
+        cache_freshness=freshness,
+        cache_age_seconds=cache_status.cache_age_seconds,
+        total_count=len(items),
+    )
+
+    logger.info(
+        f"📊 Found {len(items)} open positions (freshness={freshness.value}, "
+        f"age={cache_status.cache_age_seconds}s)"
+    )
+    return ApiResponse(success=True, data=response, error=None)
 
 
 @router.get(
@@ -155,11 +216,65 @@ async def get_position(
     return ApiResponse(success=True, data=response, error=None)
 
 
-# ==================== Story 5.7: 持仓同步 ====================
+# ==================== Tech-Spec: 持仓缓存管理 ====================
+
+
+class CacheStatusResponse(BaseModel):
+    """Cache status response model.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Attributes:
+        cache_updated_at: ISO timestamp of last successful cache refresh
+        cache_age_seconds: Age of cached data in seconds (0 if no cache)
+        cache_freshness: Current freshness state (FRESH < TTL, STALE >= TTL, EXPIRED = no cache)
+        is_refreshing: Whether a refresh operation is currently in progress
+        can_refresh: Whether refresh is possible (requires API credentials in live mode)
+        last_error: Last error message if refresh failed, None if successful
+        total_positions: Total number of open positions in cache
+    """
+
+    cache_updated_at: str | None = None
+    cache_age_seconds: int = 0
+    cache_freshness: CacheFreshness
+    is_refreshing: bool = False
+    can_refresh: bool = False
+    last_error: str | None = None
+    total_positions: int = 0
+
+
+class CacheRefreshResultResponse(BaseModel):
+    """Cache refresh result response model.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Attributes:
+        new_positions: Number of new positions discovered from API
+        updated_positions: Number of existing positions with changed share counts
+        closed_positions: Number of positions closed (not found on chain)
+        unchanged_positions: Number of positions unchanged
+        total_fetched: Total balances fetched from Polymarket API
+        refreshed_at: ISO timestamp of this refresh operation
+        error: Error message if refresh failed, None if successful
+    """
+
+    new_positions: int = 0
+    updated_positions: int = 0
+    closed_positions: int = 0
+    unchanged_positions: int = 0
+    total_fetched: int = 0
+    refreshed_at: str
+    error: str | None = None
+
+
+# ==================== Story 5.7: 持仓同步 (Deprecated) ====================
 
 
 class PositionSyncStatusResponse(BaseModel):
-    """Position sync status response model."""
+    """Position sync status response model.
+
+    Deprecated: Use CacheStatusResponse instead.
+    """
 
     last_sync_at: str | None = None
     is_syncing: bool = False
@@ -169,7 +284,10 @@ class PositionSyncStatusResponse(BaseModel):
 
 
 class PositionSyncResultResponse(BaseModel):
-    """Position sync result response model."""
+    """Position sync result response model.
+
+    Deprecated: Use CacheRefreshResultResponse instead.
+    """
 
     new_positions: int = 0
     updated_positions: int = 0
@@ -180,31 +298,129 @@ class PositionSyncResultResponse(BaseModel):
     error: str | None = None
 
 
+# ==================== New Cache Endpoints ====================
+
+
+@router.get(
+    "/cache/status",
+    response_model=ApiResponse[CacheStatusResponse],
+    summary="Get position cache status",
+    description="Get the current position cache status with freshness indicator.",
+)
+async def get_cache_status() -> ApiResponse[CacheStatusResponse]:
+    """Get current position cache status.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Returns:
+        Cache status information with freshness indicator
+    """
+    from src.trading.position_sync import PositionCacheService
+
+    logger.info("📊 Getting position cache status")
+
+    service = PositionCacheService()
+    status = await service.get_cache_status()
+
+    response = CacheStatusResponse(
+        cache_updated_at=status.cache_updated_at.isoformat()
+        if status.cache_updated_at
+        else None,
+        cache_age_seconds=status.cache_age_seconds,
+        cache_freshness=status.cache_freshness,
+        is_refreshing=status.is_refreshing,
+        can_refresh=status.can_refresh,
+        last_error=status.last_error,
+        total_positions=status.total_positions,
+    )
+
+    return ApiResponse(success=True, data=response, error=None)
+
+
+@router.post(
+    "/refresh",
+    response_model=ApiResponse[CacheRefreshResultResponse],
+    summary="Refresh position cache",
+    description="Refresh position cache from Polymarket API.",
+)
+async def refresh_cache() -> ApiResponse[CacheRefreshResultResponse]:
+    """Refresh position cache from Polymarket API.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+
+    Fetches position balances from Polymarket and updates the local cache.
+    Requires API credentials to be configured.
+
+    Returns:
+        Refresh result with statistics
+    """
+    from src.trading.position_sync import PositionCacheService
+
+    logger.info("📊 Starting position cache refresh")
+
+    service = PositionCacheService()
+    result = await service.refresh_cache()
+
+    response = CacheRefreshResultResponse(
+        new_positions=result.new_positions,
+        updated_positions=result.updated_positions,
+        closed_positions=result.closed_positions,
+        unchanged_positions=result.unchanged_positions,
+        total_fetched=result.total_fetched,
+        refreshed_at=result.refreshed_at.isoformat(),
+        error=result.error,
+    )
+
+    if result.is_success:
+        logger.info(
+            f"📊 Cache refresh complete: {result.new_positions} new, "
+            f"{result.updated_positions} updated, {result.closed_positions} closed"
+        )
+        return ApiResponse(success=True, data=response, error=None)
+    else:
+        logger.warning(f"📊 Cache refresh failed: {result.error}")
+        return ApiResponse(
+            success=False,
+            data=response,
+            error=ErrorDetail(
+                code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"
+            ),
+        )
+
+
+# ==================== Deprecated Sync Endpoints ====================
+
+
 @router.get(
     "/sync/status",
     response_model=ApiResponse[PositionSyncStatusResponse],
-    summary="Get position sync status",
-    description="Get the current position sync status.",
+    summary="[DEPRECATED] Get position sync status",
+    description="DEPRECATED: Use /api/positions/cache/status instead.",
+    deprecated=True,
 )
 async def get_position_sync_status() -> ApiResponse[PositionSyncStatusResponse]:
     """Get current position sync status.
 
-    Returns information about the last sync and whether sync is available.
+    Deprecated: Use get_cache_status instead.
 
     Returns:
         Sync status information
     """
-    from src.trading.position_sync import PositionSyncService
+    from src.trading.position_sync import PositionCacheService
 
-    logger.info("💰 Getting position sync status")
+    logger.warning(
+        "⚠️ DEPRECATED: /sync/status endpoint is deprecated. Use /cache/status instead."
+    )
 
-    service = PositionSyncService()
-    status = await service.get_sync_status()
+    service = PositionCacheService()
+    status = await service.get_cache_status()
 
     response = PositionSyncStatusResponse(
-        last_sync_at=status.last_sync_at.isoformat() if status.last_sync_at else None,
-        is_syncing=status.is_syncing,
-        can_sync=status.can_sync,
+        last_sync_at=status.cache_updated_at.isoformat()
+        if status.cache_updated_at
+        else None,
+        is_syncing=status.is_refreshing,
+        can_sync=status.can_refresh,
         last_error=status.last_error,
         total_positions=status.total_positions,
     )
@@ -215,24 +431,26 @@ async def get_position_sync_status() -> ApiResponse[PositionSyncStatusResponse]:
 @router.post(
     "/sync",
     response_model=ApiResponse[PositionSyncResultResponse],
-    summary="Sync positions from Polymarket",
-    description="Synchronize wallet positions from Polymarket API to local database.",
+    summary="[DEPRECATED] Sync positions from Polymarket",
+    description="DEPRECATED: Use POST /api/positions/refresh instead.",
+    deprecated=True,
 )
 async def sync_positions() -> ApiResponse[PositionSyncResultResponse]:
     """Sync positions from Polymarket API.
 
-    Fetches position balances from Polymarket and syncs with local database.
-    Requires API credentials to be configured.
+    Deprecated: Use refresh_cache instead.
 
     Returns:
         Sync result with statistics
     """
-    from src.trading.position_sync import PositionSyncService
+    from src.trading.position_sync import PositionCacheService
 
-    logger.info("💰 Starting position sync")
+    logger.warning(
+        "⚠️ DEPRECATED: /sync endpoint is deprecated. Use /refresh instead."
+    )
 
-    service = PositionSyncService()
-    result = await service.sync_positions()
+    service = PositionCacheService()
+    result = await service.refresh_cache()
 
     response = PositionSyncResultResponse(
         new_positions=result.new_positions,
@@ -240,18 +458,18 @@ async def sync_positions() -> ApiResponse[PositionSyncResultResponse]:
         closed_positions=result.closed_positions,
         unchanged_positions=result.unchanged_positions,
         total_fetched=result.total_fetched,
-        last_sync_at=result.last_sync_at.isoformat(),
+        last_sync_at=result.refreshed_at.isoformat(),
         error=result.error,
     )
 
     if result.is_success:
         logger.info(
-            f"💰 Sync complete: {result.new_positions} new, "
+            f"📊 Sync complete: {result.new_positions} new, "
             f"{result.updated_positions} updated, {result.closed_positions} closed"
         )
         return ApiResponse(success=True, data=response, error=None)
     else:
-        logger.warning(f"💰 Sync failed: {result.error}")
+        logger.warning(f"📊 Sync failed: {result.error}")
         return ApiResponse(
             success=False,
             data=response,
@@ -309,6 +527,9 @@ async def manual_exit_position(
     trade_repo: TradeRepository = Depends(get_trade_repository),
 ) -> ApiResponse[ManualExitResponse]:
     """Manually exit a position.
+
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+        - Marks cache as stale after exit
 
     This endpoint provides a simplified manual exit for paper trading mode.
     It marks the position as closed and creates a sell trade record.
@@ -409,6 +630,13 @@ async def manual_exit_position(
         position.pnl = realized_pnl if realized_pnl is not None else position.pnl
         updated_position = await position_repo.update(position)
         logger.info(f"💰 Position {position_id} marked as closed")
+
+        # Mark cache as stale (Tech-Spec: Single Source of Truth)
+        from src.trading.position_sync import PositionCacheService
+
+        cache_service = PositionCacheService()
+        await cache_service.mark_stale()
+        logger.debug(f"📊 Cache marked as stale after manual exit")
 
         # Build response
         response = ManualExitResponse(

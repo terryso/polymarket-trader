@@ -1072,9 +1072,7 @@ class PolymarketClient:
                         self._logger.warning(f"Failed to get local market IDs: {e}")
                     return market_ids
 
-                local_market_ids = asyncio.get_event_loop().run_until_complete(
-                    get_local_market_ids()
-                )
+                local_market_ids = asyncio.run(get_local_market_ids())
 
                 if local_market_ids:
                     self._logger.info(
@@ -1227,8 +1225,8 @@ class PolymarketClient:
                     int(asset_id),
                 ).call()
 
-                # Convert from wei to shares (6 decimals)
-                return balance_wei / 1_000_000
+                # Convert from wei to shares (18 decimals for Polymarket CTF)
+                return balance_wei / 10**18
 
             except Exception as e:
                 last_error = e

@@ -4,6 +4,7 @@ This module provides the PaperTradingExecutor class that simulates
 trade execution without placing real orders.
 
 Story 5.2: Paper Trading 执行器
+Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
 
 Example:
     >>> from src.trading.paper_trading import PaperTradingExecutor
@@ -32,7 +33,7 @@ from src.exceptions import TradingError, ValidationError
 from src.models.position import PositionOutcome
 from src.models.prediction import Recommendation
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
-from src.utils.logger import get_logger
+from src.utils.logger import OPERATION_EMOJIS, get_logger
 
 if TYPE_CHECKING:
     from src.core.state import ThreadSafeState
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from src.models.position import Position
     from src.models.prediction import PredictionResult
     from src.storage.repositories.trade_repo import TradeRepository
+    from src.trading.position_cache import PositionCacheService
     from src.trading.position_manager import PositionManager
 
 
@@ -69,10 +71,15 @@ class PaperTradingExecutor:
     Executes trades in PAPER mode without connecting to real Polymarket API.
     Creates trade records and positions for tracking and analysis.
 
+    Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+        - Added cache_service for marking cache stale after trades
+        - Uses get_position_by_market_from_api for consistency (returns local data in Paper mode)
+
     Attributes:
         _trade_repo: TradeRepository for saving trade records
         _position_manager: PositionManager for creating positions
         _state: ThreadSafeState for capital tracking
+        _cache_service: Optional cache service for marking stale
 
     Example:
         >>> executor = PaperTradingExecutor(trade_repo, position_manager, state)
@@ -86,6 +93,7 @@ class PaperTradingExecutor:
         trade_repo: "TradeRepository",
         position_manager: "PositionManager",
         state: "ThreadSafeState",
+        cache_service: "PositionCacheService | None" = None,
     ) -> None:
         """Initialize paper trading executor.
 
@@ -93,10 +101,12 @@ class PaperTradingExecutor:
             trade_repo: Repository for trade records
             position_manager: Manager for position lifecycle
             state: Thread-safe state manager for capital tracking
+            cache_service: Optional cache service for marking stale after trades
         """
         self._trade_repo = trade_repo
         self._position_manager = position_manager
         self._state = state
+        self._cache_service = cache_service
         self._logger = get_logger(__name__)
         self._logger.info("PaperTradingExecutor initialized")
 
@@ -108,6 +118,10 @@ class PaperTradingExecutor:
         prediction_id: int | None = None,
     ) -> PaperTradeResult:
         """Execute a paper trade.
+
+        Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
+            - Uses get_position_by_market_from_api for position validation (returns local in Paper)
+            - Marks cache stale after successful trade
 
         Simulates trade execution by:
         1. Creating a Trade record (mode=PAPER, status=FILLED)
@@ -134,6 +148,20 @@ class PaperTradingExecutor:
             ...     print(f"Bought {result.trade.shares:.2f} shares")
         """
         try:
+            # 0. Check for existing position using API method (returns local in Paper mode)
+            existing_position = await self._position_manager.get_position_by_market_from_api(market.id)
+            if existing_position:
+                self._logger.warning(
+                    f"{OPERATION_EMOJIS['warning']} Skipping trade: open position already exists "
+                    f"for market {market.id} (shares={existing_position.shares:.2f})"
+                )
+                return PaperTradeResult(
+                    trade=None,
+                    position=None,
+                    success=False,
+                    error_message=f"Open position already exists for market {market.id}",
+                )
+
             # Validate inputs
             if amount <= 0:
                 raise ValidationError(f"Trade amount must be positive, got {amount}")
@@ -185,8 +213,13 @@ class PaperTradingExecutor:
             # For now, we can save again to update
             await self._trade_repo.save(saved_trade)
 
+            # 8. Mark cache as stale (Tech-Spec: Single Source of Truth)
+            if self._cache_service:
+                await self._cache_service.mark_stale()
+                self._logger.debug(f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade")
+
             self._logger.info(
-                f"✅ Paper trade completed: trade_id={saved_trade.id}, "
+                f"{OPERATION_EMOJIS['success']} Paper trade completed: trade_id={saved_trade.id}, "
                 f"position_id={position.id}"
             )
 
@@ -197,7 +230,7 @@ class PaperTradingExecutor:
             )
 
         except (ValidationError, TradingError) as e:
-            self._logger.error(f"❌ Paper trade failed: {e}")
+            self._logger.error(f"{OPERATION_EMOJIS['error']} Paper trade failed: {e}")
             return PaperTradeResult(
                 trade=None,
                 position=None,
@@ -205,7 +238,7 @@ class PaperTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"❌ Unexpected error in paper trade: {e}")
+            self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in paper trade: {e}")
             return PaperTradeResult(
                 trade=None,
                 position=None,
