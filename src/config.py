@@ -787,6 +787,7 @@ class _SettingsProxy:
         "PCT_LOSS",
         "INITIAL_CAPITAL",
         "MAX_SINGLE_RATIO",
+        "MIN_BET",
         "MIN_CONFIDENCE",
         "MIN_EDGE",
         "MAX_OPEN_MARKETS",
