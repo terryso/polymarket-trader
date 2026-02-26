@@ -1,0 +1,42 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "c6393e9b5e3a",
+  "session_id": "11ec37bf-be4c-4425-bef4-e3dfaf66ba54",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T20:25:56.356847Z",
+  "branch": "develop",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "_bmad-output/implementation-artifacts/7-9-trade-history-realtime-by-mode.md",
+    "_bmad-output/implementation-artifacts/sprint-status.yaml",
+    "_bmad-output/test-artifacts/atdd-checklist-7.9.md",
+    "_bmad-output/test-artifacts/traceability-report.md",
+    "dashboard/src/api/trades.test.ts",
+    "dashboard/src/api/trades.ts",
+    "dashboard/src/api/types.ts",
+    "dashboard/src/pages/Trades.story79.test.tsx",
+    "dashboard/src/pages/Trades.test.tsx",
+    "dashboard/src/pages/Trades.tsx",
+    "src/dashboard/routes/trades.py",
+    "tests/test_dashboard/test_routes/test_trades.py",
+    "tests/test_dashboard/test_routes/test_trades_story79.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "32d57aaf4373",
+  "token_usage": {
+    "input_tokens": 668851,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 14686720,
+    "output_tokens": 56248,
+    "api_call_count": 165
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T20:25:55.160712Z",
+    "agent_lines": 2213,
+    "human_added": 152,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 2365,
+    "agent_percentage": 93.57293868921775
+  }
+}
