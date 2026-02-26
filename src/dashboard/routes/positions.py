@@ -268,38 +268,7 @@ class CacheRefreshResultResponse(BaseModel):
     error: str | None = None
 
 
-# ==================== Story 5.7: 持仓同步 (Deprecated) ====================
-
-
-class PositionSyncStatusResponse(BaseModel):
-    """Position sync status response model.
-
-    Deprecated: Use CacheStatusResponse instead.
-    """
-
-    last_sync_at: str | None = None
-    is_syncing: bool = False
-    can_sync: bool = False
-    last_error: str | None = None
-    total_positions: int = 0
-
-
-class PositionSyncResultResponse(BaseModel):
-    """Position sync result response model.
-
-    Deprecated: Use CacheRefreshResultResponse instead.
-    """
-
-    new_positions: int = 0
-    updated_positions: int = 0
-    closed_positions: int = 0
-    unchanged_positions: int = 0
-    total_fetched: int = 0
-    last_sync_at: str
-    error: str | None = None
-
-
-# ==================== New Cache Endpoints ====================
+# ==================== Cache Endpoints ====================
 
 
 @router.get(
@@ -673,97 +642,6 @@ async def refresh_cache() -> ApiResponse[CacheRefreshResultResponse]:
         return ApiResponse(success=True, data=response, error=None)
     else:
         logger.warning(f"📊 Cache refresh failed: {result.error}")
-        return ApiResponse(
-            success=False,
-            data=response,
-            error=ErrorDetail(
-                code=ErrorCode.TRADING_ERROR, message=result.error or "Unknown error"
-            ),
-        )
-
-
-# ==================== Deprecated Sync Endpoints ====================
-
-
-@router.get(
-    "/sync/status",
-    response_model=ApiResponse[PositionSyncStatusResponse],
-    summary="[DEPRECATED] Get position sync status",
-    description="DEPRECATED: Use /api/positions/cache/status instead.",
-    deprecated=True,
-)
-async def get_position_sync_status() -> ApiResponse[PositionSyncStatusResponse]:
-    """Get current position sync status.
-
-    Deprecated: Use get_cache_status instead.
-
-    Returns:
-        Sync status information
-    """
-    from src.trading.position_sync import PositionCacheService
-
-    logger.warning(
-        "⚠️ DEPRECATED: /sync/status endpoint is deprecated. Use /cache/status instead."
-    )
-
-    service = PositionCacheService()
-    status = await service.get_cache_status()
-
-    response = PositionSyncStatusResponse(
-        last_sync_at=status.cache_updated_at.isoformat()
-        if status.cache_updated_at
-        else None,
-        is_syncing=status.is_refreshing,
-        can_sync=status.can_refresh,
-        last_error=status.last_error,
-        total_positions=status.total_positions,
-    )
-
-    return ApiResponse(success=True, data=response, error=None)
-
-
-@router.post(
-    "/sync",
-    response_model=ApiResponse[PositionSyncResultResponse],
-    summary="[DEPRECATED] Sync positions from Polymarket",
-    description="DEPRECATED: Use POST /api/positions/refresh instead.",
-    deprecated=True,
-)
-async def sync_positions() -> ApiResponse[PositionSyncResultResponse]:
-    """Sync positions from Polymarket API.
-
-    Deprecated: Use refresh_cache instead.
-
-    Returns:
-        Sync result with statistics
-    """
-    from src.trading.position_sync import PositionCacheService
-
-    logger.warning(
-        "⚠️ DEPRECATED: /sync endpoint is deprecated. Use /refresh instead."
-    )
-
-    service = PositionCacheService()
-    result = await service.refresh_cache()
-
-    response = PositionSyncResultResponse(
-        new_positions=result.new_positions,
-        updated_positions=result.updated_positions,
-        closed_positions=result.closed_positions,
-        unchanged_positions=result.unchanged_positions,
-        total_fetched=result.total_fetched,
-        last_sync_at=result.refreshed_at.isoformat(),
-        error=result.error,
-    )
-
-    if result.is_success:
-        logger.info(
-            f"📊 Sync complete: {result.new_positions} new, "
-            f"{result.updated_positions} updated, {result.closed_positions} closed"
-        )
-        return ApiResponse(success=True, data=response, error=None)
-    else:
-        logger.warning(f"📊 Sync failed: {result.error}")
         return ApiResponse(
             success=False,
             data=response,

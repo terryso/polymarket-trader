@@ -4,12 +4,12 @@
  * Provides functions to fetch position data including list and detail endpoints.
  *
  * Story 7.6: 前端 API 集成
- * Story 5.7: 同步实际持仓
+ * Story 5.7: 同步实际持仓 (已重构为缓存模式)
  * Story 10.6: 手动退出持仓
  */
 
 import { get, post } from './client';
-import type { PositionListItem, PositionListResponse, PositionResponse, PositionSyncStatus, PositionSyncResult, ManualExitResponse } from './types';
+import type { PositionListItem, PositionListResponse, PositionResponse, ManualExitResponse } from './types';
 
 /**
  * Get list of open positions.
@@ -29,24 +29,6 @@ export async function fetchPosition(positionId: number): Promise<PositionRespons
 }
 
 /**
- * Get position sync status.
- *
- * Story 5.7: 同步实际持仓
- */
-export async function fetchPositionSyncStatus(): Promise<PositionSyncStatus> {
-  return get<PositionSyncStatus>('/api/positions/sync/status');
-}
-
-/**
- * Sync positions from Polymarket.
- *
- * Story 5.7: 同步实际持仓
- */
-export async function syncPositions(): Promise<PositionSyncResult> {
-  return post<PositionSyncResult>('/api/positions/sync');
-}
-
-/**
  * Manually exit a position.
  *
  * Story 10.6: Dashboard 退出策略管理
@@ -63,7 +45,5 @@ export async function exitPosition(positionId: number): Promise<ManualExitRespon
 export const positionsApi = {
   getList: fetchPositions,
   getById: fetchPosition,
-  getSyncStatus: fetchPositionSyncStatus,
-  sync: syncPositions,
   exit: exitPosition,
 };
