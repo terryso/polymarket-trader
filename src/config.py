@@ -690,6 +690,18 @@ class TaskScheduleSettings(BaseEnvSettings):
         gt=0,
         description="Interval in minutes for persisting state to database",
     )
+    fetch_markets_limit: int = Field(
+        default=200,
+        alias="SCHEDULE_FETCH_MARKETS_LIMIT",
+        gt=0,
+        description="Maximum number of markets to fetch in scheduled tasks",
+    )
+    initial_analysis_limit: int = Field(
+        default=50,
+        alias="SCHEDULE_INITIAL_ANALYSIS_LIMIT",
+        gt=0,
+        description="Maximum number of markets to analyze on startup",
+    )
 
 
 class Settings(BaseEnvSettings):

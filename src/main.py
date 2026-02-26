@@ -246,7 +246,7 @@ class Application:
                 )
 
             gamma_markets = client.get_all_active_markets(
-                total_limit=50,
+                total_limit=settings.task_schedule.initial_analysis_limit,
                 page_size=50,
                 order_by="volume24hr",  # Sort by volume (most liquid first)
                 ascending=False,
@@ -439,7 +439,7 @@ class Application:
                     )
 
                 gamma_markets = client.get_all_active_markets(
-                    total_limit=200,
+                    total_limit=app_settings.task_schedule.fetch_markets_limit,
                     page_size=50,
                     order_by="volume24hr",  # Sort by volume (most liquid first)
                     ascending=False,
