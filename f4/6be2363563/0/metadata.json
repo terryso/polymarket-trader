@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "f46be2363563",
+  "session_id": "550b7568-fb9d-484e-abe6-20575b472194",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T19:06:16.467386Z",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "_bmad-output/planning-artifacts/sprint-change-proposal-2026-02-27.md",
+    "dashboard/src/api/positions.ts",
+    "dashboard/src/api/types.ts",
+    "src/dashboard/routes/positions.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "91df166b429f",
+  "token_usage": {
+    "input_tokens": 29987,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 115328,
+    "output_tokens": 790,
+    "api_call_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T19:06:16.437086Z",
+    "agent_lines": 286,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 286,
+    "agent_percentage": 100
+  }
+}

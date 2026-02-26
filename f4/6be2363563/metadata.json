@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "f46be2363563",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "_bmad-output/planning-artifacts/sprint-change-proposal-2026-02-27.md",
+    "dashboard/src/api/positions.ts",
+    "dashboard/src/api/types.ts",
+    "src/dashboard/routes/positions.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f4/6be2363563/0/metadata.json",
+      "transcript": "/f4/6be2363563/0/full.jsonl",
+      "context": "/f4/6be2363563/0/context.md",
+      "content_hash": "/f4/6be2363563/0/content_hash.txt",
+      "prompt": "/f4/6be2363563/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 29987,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 115328,
+    "output_tokens": 790,
+    "api_call_count": 5
+  }
+}
