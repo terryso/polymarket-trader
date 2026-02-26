@@ -1042,7 +1042,7 @@ class Application:
             PID_FILE.unlink()
             logger.debug("PID file removed")
 
-    async def _handle_signal(self, sig: signal.Signals) -> None:
+    def _handle_signal(self, sig: signal.Signals) -> None:
         """Handle shutdown signal.
 
         Args:
