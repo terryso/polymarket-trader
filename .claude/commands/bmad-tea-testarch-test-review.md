@@ -1,7 +1,6 @@
 ---
 name: 'testarch-test-review'
-description: 'Review test quality using comprehensive knowledge base and best practices validation'
-disable-model-invocation: true
+description: 'Review test quality using best practices validation. Use when the user says ""lets review tests"" or ""I want to evaluate test quality""'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

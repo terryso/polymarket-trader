@@ -1267,6 +1267,44 @@ So that **我能够理解 LLM 为什么做出这个预测，包括分析理由�
 
 ---
 
+### Story 7.9: 交易历史按模式实时显示
+
+As a **用户**,
+I want **交易历史页面根据系统配置自动显示正确的数据源，无需手动同步**,
+So that **我看到的交易历史始终与 Polymarket 网站一致（Live 模式）或与本地 Paper Trading 一致**.
+
+**Acceptance Criteria:**
+
+**Given** 系统配置 `TRADING_MODE=paper` 或 `TRADING_MODE=live`
+**When** 用户访问交易历史页面
+**Then** 后端 API 行为:
+- `TRADING_MODE=paper` 时，`GET /api/trades` 返回本地数据库中 mode=PAPER 的交易记录
+- `TRADING_MODE=live` 时，`GET /api/trades` 实时调用 Polymarket API 获取真实交易历史
+- Live 模式下响应时间可能较长，需支持加载状态
+
+**And** 前端 UI 变更:
+- ❌ 移除同步按钮 (`<Button onClick={handleSync}>同步</Button>`)
+- ❌ 移除同步状态显示 (`最后同步: ...`)
+- ❌ 移除同步结果 Alert (`syncResult` 相关)
+- ❌ 移除 Paper/Live 筛选器 (`modeFilter`)
+- ✅ 保留买入/卖出筛选器 (`typeFilter`)
+- ✅ Live 模式下显示加载状态（调用 API 时）
+
+**And** 后端实现:
+- 在 `src/dashboard/routes/trades.py` 中读取 `settings.trading_mode`
+- Live 模式: 调用 `PolymarketClient.get_order_history()` 实时获取
+- Paper 模式: 调用 `TradeRepository.get_by_mode(TradeMode.PAPER)`
+
+**And** 清理代码:
+- 可选：移除 `trade_sync.py` 中的同步相关代码（或保留供其他用途）
+- 移除 `/api/trades/sync` 和 `/api/trades/sync/status` 端点（或标记为废弃）
+
+**And** 添加单元测试:
+- 测试 Paper 模式返回本地数据
+- 测试 Live 模式调用 Polymarket API
+
+---
+
 ## Epic 8: 系统调度与自动化运行
 
 **目标:** 实现 24/7 自动运行并自动恢复，真正无人值守交易。
@@ -2179,7 +2217,7 @@ async def send_exit_notification(
 | Metric | Count |
 |--------|-------|
 | **Total Epics** | 10 |
-| **Total Stories** | 63 |
+| **Total Stories** | 64 |
 | **FR Coverage** | 12/12 (100%) |
 | **NFR Coverage** | 10/10 (100%) |
 | **AR Coverage** | 12/12 (100%) |
@@ -2194,7 +2232,7 @@ async def send_exit_notification(
 | Epic 4: 风险控制与熔断系统 | 5 | FR5, FR6, FR7, FR8 |
 | Epic 5: Paper Trading 模拟交易 | 5 | FR4 |
 | Epic 6: 预测追踪与学习日志 | 5 | FR9, FR10 |
-| Epic 7: Dashboard 后端 API 集成 | 8 | FR11, FR12, AR2, AR10 |
+| Epic 7: Dashboard 后端 API 集成 | 9 | FR11, FR12, AR2, AR10 |
 | Epic 8: 系统调度与自动化运行 | 6 | NFR1, NFR2, NFR10, AR4 |
 | Epic 9: Telegram 通知与远程控制 | 12 | (新增功能) |
 | Epic 10: 持仓退出策略 | 6 | (新增功能) |

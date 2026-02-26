@@ -1,7 +1,6 @@
 ---
 name: 'testarch-framework'
-description: 'Initialize production-ready test framework architecture (Playwright or Cypress) with fixtures, helpers, and configuration'
-disable-model-invocation: true
+description: 'Initialize test framework with Playwright or Cypress. Use when the user says ""lets setup test framework"" or ""I want to initialize testing framework""'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

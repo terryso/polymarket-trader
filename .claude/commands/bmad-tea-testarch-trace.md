@@ -1,7 +1,6 @@
 ---
 name: 'testarch-trace'
-description: 'Generate requirements-to-tests traceability matrix, analyze coverage, and make quality gate decision (PASS/CONCERNS/FAIL/WAIVED)'
-disable-model-invocation: true
+description: 'Generate traceability matrix and quality gate decision. Use when the user says ""lets create traceability matrix"" or ""I want to analyze test coverage""'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

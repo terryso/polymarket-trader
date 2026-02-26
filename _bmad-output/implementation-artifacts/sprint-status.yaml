@@ -1,4 +1,4 @@
-# generated: 2026-02-24
+# generated: 2026-02-27
 # project: polymarket-trader
 # project_key: NOKEY
 # tracking_system: file-system
@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-24
+generated: 2026-02-27
 project: polymarket-trader
 project_key: NOKEY
 tracking_system: file-system
@@ -98,7 +98,7 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: Dashboard 后端 API 集成
-  epic-7: done
+  epic-7: in-progress
   7-1-fastapi-app-initialization: done
   7-2-market-data-api: done
   7-3-position-and-trade-api: done
@@ -107,6 +107,7 @@ development_status:
   7-6-frontend-api-integration: done
   7-7-recent-activity-api: done
   7-8-prediction-detail-drawer-component: done
+  7-9-trade-history-realtime-by-mode: backlog
   epic-7-retrospective: optional
 
   # Epic 8: 系统调度与自动化运行
@@ -135,7 +136,7 @@ development_status:
   9-12-message-queue-rate-limiting: done
   epic-9-retrospective: optional
 
-  # Epic 10: 持仓退出策略 (NEW)
+  # Epic 10: 持仓退出策略
   epic-10: done
   10-1-sell-executor: done
   10-2-exit-strategy-config: done

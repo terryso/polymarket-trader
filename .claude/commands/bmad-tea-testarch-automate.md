@@ -1,7 +1,6 @@
 ---
 name: 'testarch-automate'
-description: 'Expand test automation coverage after implementation or analyze existing codebase to generate comprehensive test suite'
-disable-model-invocation: true
+description: 'Expand test automation coverage for codebase. Use when the user says ""lets expand test coverage"" or ""I want to automate tests""'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

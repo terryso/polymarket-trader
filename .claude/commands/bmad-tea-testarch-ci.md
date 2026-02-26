@@ -1,7 +1,6 @@
 ---
 name: 'testarch-ci'
-description: 'Scaffold CI/CD quality pipeline with test execution, burn-in loops, and artifact collection'
-disable-model-invocation: true
+description: 'Scaffold CI/CD quality pipeline with test execution. Use when the user says ""lets setup CI pipeline"" or ""I want to create quality gates""'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

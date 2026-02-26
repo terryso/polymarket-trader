@@ -1,6 +1,6 @@
 ---
 name: testarch-framework
-description: 'Initialize production-ready test framework architecture (Playwright or Cypress) with fixtures, helpers, and configuration'
+description: Initialize test framework with Playwright or Cypress. Use when user says 'lets setup test framework' or 'I want to initialize testing framework'
 web_bundle: true
 ---
 
@@ -29,11 +29,13 @@ This workflow uses **tri-modal step-file architecture**:
 "Welcome to the workflow. What would you like to do?"
 
 - **[C] Create** — Run the workflow
+- **[R] Resume** — Resume an interrupted workflow
 - **[V] Validate** — Validate existing outputs
 - **[E] Edit** — Edit existing outputs
 
 ### 2. Route to First Step
 
 - **If C:** Load `steps-c/step-01-preflight.md`
+- **If R:** Load `steps-c/step-01b-resume.md`
 - **If V:** Load `steps-v/step-01-validate.md`
 - **If E:** Load `steps-e/step-01-assess.md`
