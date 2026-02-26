@@ -214,7 +214,9 @@ export interface TradeResponse {
 export interface TradeListQueryParams {
   page?: number;
   per_page?: number;
+  /** @deprecated Mode is now determined by backend TRADING_MODE setting */
   mode?: TradeMode;
+  type_filter?: 'buy' | 'sell';
 }
 
 // ============================================================================

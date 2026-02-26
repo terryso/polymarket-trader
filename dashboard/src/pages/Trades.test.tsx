@@ -5,11 +5,12 @@
  * - Loading state rendering
  * - Error state handling
  * - Trade table display
- * - Filtering by mode and type
+ * - Filtering by type (buy/sell only)
  * - Pagination functionality
  * - Empty state handling
  *
  * Story 7.6: 前端 API 集成
+ * Story 7.9: 交易历史按模式实时显示 (移除 Mode 筛选器和同步功能)
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -58,6 +59,7 @@ const mockTrades: TradeListItem[] = [
     price: 0.55,
     shares: 18.18,
     status: "FILLED",
+    exit_type: null,
     created_at: "2026-02-17T10:00:00Z",
   },
   {
@@ -69,6 +71,7 @@ const mockTrades: TradeListItem[] = [
     price: 0.70,
     shares: 7.14,
     status: "FILLED",
+    exit_type: null,
     created_at: "2026-02-17T11:00:00Z",
   },
   {
@@ -80,6 +83,7 @@ const mockTrades: TradeListItem[] = [
     price: 0.30,
     shares: 66.67,
     status: "PENDING",
+    exit_type: null,
     created_at: "2026-02-17T12:00:00Z",
   },
 ];
@@ -261,7 +265,8 @@ describe("Trades Page", () => {
   });
 
   describe("Filtering", () => {
-    it("should render mode filter buttons", async () => {
+    // Story 7.9: Mode filter removed - only type filter remains
+    it("should NOT render mode filter buttons (Paper/Live removed)", async () => {
       const { useTrades } = await import("@/hooks/useTrades");
       vi.mocked(useTrades).mockReturnValue({
         isLoading: false,
@@ -272,14 +277,13 @@ describe("Trades Page", () => {
       const { default: Trades } = await import("./Trades");
       render(<Trades />, { wrapper: createWrapper() });
 
-      // There are multiple "全部" buttons (for mode and type filters)
-      const allButtons = screen.getAllByText("全部");
-      expect(allButtons.length).toBeGreaterThanOrEqual(2);
-      expect(screen.getByText("Paper")).toBeInTheDocument();
-      expect(screen.getByText("Live")).toBeInTheDocument();
+      // Mode filter should NOT exist
+      expect(screen.queryByTestId("mode-filter")).not.toBeInTheDocument();
+      expect(screen.queryByText("Paper")).not.toBeInTheDocument();
+      expect(screen.queryByText("Live")).not.toBeInTheDocument();
     });
 
-    it("should render type filter buttons", async () => {
+    it("should render type filter buttons (Story 7.9: only filter remaining)", async () => {
       const { useTrades } = await import("@/hooks/useTrades");
       vi.mocked(useTrades).mockReturnValue({
         isLoading: false,
@@ -290,30 +294,11 @@ describe("Trades Page", () => {
       const { default: Trades } = await import("./Trades");
       render(<Trades />, { wrapper: createWrapper() });
 
-      // There are multiple "全部" buttons (for mode and type filters)
+      // There is only ONE "全部" button now (type filter only)
       const allButtons = screen.getAllByText("全部");
-      expect(allButtons.length).toBe(2);
+      expect(allButtons.length).toBe(1);
       expect(screen.getByText("买入")).toBeInTheDocument();
       expect(screen.getByText("卖出")).toBeInTheDocument();
-    });
-
-    it("should filter trades by mode when Paper button is clicked", async () => {
-      const { useTrades } = await import("@/hooks/useTrades");
-      const mockUseTrades = vi.mocked(useTrades);
-      mockUseTrades.mockReturnValue({
-        isLoading: false,
-        data: { items: mockTrades, total: 3 },
-        error: null,
-      } as ReturnType<typeof useTrades>);
-
-      const { default: Trades } = await import("./Trades");
-      render(<Trades />, { wrapper: createWrapper() });
-
-      // Click Paper filter
-      fireEvent.click(screen.getByText("Paper"));
-
-      // Should have been called with PAPER mode
-      expect(mockUseTrades).toHaveBeenCalled();
     });
 
     it("should filter trades by type when 买入 button is clicked", async () => {
@@ -395,6 +380,7 @@ describe("Trades Page", () => {
         price: 0.50,
         shares: 20.0,
         status: "FILLED" as const,
+        exit_type: null,
         created_at: `2026-02-17T${10 + i}:00:00Z`,
       }));
 
@@ -425,6 +411,7 @@ describe("Trades Page", () => {
           price: 0.55,
           shares: 18.18,
           status: "FILLED",
+          exit_type: null,
           created_at: null,
         },
       ];
@@ -454,6 +441,7 @@ describe("Trades Page", () => {
           price: 0.55,
           shares: null,
           status: "FILLED",
+          exit_type: null,
           created_at: "2026-02-17T10:00:00Z",
         },
       ];
@@ -483,6 +471,7 @@ describe("Trades Page", () => {
           price: 0.55,
           shares: 18.18,
           status: "FAILED",
+          exit_type: null,
           created_at: "2026-02-17T10:00:00Z",
         },
       ];

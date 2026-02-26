@@ -4,6 +4,7 @@
  * Provides functions to fetch trade history including list and detail endpoints.
  *
  * Story 7.6: 前端 API 集成
+ * Story 7.9: 交易历史按模式实时显示
  */
 
 import { getPaginated, get, post } from './client';
@@ -12,7 +13,9 @@ import type { TradeListItem, TradeResponse, TradeListQueryParams, SyncStatus, Sy
 /**
  * Get trade history with pagination and filtering.
  *
- * @param params - Query parameters for pagination and filtering
+ * Note: Trading mode (paper/live) is now determined by backend TRADING_MODE setting.
+ *
+ * @param params - Query parameters for pagination and type filtering
  */
 export async function fetchTrades(
   params: TradeListQueryParams = {}
@@ -21,7 +24,8 @@ export async function fetchTrades(
     params: {
       page: params.page ?? 1,
       per_page: params.per_page ?? 20,
-      mode: params.mode,
+      type_filter: params.type_filter,
+      // Note: mode parameter is deprecated - backend uses TRADING_MODE setting
     },
   });
   return {
@@ -44,6 +48,7 @@ export async function fetchTrade(tradeId: number): Promise<TradeResponse> {
 /**
  * Get trade sync status.
  *
+ * @deprecated Sync is now automatic based on trading mode. See Story 7.9.
  * Story 5.6: 交易历史同步
  */
 export async function fetchSyncStatus(): Promise<SyncStatus> {
@@ -53,6 +58,7 @@ export async function fetchSyncStatus(): Promise<SyncStatus> {
 /**
  * Sync trades from Polymarket.
  *
+ * @deprecated Sync is now automatic based on trading mode. See Story 7.9.
  * Story 5.6: 交易历史同步
  */
 export async function syncTrades(): Promise<SyncResult> {
@@ -65,6 +71,8 @@ export async function syncTrades(): Promise<SyncResult> {
 export const tradesApi = {
   getList: fetchTrades,
   getById: fetchTrade,
+  /** @deprecated Sync is now automatic */
   getSyncStatus: fetchSyncStatus,
+  /** @deprecated Sync is now automatic */
   sync: syncTrades,
 };

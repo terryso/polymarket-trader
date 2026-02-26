@@ -98,7 +98,7 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: Dashboard 后端 API 集成
-  epic-7: in-progress
+  epic-7: done
   7-1-fastapi-app-initialization: done
   7-2-market-data-api: done
   7-3-position-and-trade-api: done
@@ -107,7 +107,7 @@ development_status:
   7-6-frontend-api-integration: done
   7-7-recent-activity-api: done
   7-8-prediction-detail-drawer-component: done
-  7-9-trade-history-realtime-by-mode: backlog
+  7-9-trade-history-realtime-by-mode: done
   epic-7-retrospective: optional
 
   # Epic 8: 系统调度与自动化运行

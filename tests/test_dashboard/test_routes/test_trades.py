@@ -4,6 +4,7 @@ This module contains tests for the trade data API endpoints,
 including list and detail endpoints with pagination and mode filtering.
 
 Story 7.3: 持仓与交易 API
+Story 7.9: 交易历史按模式实时显示
 """
 
 from datetime import datetime
@@ -94,7 +95,15 @@ def mock_trade_repo() -> MagicMock:
 
 
 @pytest.fixture
-def client(mock_trade_repo: MagicMock) -> Generator[TestClient, None, None]:
+def mock_settings():
+    """Mock settings with paper trading mode."""
+    with patch("src.dashboard.routes.trades.settings") as mock_settings:
+        mock_settings.trading_mode = "paper"
+        yield mock_settings
+
+
+@pytest.fixture
+def client(mock_trade_repo: MagicMock, mock_settings: MagicMock) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
     # Patch init_db and close_db to avoid database operations
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
@@ -126,7 +135,8 @@ class TestListTrades:
         mock_trade_repo: MagicMock,
     ) -> None:
         """Test list trades returns 200."""
-        mock_trade_repo.get_recent.return_value = []
+        # Story 7.9: Paper mode uses get_by_mode
+        mock_trade_repo.get_by_mode.return_value = []
 
         response = client.get("/api/trades")
 
@@ -138,7 +148,8 @@ class TestListTrades:
         mock_trade_repo: MagicMock,
     ) -> None:
         """Test list trades returns success status."""
-        mock_trade_repo.get_recent.return_value = []
+        # Story 7.9: Paper mode uses get_by_mode
+        mock_trade_repo.get_by_mode.return_value = []
 
         response = client.get("/api/trades")
         data = response.json()
@@ -151,7 +162,8 @@ class TestListTrades:
         mock_trade_repo: MagicMock,
     ) -> None:
         """Test list trades returns data as list."""
-        mock_trade_repo.get_recent.return_value = []
+        # Story 7.9: Paper mode uses get_by_mode
+        mock_trade_repo.get_by_mode.return_value = []
 
         response = client.get("/api/trades")
         data = response.json()
@@ -165,7 +177,8 @@ class TestListTrades:
         mock_trade_repo: MagicMock,
     ) -> None:
         """Test list trades returns pagination metadata."""
-        mock_trade_repo.get_recent.return_value = []
+        # Story 7.9: Paper mode uses get_by_mode
+        mock_trade_repo.get_by_mode.return_value = []
 
         response = client.get("/api/trades")
         data = response.json()
@@ -182,14 +195,16 @@ class TestListTrades:
         sample_trades: list[Trade],
     ) -> None:
         """Test list trades returns trades correctly."""
-        mock_trade_repo.get_recent.return_value = sample_trades
+        # Story 7.9: Paper mode now uses get_by_mode(TradeMode.PAPER)
+        paper_trades = [t for t in sample_trades if t.mode == TradeMode.PAPER]
+        mock_trade_repo.get_by_mode.return_value = paper_trades
 
         response = client.get("/api/trades")
         data = response.json()
 
         assert response.status_code == 200
         assert data["success"] is True
-        assert len(data["data"]) == 3
+        assert len(data["data"]) == 2  # Only PAPER trades (2 out of 3)
 
         # Check first trade
         first_trade = data["data"][0]
@@ -208,16 +223,18 @@ class TestListTrades:
         sample_trades: list[Trade],
     ) -> None:
         """Test list trades pagination."""
-        mock_trade_repo.get_recent.return_value = sample_trades
+        # Story 7.9: Paper mode now uses get_by_mode(TradeMode.PAPER)
+        paper_trades = [t for t in sample_trades if t.mode == TradeMode.PAPER]
+        mock_trade_repo.get_by_mode.return_value = paper_trades
 
-        response = client.get("/api/trades?page=1&per_page=2")
+        response = client.get("/api/trades?page=1&per_page=1")
         data = response.json()
 
         assert response.status_code == 200
         assert data["meta"]["page"] == 1
-        assert data["meta"]["per_page"] == 2
-        assert data["meta"]["total"] == 3
-        assert len(data["data"]) == 2
+        assert data["meta"]["per_page"] == 1
+        assert data["meta"]["total"] == 2  # Only PAPER trades
+        assert len(data["data"]) == 1
 
     def test_list_trades_page_2(
         self,
@@ -226,15 +243,17 @@ class TestListTrades:
         sample_trades: list[Trade],
     ) -> None:
         """Test list trades second page."""
-        mock_trade_repo.get_recent.return_value = sample_trades
+        # Story 7.9: Paper mode now uses get_by_mode(TradeMode.PAPER)
+        paper_trades = [t for t in sample_trades if t.mode == TradeMode.PAPER]
+        mock_trade_repo.get_by_mode.return_value = paper_trades
 
-        response = client.get("/api/trades?page=2&per_page=2")
+        response = client.get("/api/trades?page=2&per_page=1")
         data = response.json()
 
         assert response.status_code == 200
         assert data["meta"]["page"] == 2
         assert len(data["data"]) == 1
-        assert data["data"][0]["id"] == 3
+        assert data["data"][0]["id"] == 2  # Second PAPER trade
 
     def test_list_trades_mode_filter_paper(
         self,
@@ -246,7 +265,9 @@ class TestListTrades:
         paper_trades = [t for t in sample_trades if t.mode == TradeMode.PAPER]
         mock_trade_repo.get_by_mode.return_value = paper_trades
 
-        response = client.get("/api/trades?mode=paper")
+        # Note: mode query param is now ignored (Story 7.9)
+        # The backend uses settings.trading_mode instead
+        response = client.get("/api/trades")
         data = response.json()
 
         assert response.status_code == 200
@@ -291,7 +312,8 @@ class TestListTrades:
         mock_trade_repo: MagicMock,
     ) -> None:
         """Test list trades returns empty list when no trades."""
-        mock_trade_repo.get_recent.return_value = []
+        # Story 7.9: Paper mode uses get_by_mode
+        mock_trade_repo.get_by_mode.return_value = []
 
         response = client.get("/api/trades")
         data = response.json()
@@ -530,7 +552,8 @@ class TestGetTrade:
                 created_at=datetime(2026, 2, 18, 11, 0, 0),
             ),
         ]
-        mock_trade_repo.get_recent.return_value = trades_with_exit
+        # Story 7.9: Use get_by_mode for paper mode
+        mock_trade_repo.get_by_mode.return_value = trades_with_exit
 
         response = client.get("/api/trades")
         data = response.json()
@@ -563,7 +586,8 @@ class TestGetTrade:
                     created_at=datetime(2026, 2, 19, 10 + i, 0, 0),
                 )
             )
-        mock_trade_repo.get_recent.return_value = trades
+        # Story 7.9: Use get_by_mode for paper mode
+        mock_trade_repo.get_by_mode.return_value = trades
 
         response = client.get("/api/trades")
         data = response.json()

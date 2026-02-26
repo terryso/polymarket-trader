@@ -3,15 +3,19 @@
 This module provides REST API endpoints for trade operations.
 
 Story 7.3: 持仓与交易 API
+Story 7.9: 交易历史按模式实时显示
 
 Endpoints:
-    GET /api/trades - Get trade history with pagination
+    GET /api/trades - Get trade history with pagination (mode determined by settings.trading_mode)
     GET /api/trades/{trade_id} - Get trade details
 
 Query Parameters:
     page: Page number (default: 1)
     per_page: Items per page (default: 20, max: 100)
-    mode: Filter by trading mode (paper/live)
+
+Note:
+    Trading mode (paper/live) is now determined by TRADING_MODE environment variable,
+    not by query parameter. See Story 7.9.
 
 Usage:
     from src.dashboard.routes.trades import router
@@ -28,6 +32,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from src.api.polymarket import OrderHistoryItem, OrderHistoryResult, PolymarketClient
+from src.config import settings
 from src.models.api_response import (
     ApiResponse,
     ErrorCode,
@@ -35,7 +41,7 @@ from src.models.api_response import (
     PaginatedResponse,
     PaginationMeta,
 )
-from src.models.trade import TradeMode
+from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.models.trade_response import TradeListItem, TradeResponse
 from src.storage.repositories.trade_repo import TradeRepository
 
@@ -53,52 +59,118 @@ def get_trade_repository() -> TradeRepository:
     return TradeRepository()
 
 
+def _convert_order_to_trade(order: OrderHistoryItem) -> Trade:
+    """Convert OrderHistoryItem to Trade model.
+
+    Args:
+        order: Order history item from Polymarket API
+
+    Returns:
+        Trade model with data from order
+    """
+    # Determine trade type from side and outcome
+    side = order.side.upper()
+    outcome = order.outcome.upper()
+
+    if side == "BUY" and outcome == "YES":
+        trade_type = TradeType.BUY_YES
+    elif side == "BUY" and outcome == "NO":
+        trade_type = TradeType.BUY_NO
+    elif side == "SELL" and outcome == "YES":
+        trade_type = TradeType.SELL_YES
+    else:
+        trade_type = TradeType.SELL_NO
+
+    return Trade(
+        id=int(order.order_id) if order.order_id.isdigit() else 0,
+        market_id=order.market_id,
+        trade_type=trade_type,
+        mode=TradeMode.LIVE,
+        amount=order.size * order.price,  # USD amount
+        price=order.price,
+        shares=order.size,
+        status=TradeStatus.FILLED,  # Order history only contains filled orders
+        created_at=order.created_at,
+    )
+
+
 @router.get(
     "",
     response_model=PaginatedResponse[TradeListItem],
     summary="Get trade history",
-    description="Retrieve trade history with pagination and optional filtering by mode.",
+    description="Retrieve trade history with pagination. Mode is determined by TRADING_MODE setting.",
 )
 async def list_trades(
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     per_page: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
-    mode: Annotated[str | None, Query(description="Mode filter (paper/live)")] = None,
+    type_filter: Annotated[str | None, Query(description="Type filter (buy/sell)")] = None,
     repo: TradeRepository = Depends(get_trade_repository),
 ) -> PaginatedResponse[TradeListItem]:
-    """Get trade history with pagination and filtering.
+    """Get trade history with pagination.
+
+    Trading mode is determined by settings.trading_mode (TRADING_MODE env var):
+    - Paper mode: Returns trades from local database (mode=PAPER)
+    - Live mode: Returns trades from Polymarket API in real-time
 
     Args:
         page: Page number (1-based)
         per_page: Items per page (max 100)
-        mode: Mode filter (paper/live)
+        type_filter: Filter by trade type (buy/sell)
         repo: TradeRepository dependency
 
     Returns:
         Paginated list of trades
 
     Example:
-        >>> # GET /api/trades?page=1&per_page=20&mode=paper
+        >>> # GET /api/trades?page=1&per_page=20&type_filter=buy
         >>> # Response: {"success": true, "data": [...], "meta": {"total": 50, "page": 1, "per_page": 20}}
     """
-    logger.info(f"💰 Listing trades: page={page}, per_page={per_page}, mode={mode}")
+    trading_mode = settings.trading_mode
+    logger.info(
+        f"💰 Listing trades: page={page}, per_page={per_page}, "
+        f"type_filter={type_filter}, mode={trading_mode}"
+    )
 
-    # TODO: [LOW Priority] Consider database-level pagination for better performance.
-    # Current implementation fetches up to 1000 records and paginates in memory.
-    # For large datasets, this should be optimized to use OFFSET/LIMIT at the SQL level
-    # by adding a paginated query method to TradeRepository (e.g., get_paginated(page, per_page, mode)).
-    # See NFR4: Response time should be < 2 seconds.
-
-    # Get trades based on mode filter
-    if mode:
-        try:
-            mode_enum = TradeMode(mode.upper())
-            trades = await repo.get_by_mode(mode_enum)
-        except ValueError:
-            # Invalid mode, return empty list
-            logger.warning(f"💰 Invalid mode filter: {mode}")
-            trades = []
+    # Get trades based on trading mode from settings
+    if trading_mode == "paper":
+        # Paper mode: fetch from local database
+        trades = await repo.get_by_mode(TradeMode.PAPER)
     else:
-        trades = await repo.get_recent(limit=1000)  # Get all for pagination
+        # Live mode: fetch from Polymarket API
+        client = PolymarketClient()
+        result: OrderHistoryResult = client.get_order_history()
+
+        if not result.is_success:
+            logger.warning(f"💰 Failed to fetch order history: {result.error}")
+            # Return empty list with error indication
+            return PaginatedResponse(
+                success=False,
+                data=[],
+                meta=PaginationMeta(total=0, page=page, per_page=per_page),
+                error=ErrorDetail(
+                    code=ErrorCode.NETWORK_ERROR,
+                    message=result.error or "Failed to fetch order history",
+                ),
+            )
+
+        # Convert OrderHistoryItem to Trade
+        trades = [_convert_order_to_trade(order) for order in result.orders]
+
+    # Apply type filter if specified
+    if type_filter:
+        type_lower = type_filter.lower()
+        if type_lower == "buy":
+            trades = [
+                t
+                for t in trades
+                if t.trade_type in (TradeType.BUY_YES, TradeType.BUY_NO)
+            ]
+        elif type_lower == "sell":
+            trades = [
+                t
+                for t in trades
+                if t.trade_type in (TradeType.SELL_YES, TradeType.SELL_NO)
+            ]
 
     # Calculate pagination
     total = len(trades)
@@ -124,7 +196,7 @@ async def list_trades(
     ]
 
     logger.info(
-        f"💰 Found {total} trades, returning page {page} with {len(items)} items"
+        f"💰 Found {total} trades (mode={trading_mode}), returning page {page} with {len(items)} items"
     )
 
     return PaginatedResponse(
@@ -196,12 +268,17 @@ async def get_trade(
     return ApiResponse(success=True, data=response, error=None)
 
 
-# ==================== Story 5.6: 交易历史同步 ====================
+# ==================== Story 5.6: 交易历史同步 (DEPRECATED in Story 7.9) ====================
+# NOTE: These endpoints are deprecated. Trading mode is now determined by TRADING_MODE setting.
+# In live mode, trades are fetched in real-time from Polymarket API.
+# These endpoints are kept for backward compatibility but may be removed in future versions.
 
 
 class SyncStatusResponse(BaseModel):
-    """Sync status response model."""
+    """Sync status response model (DEPRECATED)."""
 
+    deprecated: bool = True
+    message: str = "This endpoint is deprecated. Trading mode is now automatic."
     last_sync_at: str | None = None
     is_syncing: bool = False
     can_sync: bool = False
@@ -210,8 +287,10 @@ class SyncStatusResponse(BaseModel):
 
 
 class SyncResultResponse(BaseModel):
-    """Sync result response model."""
+    """Sync result response model (DEPRECATED)."""
 
+    deprecated: bool = True
+    message: str = "This endpoint is deprecated. Trading mode is now automatic."
     new_trades: int = 0
     updated_trades: int = 0
     consistent_trades: int = 0
@@ -224,20 +303,24 @@ class SyncResultResponse(BaseModel):
 @router.get(
     "/sync/status",
     response_model=ApiResponse[SyncStatusResponse],
-    summary="Get sync status",
-    description="Get the current trade sync status.",
+    summary="[DEPRECATED] Get sync status",
+    description="DEPRECATED: This endpoint is deprecated. Trading mode is now determined by TRADING_MODE setting.",
+    deprecated=True,
 )
 async def get_sync_status() -> ApiResponse[SyncStatusResponse]:
-    """Get current trade sync status.
+    """Get current trade sync status (DEPRECATED).
 
-    Returns information about the last sync and whether sync is available.
+    .. deprecated::
+        This endpoint is deprecated as of Story 7.9.
+        Trading mode is now determined by TRADING_MODE environment variable.
+        In live mode, trades are fetched in real-time from Polymarket API.
 
     Returns:
-        Sync status information
+        Sync status information with deprecation notice
     """
     from src.trading.trade_sync import TradeSyncService
 
-    logger.info("💰 Getting trade sync status")
+    logger.warning("💰 DEPRECATED: get_sync_status endpoint called")
 
     service = TradeSyncService()
     status = await service.get_sync_status()
@@ -256,21 +339,24 @@ async def get_sync_status() -> ApiResponse[SyncStatusResponse]:
 @router.post(
     "/sync",
     response_model=ApiResponse[SyncResultResponse],
-    summary="Sync trades from Polymarket",
-    description="Synchronize trade history from Polymarket API to local database.",
+    summary="[DEPRECATED] Sync trades from Polymarket",
+    description="DEPRECATED: This endpoint is deprecated. Trading mode is now determined by TRADING_MODE setting.",
+    deprecated=True,
 )
 async def sync_trades() -> ApiResponse[SyncResultResponse]:
-    """Sync trades from Polymarket API.
+    """Sync trades from Polymarket API (DEPRECATED).
 
-    Fetches order history from Polymarket and syncs with local database.
-    Requires API credentials to be configured.
+    .. deprecated::
+        This endpoint is deprecated as of Story 7.9.
+        Trading mode is now determined by TRADING_MODE environment variable.
+        In live mode, trades are fetched in real-time from Polymarket API.
 
     Returns:
-        Sync result with statistics
+        Sync result with statistics and deprecation notice
     """
     from src.trading.trade_sync import TradeSyncService
 
-    logger.info("💰 Starting trade sync")
+    logger.warning("💰 DEPRECATED: sync_trades endpoint called")
 
     service = TradeSyncService()
     result = await service.sync_trades()

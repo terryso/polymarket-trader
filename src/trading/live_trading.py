@@ -680,7 +680,39 @@ class LiveTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
+            error_str = str(e)
             self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in sell position: {e}")
+
+            # Check if market was resolved (orderbook no longer exists)
+            if "orderbook" in error_str.lower() and "does not exist" in error_str.lower():
+                self._logger.warning(
+                    f"{OPERATION_EMOJIS['warning']} Market appears to be resolved "
+                    f"(orderbook not found), closing position {position.id}"
+                )
+                # Close the position since the market is resolved and can't be traded
+                try:
+                    closed_position = await self._position_manager.close_position(
+                        position_id=position.id,
+                        final_price=position.current_value / position.shares if position.shares > 0 else 0,
+                        market=market,
+                    )
+                    self._logger.info(
+                        f"{OPERATION_EMOJIS['success']} Position {position.id} closed "
+                        f"due to market resolution (orderbook not found)"
+                    )
+                    return SellResult(
+                        trade=None,
+                        position=closed_position,
+                        realized_pnl=0.0,  # Can't determine PnL without market price
+                        success=True,  # Position closed successfully
+                        error_message="Market resolved - position closed without trade",
+                    )
+                except Exception as close_error:
+                    self._logger.error(
+                        f"{OPERATION_EMOJIS['error']} Failed to close position {position.id} "
+                        f"after market resolution: {close_error}"
+                    )
+
             return SellResult(
                 trade=None,
                 position=position,

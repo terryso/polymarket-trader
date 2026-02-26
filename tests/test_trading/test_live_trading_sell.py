@@ -682,3 +682,96 @@ class TestLiveTradingExecutorSell:
 
         assert result.success is True
         assert result.realized_pnl == pytest.approx(2.67, rel=1e-1)
+
+    # ========== Market Resolved Tests ==========
+
+    @pytest.mark.asyncio
+    async def test_sell_orderbook_not_exist_closes_position(
+        self,
+        mock_client: MagicMock,
+        mock_trade_repo: AsyncMock,
+        mock_position_manager: AsyncMock,
+        mock_state: AsyncMock,
+        sample_market: Market,
+        sample_position_yes: Position,
+    ) -> None:
+        """测试 orderbook 不存在时（市场已结算）自动关闭持仓."""
+        # Configure mock to raise exception with orderbook not found
+        mock_client._client.create_and_post_order = MagicMock(
+            side_effect=Exception(
+                "PolyApiException[status_code=400, error_message={'error': 'the orderbook 13815952460361514493880496712561164230868624302562138286445313445449019645304 does not exist'}]"
+            )
+        )
+
+        # Configure position manager mock
+        closed_position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=0.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=0.0,
+            pnl=0.0,
+            status=PositionStatus.CLOSED,
+        )
+        mock_position_manager.close_position = AsyncMock(return_value=closed_position)
+
+        executor = LiveTradingExecutor(
+            client=mock_client,
+            trade_repo=mock_trade_repo,
+            position_manager=mock_position_manager,
+            state=mock_state,
+        )
+
+        result = await executor.sell_position(
+            position=sample_position_yes,
+            market=sample_market,
+        )
+
+        # Position should be closed successfully (market resolved)
+        assert result.success is True
+        assert result.trade is None  # No trade was executed
+        assert result.position is not None
+        assert result.position.status == PositionStatus.CLOSED
+        assert "market resolved" in result.error_message.lower()
+        mock_position_manager.close_position.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_sell_orderbook_not_exist_close_fails(
+        self,
+        mock_client: MagicMock,
+        mock_trade_repo: AsyncMock,
+        mock_position_manager: AsyncMock,
+        mock_state: AsyncMock,
+        sample_market: Market,
+        sample_position_yes: Position,
+    ) -> None:
+        """测试 orderbook 不存在且关闭持仓失败时返回错误."""
+        # Configure mock to raise exception with orderbook not found
+        mock_client._client.create_and_post_order = MagicMock(
+            side_effect=Exception(
+                "PolyApiException[status_code=400, error_message={'error': 'the orderbook 123 does not exist'}]"
+            )
+        )
+
+        # Configure position manager mock to fail
+        mock_position_manager.close_position = AsyncMock(
+            side_effect=Exception("Database error")
+        )
+
+        executor = LiveTradingExecutor(
+            client=mock_client,
+            trade_repo=mock_trade_repo,
+            position_manager=mock_position_manager,
+            state=mock_state,
+        )
+
+        result = await executor.sell_position(
+            position=sample_position_yes,
+            market=sample_market,
+        )
+
+        # Should fail since we couldn't close the position
+        assert result.success is False
+        assert "orderbook" in result.error_message.lower() or "does not exist" in result.error_message.lower()

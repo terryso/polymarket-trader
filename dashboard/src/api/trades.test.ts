@@ -4,9 +4,11 @@
  * Tests for the trades API functions including list and detail endpoints.
  *
  * Story 7.6: 前端 API 集成
+ * Story 7.9: 交易历史按模式实时显示 (mode parameter deprecated)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { TradeListItem, TradeResponse } from './types';
 
 // Mock the client module
 vi.mock('./client', () => ({
@@ -21,22 +23,22 @@ describe('Trades API', () => {
 
   describe('fetchTrades', () => {
     it('should call the correct endpoint with default params', async () => {
+      const mockTradeItem: TradeListItem = {
+        id: 1,
+        market_id: 'market-1',
+        trade_type: 'BUY_YES',
+        mode: 'PAPER',
+        amount: 30,
+        price: 0.6,
+        shares: 50,
+        status: 'FILLED',
+        exit_type: null,
+        created_at: '2026-02-01T10:00:00Z',
+      };
+
       const mockGetPaginated = vi.fn().mockResolvedValue({
         success: true,
-        data: [
-          {
-            id: 1,
-            condition_id: 'market-1',
-            question: 'Will Bitcoin reach $100k?',
-            outcome: 'Yes',
-            side: 'BUY',
-            size: 50,
-            price: 0.6,
-            total_cost: 30,
-            timestamp: '2026-02-01T10:00:00Z',
-            mode: 'PAPER',
-          },
-        ],
+        data: [mockTradeItem],
         meta: { total: 1, page: 1, per_page: 20 },
       });
 
@@ -49,15 +51,15 @@ describe('Trades API', () => {
         params: {
           page: 1,
           per_page: 20,
-          mode: undefined,
+          type_filter: undefined,
         },
       });
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
-      expect(result.items[0].side).toBe('BUY');
+      expect(result.items[0].trade_type).toBe('BUY_YES');
     });
 
-    it('should pass query params correctly', async () => {
+    it('should pass type_filter query param correctly (Story 7.9)', async () => {
       const mockGetPaginated = vi.fn().mockResolvedValue({
         success: true,
         data: [],
@@ -67,13 +69,13 @@ describe('Trades API', () => {
       vi.mocked(await import('./client')).getPaginated = mockGetPaginated;
 
       const { fetchTrades } = await import('./trades');
-      await fetchTrades({ page: 1, per_page: 20, mode: 'PAPER' });
+      await fetchTrades({ page: 1, per_page: 20, type_filter: 'buy' });
 
       expect(mockGetPaginated).toHaveBeenCalledWith('/api/trades', {
         params: {
           page: 1,
           per_page: 20,
-          mode: 'PAPER',
+          type_filter: 'buy',
         },
       });
     });
@@ -81,20 +83,19 @@ describe('Trades API', () => {
 
   describe('fetchTrade', () => {
     it('should call the correct endpoint for trade details', async () => {
-      const mockTrade = {
+      const mockTrade: TradeResponse = {
         id: 1,
-        condition_id: 'market-1',
-        question: 'Will Bitcoin reach $100k?',
-        description: 'Detailed description',
-        outcome: 'Yes',
-        side: 'BUY',
-        size: 50,
-        price: 0.6,
-        total_cost: 30,
-        fee: 0.1,
-        timestamp: '2026-02-01T10:00:00Z',
+        market_id: 'market-1',
+        trade_type: 'BUY_YES',
         mode: 'PAPER',
-        prediction_id: 123,
+        amount: 30,
+        price: 0.6,
+        shares: 50,
+        status: 'FILLED',
+        llm_prediction_id: 123,
+        position_id: null,
+        exit_type: null,
+        created_at: '2026-02-01T10:00:00Z',
       };
 
       const mockGet = vi.fn().mockResolvedValue(mockTrade);
@@ -105,8 +106,8 @@ describe('Trades API', () => {
 
       expect(mockGet).toHaveBeenCalledWith('/api/trades/1');
       expect(result.id).toBe(1);
-      expect(result.side).toBe('BUY');
-      expect(result.prediction_id).toBe(123);
+      expect(result.trade_type).toBe('BUY_YES');
+      expect(result.llm_prediction_id).toBe(123);
     });
   });
 

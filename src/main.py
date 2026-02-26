@@ -1049,16 +1049,36 @@ class Application:
             sig: Signal that was received (SIGTERM, SIGINT, etc.)
         """
         logger.info(f"Received signal {sig.name}, initiating graceful shutdown...")
-        # Set the shutdown event directly
+        # Set the shutdown event to unblock the main loop
         if self._shutdown_event:
             self._shutdown_event.set()
 
     def _setup_signal_handlers(self) -> None:
-        """Setup signal handlers for graceful shutdown."""
+        """Setup signal handlers for graceful shutdown.
+
+        Note: For SIGINT (Ctrl+C), we use signal.signal() instead of
+        loop.add_signal_handler() because asyncio.run() in Python 3.11+
+        manages SIGINT internally. Using signal.signal() ensures our
+        handler is called regardless of asyncio's internal handling.
+        """
         loop = asyncio.get_running_loop()
 
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, self._handle_signal, sig)
+        # For SIGTERM, use loop.add_signal_handler (works fine)
+        loop.add_signal_handler(signal.SIGTERM, self._handle_signal, signal.SIGTERM)
+
+        # For SIGINT (Ctrl+C), use signal.signal for more reliable handling
+        # This bypasses asyncio's signal management which can be finicky
+        original_handler = signal.getsignal(signal.SIGINT)
+
+        def sigint_handler(signum: int, frame: object) -> None:
+            logger.info("Received SIGINT (Ctrl+C), initiating graceful shutdown...")
+            # Set shutdown event in a thread-safe manner
+            if self._shutdown_event:
+                loop.call_soon_threadsafe(self._shutdown_event.set)
+
+        # Only install if not already SIG_IGN (ignored) or SIG_DFL (default)
+        if original_handler is None or original_handler == signal.SIG_DFL:
+            signal.signal(signal.SIGINT, sigint_handler)
 
 
 def parse_args() -> argparse.Namespace:
