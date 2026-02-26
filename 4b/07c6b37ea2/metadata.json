@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "4b07c6b37ea2",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "_bmad-output/implementation-artifacts/sprint-status.yaml",
+    "_bmad-output/planning-artifacts/epics.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/4b/07c6b37ea2/0/metadata.json",
+      "transcript": "/4b/07c6b37ea2/0/full.jsonl",
+      "context": "/4b/07c6b37ea2/0/context.md",
+      "content_hash": "/4b/07c6b37ea2/0/content_hash.txt",
+      "prompt": "/4b/07c6b37ea2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 83527,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1895040,
+    "output_tokens": 10350,
+    "api_call_count": 33
+  }
+}

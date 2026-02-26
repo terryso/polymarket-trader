@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "4b07c6b37ea2",
+  "session_id": "c9056426-9142-415d-aeba-5b4a8b8b9402",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T19:29:59.951698Z",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "_bmad-output/implementation-artifacts/sprint-status.yaml",
+    "_bmad-output/planning-artifacts/epics.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c8aabab0563b",
+  "token_usage": {
+    "input_tokens": 83527,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1895040,
+    "output_tokens": 10350,
+    "api_call_count": 33
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T19:29:59.579224Z",
+    "agent_lines": 45,
+    "human_added": 6653,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 6698,
+    "agent_percentage": 0.6718423409973127
+  }
+}
