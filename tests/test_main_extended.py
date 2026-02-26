@@ -47,8 +47,7 @@ class TestApplicationStart:
 
             mock_setup_signals.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_start_signal_handler_sigint(self) -> None:
+    def test_start_signal_handler_sigint(self) -> None:
         """Test SIGINT signal triggers shutdown.
 
         This test verifies that signal handlers are registered during start()
@@ -61,7 +60,7 @@ class TestApplicationStart:
         assert not app._shutdown_event.is_set()
 
         # Simulate signal handling
-        await app._handle_signal(signal.SIGINT)
+        app._handle_signal(signal.SIGINT)
         assert app._shutdown_event.is_set()
 
     @pytest.mark.asyncio
@@ -130,18 +129,17 @@ class TestApplicationInitialize:
             # Should not raise an error
             await app.shutdown()
 
-    @pytest.mark.asyncio
-    async def test_multiple_signal_handling(self) -> None:
+    def test_multiple_signal_handling(self) -> None:
         """Test handling multiple signals in sequence."""
         app = Application()
         app._shutdown_event = asyncio.Event()
 
         # First signal
-        await app._handle_signal(signal.SIGTERM)
+        app._handle_signal(signal.SIGTERM)
         assert app._shutdown_event.is_set()
 
         # Second signal should not raise
-        await app._handle_signal(signal.SIGINT)
+        app._handle_signal(signal.SIGINT)
 
 
 class TestMainFunctionEdgeCases:

@@ -353,8 +353,7 @@ class TestApplicationPidFile:
 class TestApplicationSignalHandling:
     """Tests for signal handling."""
 
-    @pytest.mark.asyncio
-    async def test_handle_signal(self) -> None:
+    def test_handle_signal(self) -> None:
         """Test signal handling triggers shutdown."""
         app = Application(mode="paper")
         app._shutdown_event = asyncio.Event()
@@ -362,19 +361,18 @@ class TestApplicationSignalHandling:
         # Event should not be set initially
         assert not app._shutdown_event.is_set()
 
-        await app._handle_signal(signal.SIGTERM)
+        app._handle_signal(signal.SIGTERM)
 
         # Event should be set after signal
         assert app._shutdown_event.is_set()
 
-    @pytest.mark.asyncio
-    async def test_handle_signal_no_event(self) -> None:
+    def test_handle_signal_no_event(self) -> None:
         """Test signal handling when no shutdown event exists."""
         app = Application(mode="paper")
         app._shutdown_event = None
 
         # Should not raise an error
-        await app._handle_signal(signal.SIGTERM)
+        app._handle_signal(signal.SIGTERM)
 
 
 class TestApplicationStart:
