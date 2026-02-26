@@ -85,6 +85,8 @@ def mock_position_repo() -> MagicMock:
 @pytest.fixture
 def client(mock_position_repo: MagicMock) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
+    from src.models.position import CacheFreshness
+
     # Reset PositionCacheService singleton to ensure clean state
     from src.trading.position_sync import PositionCacheService
     PositionCacheService._reset_instance()
@@ -103,8 +105,30 @@ def client(mock_position_repo: MagicMock) -> Generator[TestClient, None, None]:
             # Override the dependency
             app.dependency_overrides[get_position_repository] = mock_get_position_repository
 
-            with TestClient(app, raise_server_exceptions=False) as c:
-                yield c
+            # Mock PositionCacheService.get_positions to return empty list by default
+            mock_cache_status = MagicMock()
+            mock_cache_status.cache_updated_at = None
+            mock_cache_status.cache_age_seconds = 0
+            mock_cache_status.cache_freshness = CacheFreshness.FRESH
+            mock_cache_status.is_refreshing = False
+            mock_cache_status.can_refresh = False
+            mock_cache_status.last_error = None
+            mock_cache_status.total_positions = 0
+
+            with patch.object(
+                PositionCacheService,
+                "get_positions",
+                new_callable=AsyncMock,
+                return_value=([], CacheFreshness.FRESH),
+            ):
+                with patch.object(
+                    PositionCacheService,
+                    "get_cache_status",
+                    new_callable=AsyncMock,
+                    return_value=mock_cache_status,
+                ):
+                    with TestClient(app, raise_server_exceptions=False) as c:
+                        yield c
 
             # Clean up
             app.dependency_overrides.clear()

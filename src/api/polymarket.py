@@ -23,7 +23,7 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance", "OrderHistoryItem", "OrderHistoryResult", "BalanceItem", "BalanceResult"]
+__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance", "OrderHistoryItem", "OrderHistoryResult", "BalanceItem", "BalanceResult", "DataPositionItem"]
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -33,7 +33,9 @@ import httpx
 from py_clob_client.client import ClobClient  # type: ignore[import-untyped]
 from py_clob_client.clob_types import (  # type: ignore[import-untyped]  # noqa: F401 - Reserved for future proxy wallet auth
     ApiCreds,
+    RequestArgs,
 )
+from py_clob_client.headers.headers import create_level_2_headers  # type: ignore[import-untyped]
 
 from src.config import settings
 from src.exceptions import NetworkError, RateLimitError, RequestTimeoutError
@@ -85,6 +87,52 @@ class BalanceItem:
     asset_id: str | None = None
     market_title: str | None = None
     avg_price: float | None = None
+    cur_price: float | None = None
+
+
+@dataclass
+class DataPositionItem:
+    """Position item from Polymarket Data API.
+
+    Response format from GET /positions endpoint.
+    Contains:
+        market: Market condition ID (conditionId in API)
+        asset: Token/asset ID
+        outcome: Outcome type (YES/NO)
+        shares: Number of shares held (size in API)
+        avg_price: Average price paid per share (avgPrice in API)
+        cur_price: Current price per share (curPrice in API)
+        total_cost: Total cost in USDC (initialValue in API)
+        market_title: Market title (title in API)
+    """
+
+    market: str
+    asset: str
+    outcome: str
+    shares: float
+    avg_price: float | None = None
+    cur_price: float | None = None
+    total_cost: float | None = None
+    market_title: str | None = None
+
+    @property
+    def total_value(self) -> float | None:
+        """Current total value of position (shares * current price)."""
+        if self.cur_price is not None and self.shares is not None:
+            return self.shares * self.cur_price
+        return None
+
+    def to_balance_item(self, market_title: str | None = None) -> BalanceItem:
+        """Convert to BalanceItem for compatibility."""
+        return BalanceItem(
+            condition_id=self.market,
+            outcome=self.outcome,
+            shares=self.shares,
+            asset_id=self.asset,
+            market_title=market_title or self.market_title,
+            avg_price=self.avg_price,
+            cur_price=self.cur_price,
+        )
 
 
 @dataclass
@@ -237,6 +285,8 @@ class PolymarketClient:
     DEFAULT_HOST = "https://clob.polymarket.com"
     # Gamma API host for market filtering
     GAMMA_HOST = "https://gamma-api.polymarket.com"
+    # Data API host for user positions
+    DATA_HOST = "https://data-api.polymarket.com"
     # Polygon mainnet chain ID
     DEFAULT_CHAIN_ID = 137
     # Default HTTP timeout
@@ -967,12 +1017,121 @@ class PolymarketClient:
                 error=error_msg,
             )
 
+    def _fetch_data_api_positions(self) -> list[DataPositionItem]:
+        """Fetch positions from Polymarket Data API.
+
+        Uses the Data API /positions endpoint to get the user's current positions.
+        This is the official API for getting positions, rather than calculating from trade history.
+
+        Requires Level 2 authentication.
+
+        Returns:
+            List of DataPositionItem objects
+
+        Raises:
+            Exception: If API call fails
+        """
+        if self._auth_level < 2:
+            self._logger.warning(
+                f"{OPERATION_EMOJIS['network']} Data API requires Level 2 authentication"
+            )
+            return []
+
+        # Ensure API credentials are set
+        if not self._api_creds_set:
+            derived_creds = self._client.create_or_derive_api_creds()
+            self._client.set_api_creds(derived_creds)
+            self._api_creds_set = True
+
+        self._logger.info(
+            f"{OPERATION_EMOJIS['network']} Fetching positions from Data API"
+        )
+
+        # Build request for Data API /positions endpoint
+        request_args = RequestArgs(
+            method="GET",
+            request_path="/positions",
+        )
+        headers = create_level_2_headers(
+            self._client.signer,  # type: ignore[attr-defined]
+            self._client.creds,  # type: ignore[attr-defined]
+            request_args,
+        )
+
+        # Make request to Data API
+        # Data API requires 'user' query parameter (proxy wallet address)
+        user_address = settings.polymarket.proxy_wallet
+        url = f"{self.DATA_HOST}/positions?user={user_address}"
+
+        try:
+            client = self._get_http_client()
+            response = client.get(url, headers=headers, timeout=self._timeout)
+            response.raise_for_status()
+
+            data = response.json()
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Data API returned {len(data) if isinstance(data, list) else 'unknown'} positions"
+            )
+
+            # Parse response into DataPositionItem objects
+            positions: list[DataPositionItem] = []
+            if isinstance(data, list):
+                for item in data:
+                    try:
+                        # Map API field names to our field names
+                        # API uses camelCase: conditionId, size, avgPrice, curPrice, initialValue, title
+                        position = DataPositionItem(
+                            market=str(item.get("conditionId", "")),
+                            asset=str(item.get("asset", "")),
+                            outcome=str(item.get("outcome", "")),
+                            shares=float(item.get("size", 0)),
+                            avg_price=float(item.get("avgPrice")) if item.get("avgPrice") is not None else None,
+                            cur_price=float(item.get("curPrice")) if item.get("curPrice") is not None else None,
+                            total_cost=float(item.get("initialValue")) if item.get("initialValue") is not None else None,
+                            market_title=item.get("title"),
+                        )
+                        if position.shares > 0:
+                            positions.append(position)
+                            self._logger.debug(
+                                f"{OPERATION_EMOJIS['network']} Position: {position.outcome} "
+                                f"{position.shares:.4f} @ avg={position.avg_price:.4f} "
+                                f"(market: {position.market[:16]}...)"
+                            )
+                    except Exception as e:
+                        self._logger.warning(
+                            f"{OPERATION_EMOJIS['network']} Failed to parse position item: {e}"
+                        )
+                        continue
+
+            return positions
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                raise RateLimitError(
+                    message="Data API rate limit exceeded",
+                    endpoint="get_positions",
+                    retry_after=int(e.response.headers.get("Retry-After", 60)),
+                    original_exception=e,
+                )
+            raise NetworkError(
+                message=f"Data API error: {e.response.status_code}",
+                endpoint="get_positions",
+                status_code=e.response.status_code,
+                original_exception=e,
+            )
+        except httpx.RequestError as e:
+            raise NetworkError(
+                message="Data API request failed",
+                endpoint="get_positions",
+                original_exception=e,
+            )
+
     def get_balances(self) -> BalanceResult:
         """Get wallet position balances from Polymarket.
 
         Fetches the user's current position balances by:
-        1. Getting asset IDs from trade history via get_trades()
-        2. Querying on-chain ERC-1155 balances using web3.py
+        1. First trying Data API /positions endpoint (primary source)
+        2. Falling back to on-chain ERC-1155 balance queries if Data API fails
         3. Returning only non-zero positions
 
         Requires Level 2 authentication (API credentials must be configured).
@@ -1014,6 +1173,32 @@ class PolymarketClient:
 
         self._logger.info(
             f"{OPERATION_EMOJIS['network']} Fetching wallet position balances"
+        )
+
+        # Try Data API first (primary source)
+        try:
+            data_positions = self._fetch_data_api_positions()
+            if data_positions:
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['network']} Got {len(data_positions)} positions from Data API"
+                )
+                # Convert DataPositionItem to BalanceItem
+                balances = [pos.to_balance_item() for pos in data_positions]
+                return BalanceResult(balances=balances, error=None)
+            else:
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['network']} Data API returned no positions, "
+                    "falling back to on-chain query"
+                )
+        except Exception as e:
+            self._logger.warning(
+                f"{OPERATION_EMOJIS['network']} Data API failed: {e}, "
+                "falling back to on-chain query"
+            )
+
+        # Fallback: Use on-chain ERC-1155 balance queries
+        self._logger.info(
+            f"{OPERATION_EMOJIS['network']} Using on-chain query as fallback"
         )
 
         try:
@@ -1110,7 +1295,7 @@ class PolymarketClient:
 
             # Step 2: Query on-chain ERC-1155 balances for each asset
             wallet = settings.polymarket.proxy_wallet
-            balances: list[BalanceItem] = []
+            on_chain_balances: list[BalanceItem] = []
 
             for asset_id, info in asset_info_map.items():
                 try:
@@ -1134,7 +1319,7 @@ class PolymarketClient:
                             market_title=None,
                             avg_price=avg_price,
                         )
-                        balances.append(balance)
+                        on_chain_balances.append(balance)
                         self._logger.debug(
                             f"{OPERATION_EMOJIS['network']} Position: {info['outcome']} "
                             f"{on_chain_balance:.6f} shares (asset: {asset_id[:10]}...)"
@@ -1153,10 +1338,10 @@ class PolymarketClient:
                     continue
 
             self._logger.info(
-                f"{OPERATION_EMOJIS['network']} Found {len(balances)} non-zero positions"
+                f"{OPERATION_EMOJIS['network']} Found {len(on_chain_balances)} non-zero positions"
             )
 
-            return BalanceResult(balances=balances, error=None)
+            return BalanceResult(balances=on_chain_balances, error=None)
 
         except Exception as e:
             error_msg = str(e)
@@ -1225,8 +1410,8 @@ class PolymarketClient:
                     int(asset_id),
                 ).call()
 
-                # Convert from wei to shares (18 decimals for Polymarket CTF)
-                return balance_wei / 10**18
+                # Convert from wei to shares (6 decimals for Polymarket CTF, same as USDC)
+                return balance_wei / 10**6
 
             except Exception as e:
                 last_error = e

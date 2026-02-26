@@ -72,16 +72,17 @@ class PositionRepository:
             cursor = await conn.execute(
                 """
                 INSERT INTO positions (
-                    market_id, outcome, shares, avg_price,
+                    market_id, outcome, shares, avg_price, cur_price,
                     initial_value, current_value, pnl, status,
                     opened_at, closed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     position.market_id,
                     position.outcome.value,
                     position.shares,
                     position.avg_price,
+                    position.cur_price,
                     position.initial_value,
                     position.current_value,
                     position.pnl,
@@ -196,7 +197,7 @@ class PositionRepository:
             await conn.execute(
                 """
                 UPDATE positions SET
-                    market_id = ?, outcome = ?, shares = ?, avg_price = ?,
+                    market_id = ?, outcome = ?, shares = ?, avg_price = ?, cur_price = ?,
                     initial_value = ?, current_value = ?, pnl = ?, status = ?,
                     opened_at = ?, closed_at = ?
                 WHERE id = ?
@@ -206,6 +207,7 @@ class PositionRepository:
                     position.outcome.value,
                     position.shares,
                     position.avg_price,
+                    position.cur_price,
                     position.initial_value,
                     position.current_value,
                     position.pnl,
@@ -273,6 +275,7 @@ class PositionRepository:
             outcome=PositionOutcome(row["outcome"]),
             shares=row["shares"],
             avg_price=row["avg_price"],
+            cur_price=row["cur_price"] if "cur_price" in row.keys() else None,
             initial_value=row["initial_value"],
             current_value=row["current_value"],
             pnl=row["pnl"],

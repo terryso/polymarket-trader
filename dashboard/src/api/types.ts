@@ -139,6 +139,7 @@ export interface MarketListQueryParams {
 
 export type PositionOutcome = 'YES' | 'NO';
 export type PositionStatus = 'open' | 'closed';
+export type CacheFreshness = 'FRESH' | 'STALE' | 'EXPIRED';
 
 export interface PositionListItem {
   id: number;
@@ -146,10 +147,18 @@ export interface PositionListItem {
   outcome: PositionOutcome;
   shares: number;
   avg_price: number;
+  cur_price: number | null;
   current_value: number | null;
   pnl: number | null;
   status: PositionStatus;
   opened_at: string | null;
+}
+
+export interface PositionListResponse {
+  positions: PositionListItem[];
+  cache_freshness: CacheFreshness;
+  cache_age_seconds: number;
+  total_count: number;
 }
 
 export interface PositionResponse {

@@ -133,6 +133,7 @@ async def list_positions(
             outcome=p.outcome,
             shares=p.shares,
             avg_price=p.avg_price,
+            cur_price=p.cur_price,
             current_value=p.current_value,
             pnl=p.pnl,
             status=p.status,
@@ -335,6 +336,299 @@ async def get_cache_status() -> ApiResponse[CacheStatusResponse]:
     )
 
     return ApiResponse(success=True, data=response, error=None)
+
+
+@router.post(
+    "/cache/reset",
+    response_model=ApiResponse[dict],
+    summary="Reset stuck cache refresh state",
+    description="Reset the refreshing flag and lock if a refresh operation is stuck.",
+)
+async def reset_cache_state() -> ApiResponse[dict]:
+    """Reset stuck cache refresh state.
+
+    Use this endpoint if a refresh operation is stuck (is_refreshing stays true).
+    This can happen if the server was restarted during a refresh or due to an error.
+
+    Returns:
+        Success message
+    """
+    import asyncio
+    from src.trading.position_sync import PositionCacheService
+
+    logger.warning("📊 Resetting stuck cache refresh state")
+
+    service = PositionCacheService()
+    was_stuck = service._refreshing or service._refresh_lock.locked()
+
+    # Reset both the flag and the lock
+    service._refreshing = False
+    if service._refresh_lock.locked():
+        # Create a new lock to replace the stuck one
+        service._refresh_lock = asyncio.Lock()
+
+    if was_stuck:
+        logger.info("📊 Cache refresh state reset successfully")
+        return ApiResponse(
+            success=True,
+            data={"message": "Cache refresh state reset successfully"},
+            error=None,
+        )
+    else:
+        return ApiResponse(
+            success=True,
+            data={"message": "No stuck refresh state found"},
+            error=None,
+        )
+
+
+@router.get(
+    "/debug/trades",
+    response_model=ApiResponse[dict],
+    summary="[DEBUG] Get trades from Polymarket API",
+    description="Debug endpoint to check what trades the Polymarket API returns.",
+)
+async def debug_get_trades() -> ApiResponse[dict]:
+    """Debug endpoint to check Polymarket API trades.
+
+    Returns:
+        Trade information from Polymarket API
+    """
+    from src.api.polymarket import PolymarketClient
+    from src.config import settings
+
+    logger.info("📊 Debug: Fetching trades from Polymarket API")
+
+    result = {
+        "pk_configured": bool(settings.polymarket.pk),
+        "proxy_wallet": settings.polymarket.proxy_wallet,
+        "trades_count": 0,
+        "trades_sample": [],
+        "error": None,
+    }
+
+    try:
+        client = PolymarketClient()
+        trades = client._client.get_trades()
+        result["trades_count"] = len(trades) if trades else 0
+
+        if trades:
+            for t in trades[:5]:
+                result["trades_sample"].append({
+                    "asset_id": str(t.get("asset_id", ""))[:30] + "...",
+                    "outcome": t.get("outcome", ""),
+                    "side": t.get("side", ""),
+                    "size": t.get("size", 0),
+                    "price": t.get("price", 0),
+                    "market": str(t.get("market", ""))[:30] + "..." if t.get("market") else None,
+                })
+
+        client.close()
+    except Exception as e:
+        result["error"] = str(e)
+        logger.error(f"📊 Debug: Error fetching trades: {e}")
+
+    return ApiResponse(success=True, data=result, error=None)
+
+
+@router.get(
+    "/debug/full-trades",
+    response_model=ApiResponse[dict],
+    summary="[DEBUG] Get full trades data with complete asset IDs",
+    description="Debug endpoint to see complete trade information.",
+)
+async def debug_full_trades() -> ApiResponse[dict]:
+    """Debug endpoint to get full trades data with complete asset IDs."""
+    from src.api.polymarket import PolymarketClient
+    from src.config import settings
+
+    logger.info("📊 Debug: Fetching full trades data")
+
+    result = {
+        "wallet": settings.polymarket.proxy_wallet,
+        "trades": [],
+        "markets": {},
+        "error": None,
+    }
+
+    try:
+        client = PolymarketClient()
+        trades = client._client.get_trades()
+
+        if trades:
+            # Get unique asset IDs and markets
+            asset_ids = set()
+            market_ids = set()
+            for t in trades:
+                if t.get("asset_id"):
+                    asset_ids.add(str(t["asset_id"]))
+                if t.get("market"):
+                    market_ids.add(str(t["market"]))
+
+            # Store full trades (first 10)
+            for t in trades[:10]:
+                result["trades"].append({
+                    "asset_id": str(t.get("asset_id", "")),
+                    "market": str(t.get("market", "")),
+                    "outcome": t.get("outcome", ""),
+                    "side": t.get("side", ""),
+                    "size": t.get("size", ""),
+                    "price": t.get("price", ""),
+                })
+
+            # Get market data for token IDs
+            for market_id in list(market_ids)[:5]:
+                try:
+                    market_data = client._client.get_market(market_id)
+                    if market_data:
+                        tokens = market_data.get("tokens", [])
+                        result["markets"][market_id] = {
+                            "tokens": [
+                                {
+                                    "token_id": str(t.get("token_id", "")),
+                                    "outcome": t.get("outcome", ""),
+                                }
+                                for t in tokens
+                            ]
+                        }
+                except Exception as e:
+                    result["markets"][market_id] = {"error": str(e)}
+
+            result["unique_assets"] = len(asset_ids)
+            result["unique_markets"] = len(market_ids)
+
+        client.close()
+    except Exception as e:
+        result["error"] = str(e)
+
+    return ApiResponse(success=True, data=result, error=None)
+
+
+@router.get(
+    "/debug/balance/{asset_id}",
+    response_model=ApiResponse[dict],
+    summary="[DEBUG] Get on-chain balance for an asset",
+    description="Debug endpoint to check on-chain ERC-1155 balance.",
+)
+async def debug_get_balance(asset_id: str) -> ApiResponse[dict]:
+    """Debug endpoint to check on-chain balance.
+
+    Args:
+        asset_id: Token/asset ID to query
+
+    Returns:
+        On-chain balance information
+    """
+    from src.api.polymarket import PolymarketClient
+    from src.config import settings
+
+    logger.info(f"📊 Debug: Fetching on-chain balance for asset {asset_id[:20]}...")
+
+    result = {
+        "asset_id": asset_id,
+        "wallet": settings.polymarket.proxy_wallet,
+        "balance": 0,
+        "error": None,
+    }
+
+    try:
+        client = PolymarketClient()
+        balance = client._get_erc1155_balance(settings.polymarket.proxy_wallet, asset_id)
+        result["balance"] = balance
+        client.close()
+    except Exception as e:
+        result["error"] = str(e)
+        logger.error(f"📊 Debug: Error fetching balance: {e}")
+
+    return ApiResponse(success=True, data=result, error=None)
+
+
+@router.get(
+    "/debug/contracts/{asset_id}",
+    response_model=ApiResponse[dict],
+    summary="[DEBUG] Check balance across all Polymarket contracts",
+    description="Debug endpoint to check balance in different CTF contracts.",
+)
+async def debug_check_contracts(asset_id: str) -> ApiResponse[dict]:
+    """Debug endpoint to check balance in different Polymarket contracts.
+
+    Args:
+        asset_id: Token/asset ID to query
+
+    Returns:
+        Balance information from different contracts
+    """
+    from web3 import Web3
+    from src.config import settings
+
+    logger.info(f"📊 Debug: Checking balance across contracts for asset {asset_id[:20]}...")
+
+    # Polymarket contracts on Polygon
+    CONTRACTS = {
+        "CTF (Standard)": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+        "Neg Risk CTF": "0xC5d563A36AE78145C45a50134d48A1215220f80a",
+        "CTF Exchange": "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8ba2E",
+        "Neg Risk Adapter": "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296",
+    }
+
+    POLYGON_RPCS = [
+        "https://polygon-mainnet.g.alchemy.com/v2/ppWb_ez8qZohBDRTqZnX5lEMYtc-5iI6",
+        "https://rpc.ankr.com/polygon",
+        "https://polygon-bor-rpc.publicnode.com",
+    ]
+
+    ctf_abi = """[{
+        "inputs": [
+            {"internalType": "address", "name": "owner", "type": "address"},
+            {"internalType": "uint256", "name": "id", "type": "uint256"}
+        ],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    }]"""
+
+    wallet = settings.polymarket.proxy_wallet
+    results = {
+        "asset_id": asset_id,
+        "wallet": wallet,
+        "balances": {},
+        "errors": [],
+    }
+
+    for rpc_url in POLYGON_RPCS:
+        try:
+            w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10}))
+            if not w3.is_connected():
+                continue
+
+            for name, address in CONTRACTS.items():
+                try:
+                    contract = w3.eth.contract(
+                        address=Web3.to_checksum_address(address),
+                        abi=ctf_abi,
+                    )
+                    balance_wei = contract.functions.balanceOf(
+                        Web3.to_checksum_address(wallet),
+                        int(asset_id),
+                    ).call()
+                    balance = balance_wei / 10**18
+                    if balance > 0:
+                        results["balances"][name] = {
+                            "address": address,
+                            "balance": balance,
+                            "rpc": rpc_url.split("/")[2],
+                        }
+                except Exception as e:
+                    pass  # Skip errors for individual contracts
+
+            if results["balances"]:
+                break  # Found balances, no need to try other RPCs
+
+        except Exception as e:
+            results["errors"].append(f"{rpc_url}: {str(e)}")
+
+    return ApiResponse(success=True, data=results, error=None)
 
 
 @router.post(

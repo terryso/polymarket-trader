@@ -378,13 +378,37 @@ class PositionCacheService:
             # Update existing position
             existing = local_positions[key]
 
-            # Check if shares changed (with tolerance for float comparison)
-            if abs(existing.shares - balance.shares) < 0.0001:
+            # Check if shares and avg_price both unchanged (with tolerance for float comparison)
+            shares_unchanged = abs(existing.shares - balance.shares) < 0.0001
+            avg_price_unchanged = (
+                balance.avg_price is None
+                or existing.avg_price is None
+                or abs(existing.avg_price - balance.avg_price) < 0.0001
+            )
+            # cur_price unchanged only if both have values and are equal
+            # If existing is None but API has a value (including 0), it's a change
+            cur_price_unchanged = (
+                existing.cur_price is not None
+                and balance.cur_price is not None
+                and abs(existing.cur_price - balance.cur_price) < 0.0001
+            )
+            if shares_unchanged and avg_price_unchanged and cur_price_unchanged:
                 return "unchanged"
 
             # Update shares
             existing.shares = balance.shares
-            existing.current_value = balance.shares * existing.avg_price
+
+            # Update avg_price if provided by Data API
+            if balance.avg_price is not None:
+                existing.avg_price = balance.avg_price
+
+            # Update cur_price if provided by Data API
+            if balance.cur_price is not None:
+                existing.cur_price = balance.cur_price
+
+            # Recalculate current_value using cur_price (or avg_price as fallback)
+            price_for_value = existing.cur_price if existing.cur_price is not None else existing.avg_price
+            existing.current_value = balance.shares * price_for_value
             if existing.initial_value:
                 existing.pnl = existing.current_value - existing.initial_value
 
@@ -394,6 +418,10 @@ class PositionCacheService:
             # Create new position
             # Use avg_price from balance if available, otherwise default to 0.5
             avg_price = balance.avg_price if balance.avg_price is not None else 0.5
+            cur_price = balance.cur_price  # Current price from Data API
+
+            # Calculate current_value using cur_price if available, otherwise avg_price
+            price_for_value = cur_price if cur_price is not None else avg_price
 
             new_position = Position(
                 id=0,  # Will be assigned by database
@@ -401,8 +429,9 @@ class PositionCacheService:
                 outcome=PositionOutcome(outcome_value),
                 shares=balance.shares,
                 avg_price=avg_price,
+                cur_price=cur_price,
                 initial_value=balance.shares * avg_price,
-                current_value=balance.shares * avg_price,
+                current_value=balance.shares * price_for_value,
                 pnl=0.0,
                 status=PositionStatus.OPEN,
                 opened_at=datetime.now(),

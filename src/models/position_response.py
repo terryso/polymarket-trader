@@ -69,6 +69,7 @@ class PositionListItem(BaseModel):
     outcome: PositionOutcome = Field(..., description="Position outcome")
     shares: float = Field(..., ge=0, description="Number of shares")
     avg_price: float = Field(..., ge=0, le=1, description="Average price (0-1)")
+    cur_price: float | None = Field(None, ge=0, le=1, description="Current price (0-1)")
     current_value: float | None = Field(None, description="Current value (USD)")
     pnl: float | None = Field(None, description="Profit/Loss (USD)")
     status: PositionStatus = Field(..., description="Position status")

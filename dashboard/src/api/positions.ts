@@ -9,13 +9,14 @@
  */
 
 import { get, post } from './client';
-import type { PositionListItem, PositionResponse, PositionSyncStatus, PositionSyncResult, ManualExitResponse } from './types';
+import type { PositionListItem, PositionListResponse, PositionResponse, PositionSyncStatus, PositionSyncResult, ManualExitResponse } from './types';
 
 /**
  * Get list of open positions.
  */
 export async function fetchPositions(): Promise<PositionListItem[]> {
-  return get<PositionListItem[]>('/api/positions');
+  const response = await get<PositionListResponse>('/api/positions');
+  return response.positions;
 }
 
 /**

@@ -236,6 +236,7 @@ class DatabaseManager:
                         outcome TEXT NOT NULL,
                         shares REAL NOT NULL,
                         avg_price REAL NOT NULL,
+                        cur_price REAL,
                         initial_value REAL,
                         current_value REAL,
                         pnl REAL,
@@ -245,6 +246,12 @@ class DatabaseManager:
                         FOREIGN KEY (market_id) REFERENCES markets(id)
                     )
                 """)
+
+                # Migration: Add cur_price column if it doesn't exist
+                try:
+                    await conn.execute("ALTER TABLE positions ADD COLUMN cur_price REAL")
+                except Exception:
+                    pass  # Column already exists, ignore error
 
                 # Create indexes for predictions table
                 await conn.execute("""
