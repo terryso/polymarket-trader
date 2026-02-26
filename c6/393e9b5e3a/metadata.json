@@ -3,7 +3,7 @@
   "checkpoint_id": "c6393e9b5e3a",
   "strategy": "manual-commit",
   "branch": "develop",
-  "checkpoints_count": 3,
+  "checkpoints_count": 6,
   "files_touched": [
     "_bmad-output/implementation-artifacts/7-9-trade-history-realtime-by-mode.md",
     "_bmad-output/implementation-artifacts/sprint-status.yaml",
@@ -15,9 +15,13 @@
     "dashboard/src/pages/Trades.story79.test.tsx",
     "dashboard/src/pages/Trades.test.tsx",
     "dashboard/src/pages/Trades.tsx",
+    "pyproject.toml",
     "src/dashboard/routes/trades.py",
+    "src/main.py",
+    "src/trading/live_trading.py",
     "tests/test_dashboard/test_routes/test_trades.py",
-    "tests/test_dashboard/test_routes/test_trades_story79.py"
+    "tests/test_dashboard/test_routes/test_trades_story79.py",
+    "tests/test_trading/test_live_trading_sell.py"
   ],
   "sessions": [
     {
@@ -26,13 +30,20 @@
       "context": "/c6/393e9b5e3a/0/context.md",
       "content_hash": "/c6/393e9b5e3a/0/content_hash.txt",
       "prompt": "/c6/393e9b5e3a/0/prompt.txt"
+    },
+    {
+      "metadata": "/c6/393e9b5e3a/1/metadata.json",
+      "transcript": "/c6/393e9b5e3a/1/full.jsonl",
+      "context": "/c6/393e9b5e3a/1/context.md",
+      "content_hash": "/c6/393e9b5e3a/1/content_hash.txt",
+      "prompt": "/c6/393e9b5e3a/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 668851,
+    "input_tokens": 779370,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 14686720,
-    "output_tokens": 56248,
-    "api_call_count": 165
+    "cache_read_tokens": 17318848,
+    "output_tokens": 66233,
+    "api_call_count": 218
   }
 }
