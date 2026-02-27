@@ -1,0 +1,136 @@
+2026-02-27 03:39:30 | ERROR    | ThreadPoolExecutor-0_0 | src.trading.live_trading | ❌ ❌ Unexpected error in sell position: PolyApiException[status_code=400, error_message={'error': 'the orderbook 13815952460361514493880496712561164230868624302562138286445313445449019645304 does not exist'}]
+2026-02-27 03:39:30 | ERROR    | ThreadPoolExecutor-0_0 | __main__ | ❌ ❌ Exit failed for position 46: Unexpected error: PolyApiException[status_code=400, error_message={'error': 'the orderbook 13815952460361514493880496712561164230868624302562138286445313445449019645304 does not exist'}]
+
+---
+
+后端服务没法通过Ctrl + C 退出
+
+---
+
+后端服务没法通过Ctrl + C 退出
+
+---
+
+第一条记录的PNL为了0好像计算错了吧
+
+---
+
+2026-02-27 09:24:09 | INFO     | asyncio_1    | httpx | ✅ HTTP Request: GET https://clob.polymarket.com/markets/0xe4c652...da13 "HTTP/2 200 OK"
+2026-02-27 09:24:09 | INFO     | ThreadPoolExecutor-0_3 | httpx | ✅ HTTP Request: POST https://clob.polymarket.com/order "HTTP/2 400 Bad Request"
+2026-02-27 09:24:09 | ERROR    | ThreadPoolExecutor-0_3 | src.trading.live_trading | ❌ ❌ Unexpected error in sell position: PolyApiException[status_code=400, error_message={'error': 'the orderbook 36684523782644553102753391282461229264623343883641420873810278694053774849142 does not exist'}]
+2026-02-27 09:24:09 | WARNING  | ThreadPoolExecutor-0_3 | src.trading.live_trading | ⚠️ ⚠️ Market appears to be resolved (orderbook not found), closing position 53
+2026-02-27 09:24:09 | ERROR    | ThreadPoolExecutor-0_3 | src.trading.live_trading | ❌ ❌ Failed to close position 53 after market resolution: Final price must be between 0 and 1, got 0.0
+2026-02-27 09:24:09 | ERROR    | ThreadPoolExecutor-0_3 | __main__ | ❌ ❌ Exit failed for position 53: Unexpected error: PolyApiException[status_code=400, error_message={'error': 'the orderbook 36684523782644553102753391282461229264623343883641420873810278694053774849142 does not exist'}]
+
+---
+
+2026-02-27 09:28:11 | ERROR    | MainThread   | src.core.state | ❌ Daily PnL (-71.23660164000002) exceeds capital (32.404225)
+
+---
+
+polymarket上有4个持仓, 但本地运行的时候只有一个
+
+---
+
+ance: $32.40 USDC (via https://polygon-mainnet.g.alchemy.com/v2/REDACTED)
+2026-02-27 09:43:29 | ERROR    | MainThread   | __main__ | ❌ Initial analysis failed: Gamma API request failed (endpoint=get_active_markets) (caused by: Server disconnected without sending a response.)
+Traceback (most recent call last):
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/http_proxy.py", line 343, in handle_request
+    return self._connection.handle_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 136, in handle_request
+    raise exc
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 106, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 177, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 231, in _receive_event
+    raise RemoteProtocolError(msg)
+httpcore.RemoteProtocolError: Server disconnected without sending a response.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/nick/CascadeProjects/polymarket-trader/src/api/polymarket.py", line 486, in get_active_markets
+    response = client.get(
+               ^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_client.py", line 1053, in get
+    return self.request(
+           ^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+  File "/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Users/nick/CascadeProjects/polymarket-trader/.venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.RemoteProtocolError: Server disconnected without sending a response.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/nick/CascadeProjects/polymarket-trader/src/main.py", line 248, in run_initial_analysis
+    gamma_markets = client.get_all_active_markets(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/src/api/polymarket.py", line 578, in get_all_active_markets
+    markets = self.get_active_markets(
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nick/CascadeProjects/polymarket-trader/src/api/polymarket.py", line 521, in get_active_markets
+    raise NetworkError(
+src.exceptions.NetworkError: Gamma API request failed (endpoint=get_active_markets) (caused by: Server disconnected without sending a response.)
+
+---
+
+持仓这里点退出, 是会卖掉持仓份额吗
+
+---
+
+{
+    "detail": {
+        "success": false,
+        "error": {
+            "code": "INTERNAL_ERROR",
+            "message": "'MarketRepository' object has no attribute 'get_by_id'"
+        }
+    }
+}
+
+退出接口报上面的错误
+
+---
+
+{
+    "detail": {
+        "success": false,
+        "error": {
+            "code": "INTERNAL_ERROR",
+            "message": "type object 'ThreadSafeState' has no attribute 'get_instance'"
+        }
+    }
+}
