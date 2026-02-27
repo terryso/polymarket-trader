@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "a22adeddd5e4",
+  "session_id": "898de18f-3efc-4388-9a7a-17ebaaa882fa",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T08:25:42.829738Z",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/api/polymarket.py",
+    "src/trading/exit_checker.py",
+    "tests/test_trading/test_exit_checker.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "d3dcd2e98654",
+  "token_usage": {
+    "input_tokens": 69534,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2295680,
+    "output_tokens": 9413,
+    "api_call_count": 38
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T08:25:42.398868Z",
+    "agent_lines": 165,
+    "human_added": 263,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 428,
+    "agent_percentage": 38.55140186915888
+  }
+}
