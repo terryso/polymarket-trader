@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "afab2e1aa4a8",
+  "session_id": "b6e76aff-ec93-4588-be38-129d1a90429e",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T10:37:15.248083Z",
+  "branch": "develop",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "src/trading/live_trading.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c073aec1aa99",
+  "token_usage": {
+    "input_tokens": 216608,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 16749696,
+    "output_tokens": 30282,
+    "api_call_count": 177
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T10:37:14.491101Z",
+    "agent_lines": 12,
+    "human_added": 13,
+    "human_modified": 10,
+    "human_removed": 0,
+    "total_committed": 35,
+    "agent_percentage": 34.285714285714285
+  }
+}
