@@ -709,8 +709,9 @@ class LiveTradingExecutor:
                 and "does not exist" in error_str.lower()
             ):
                 self._logger.warning(
-                    f"{OPERATION_EMOJIS['warning']} Market appears to be resolved "
-                    f"(orderbook not found), closing position {position.id}"
+                    f"{OPERATION_EMOJIS['warning']} Market is RESOLVED (orderbook not found). "
+                    f"Position {position.id} cannot be sold via orderbook. "
+                    f"Closing locally - you may need to REDEEM shares directly on Polymarket."
                 )
                 # Close the position since the market is resolved and can't be traded
                 try:
@@ -746,7 +747,7 @@ class LiveTradingExecutor:
                         position=closed_position,
                         realized_pnl=0.0,  # Can't determine PnL without market price
                         success=True,  # Position closed successfully
-                        error_message="Market resolved - position closed without trade",
+                        error_message="Market resolved - position closed locally. Redeem shares on Polymarket.",
                     )
                 except Exception as close_error:
                     self._logger.error(

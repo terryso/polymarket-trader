@@ -231,7 +231,10 @@ class RiskController:
         # Check if trading is disabled in state (skip when circuit breaker is disabled)
         # When DISABLE_CIRCUIT_BREAKER=true, we also skip the trading_enabled check
         # because the trading_enabled flag may have been set by circuit breaker previously
-        if not state_snapshot.trading_enabled and not self._circuit_breaker._disable_circuit_breaker:
+        if (
+            not state_snapshot.trading_enabled
+            and not self._circuit_breaker._disable_circuit_breaker
+        ):
             reasons.append("Trading is disabled in system state")
             failures.append(RiskCheckFailure.TRADING_DISABLED)
 
