@@ -220,6 +220,11 @@ class TradingSettings(BaseEnvSettings):
         gt=0,
         description="Initial capital in USD",
     )
+    trading_enabled_on_start: bool = Field(
+        default=True,
+        alias="TRADING_ENABLED_ON_START",
+        description="Whether to enable trading on bot startup (overrides saved state)",
+    )
 
 
 class RiskControlSettings(BaseEnvSettings):

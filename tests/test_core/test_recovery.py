@@ -114,7 +114,8 @@ class TestRecoveryManager:
         assert result.success is True
         # Should use initial capital when current_capital is 0.0
         assert result.recovered_state["current_capital"] == 200.0
-        assert result.recovered_state["trading_enabled"] is False  # Safe default
+        # trading_enabled follows TRADING_ENABLED_ON_START config (default: True)
+        assert result.recovered_state["trading_enabled"] is True
 
     @pytest.mark.asyncio
     async def test_recover_with_saved_state(
@@ -254,8 +255,8 @@ class TestRecoveryManager:
         assert result.success is True
         # Should NOT have errors - this is now considered valid
         assert len(result.errors) == 0
-        # Trading state should remain as default (False for safe recovery)
-        assert result.recovered_state["trading_enabled"] is False
+        # trading_enabled follows TRADING_ENABLED_ON_START config
+        assert result.recovered_state["trading_enabled"] is True
 
     @pytest.mark.asyncio
     async def test_recover_load_failure(
@@ -278,7 +279,8 @@ class TestRecoveryManager:
         merged = recovery_manager._merge_with_defaults({})
 
         assert merged["current_capital"] == 200.0  # Initial capital
-        assert merged["trading_enabled"] is False  # Safe default
+        # trading_enabled follows TRADING_ENABLED_ON_START config (default: True)
+        assert merged["trading_enabled"] is True
         assert merged["daily_pnl"] == 0.0
         assert merged["consecutive_losses"] == 0
 
@@ -295,7 +297,8 @@ class TestRecoveryManager:
 
         assert merged["current_capital"] == 150.0  # From saved
         assert merged["consecutive_losses"] == 2  # From saved
-        assert merged["trading_enabled"] is False  # Default
+        # trading_enabled follows TRADING_ENABLED_ON_START config (default: True)
+        assert merged["trading_enabled"] is True
         assert merged["daily_pnl"] == 0.0  # Default
 
     def test_merge_with_defaults_unknown_key(

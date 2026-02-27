@@ -194,6 +194,8 @@ class RecoveryManager:
         Returns:
             Complete state dictionary with all keys
         """
+        from src.config import settings
+
         merged = self.DEFAULT_SAFE_STATE.copy()
 
         for key, value in saved_state.items():
@@ -202,6 +204,14 @@ class RecoveryManager:
         # Ensure current_capital has a valid value
         if merged["current_capital"] == 0.0:
             merged["current_capital"] = self.initial_capital
+
+        # Override trading_enabled if TRADING_ENABLED_ON_START is set
+        # This allows forcing trading to be enabled on startup
+        if settings.trading.trading_enabled_on_start:
+            merged["trading_enabled"] = True
+            logger.info(
+                "TRADING_ENABLED_ON_START=true, forcing trading enabled on startup"
+            )
 
         return merged
 
