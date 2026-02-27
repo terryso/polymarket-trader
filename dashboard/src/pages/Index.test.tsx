@@ -232,15 +232,15 @@ describe("Index Page", () => {
       expect(screen.getByText("$250.50")).toBeInTheDocument();
     });
 
-    it("should display today PnL with positive values", async () => {
+    it("should display total PnL with positive values", async () => {
       const { useOverview, useSystemStatus } = await import("@/hooks/useStatistics");
       vi.mocked(useOverview).mockReturnValue({
         isLoading: false,
         data: {
-          current_capital: 210,
+          current_capital: 215.50,
           initial_capital: 200,
-          total_pnl: 10,
-          total_pnl_pct: 0.05,
+          total_pnl: 15.50,
+          total_pnl_pct: 0.0775,
           win_rate: 0.75,
           total_trades: 10,
           winning_trades: 7,
@@ -258,7 +258,7 @@ describe("Index Page", () => {
         data: {
           trading_enabled: true,
           mode: "PAPER",
-          current_capital: 210,
+          current_capital: 215.50,
           daily_pnl: 15.50,
           open_positions: 2,
           consecutive_losses: 0,
@@ -274,18 +274,19 @@ describe("Index Page", () => {
       const { default: Index } = await import("./Index");
       render(<Index />, { wrapper: createWrapper() });
 
+      // The component displays total_pnl with + prefix for positive values
       expect(screen.getByText("+$15.50")).toBeInTheDocument();
     });
 
-    it("should display today PnL with negative values", async () => {
+    it("should display total PnL with negative values", async () => {
       const { useOverview, useSystemStatus } = await import("@/hooks/useStatistics");
       vi.mocked(useOverview).mockReturnValue({
         isLoading: false,
         data: {
-          current_capital: 190,
+          current_capital: 194.75,
           initial_capital: 200,
-          total_pnl: -10,
-          total_pnl_pct: -0.05,
+          total_pnl: -5.25,
+          total_pnl_pct: -0.02625,
           win_rate: 0.5,
           total_trades: 10,
           winning_trades: 5,
@@ -303,7 +304,7 @@ describe("Index Page", () => {
         data: {
           trading_enabled: true,
           mode: "PAPER",
-          current_capital: 190,
+          current_capital: 194.75,
           daily_pnl: -5.25,
           open_positions: 2,
           consecutive_losses: 2,
@@ -319,6 +320,7 @@ describe("Index Page", () => {
       const { default: Index } = await import("./Index");
       render(<Index />, { wrapper: createWrapper() });
 
+      // The component displays negative total_pnl with $- prefix
       expect(screen.getByText("$-5.25")).toBeInTheDocument();
     });
 
@@ -587,7 +589,10 @@ describe("Index Page", () => {
       const { default: Index } = await import("./Index");
       render(<Index />, { wrapper: createWrapper() });
 
-      expect(screen.getByText("$0.00")).toBeInTheDocument();
+      // Multiple $0.00 values appear (initial_capital, current_capital, total_pnl, etc.)
+      // Use getAllByText since there are multiple elements with $0.00
+      const zeroValues = screen.getAllByText("$0.00");
+      expect(zeroValues.length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("0.0%")).toBeInTheDocument();
     });
 

@@ -423,6 +423,11 @@ class PositionCacheService:
             # Calculate current_value using cur_price if available, otherwise avg_price
             price_for_value = cur_price if cur_price is not None else avg_price
 
+            # Calculate initial_value and PnL
+            initial_value = balance.shares * avg_price
+            current_value = balance.shares * price_for_value
+            pnl = current_value - initial_value
+
             new_position = Position(
                 id=0,  # Will be assigned by database
                 market_id=balance.condition_id,
@@ -430,9 +435,9 @@ class PositionCacheService:
                 shares=balance.shares,
                 avg_price=avg_price,
                 cur_price=cur_price,
-                initial_value=balance.shares * avg_price,
-                current_value=balance.shares * price_for_value,
-                pnl=0.0,
+                initial_value=initial_value,
+                current_value=current_value,
+                pnl=pnl,
                 status=PositionStatus.OPEN,
                 opened_at=datetime.now(),
             )

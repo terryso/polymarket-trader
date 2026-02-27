@@ -775,3 +775,71 @@ class TestLiveTradingExecutorSell:
         # Should fail since we couldn't close the position
         assert result.success is False
         assert "orderbook" in result.error_message.lower() or "does not exist" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_sell_orderbook_not_exist_zero_current_value(
+        self,
+        mock_client: MagicMock,
+        mock_trade_repo: AsyncMock,
+        mock_position_manager: AsyncMock,
+        mock_state: AsyncMock,
+        sample_market: Market,
+    ) -> None:
+        """测试 orderbook 不存在且 current_value 为 0 时使用 avg_price 作为 fallback."""
+        # Create position with zero current_value but valid avg_price
+        position_zero_value = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=100.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=0.0,  # Zero current value
+            pnl=0.0,
+            status=PositionStatus.OPEN,
+        )
+
+        # Configure mock to raise exception with orderbook not found
+        mock_client._client.create_and_post_order = MagicMock(
+            side_effect=Exception(
+                "PolyApiException[status_code=400, error_message={'error': 'the orderbook 123 does not exist'}]"
+            )
+        )
+        mock_client._client.get_positions = MagicMock(return_value=[])
+
+        # Configure position manager mock
+        closed_position = Position(
+            id=1,
+            market_id="test-market",
+            outcome=PositionOutcome.YES,
+            shares=0.0,
+            avg_price=0.45,
+            initial_value=45.0,
+            current_value=0.0,
+            pnl=-45.0,
+            status=PositionStatus.CLOSED,
+        )
+        mock_position_manager.close_position = AsyncMock(return_value=closed_position)
+        mock_position_manager.get_position_by_market_from_api = AsyncMock(return_value=position_zero_value)
+
+        executor = LiveTradingExecutor(
+            client=mock_client,
+            trade_repo=mock_trade_repo,
+            position_manager=mock_position_manager,
+            state=mock_state,
+        )
+
+        result = await executor.sell_position(
+            position=position_zero_value,
+            market=sample_market,
+        )
+
+        # Position should be closed successfully using avg_price as fallback
+        assert result.success is True
+        assert result.position is not None
+        assert result.position.status == PositionStatus.CLOSED
+        # Verify close_position was called with a valid price (between 0 and 1)
+        call_args = mock_position_manager.close_position.call_args
+        final_price = call_args.kwargs.get("final_price")
+        assert final_price is not None
+        assert 0 < final_price < 1  # Must be valid price

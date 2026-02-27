@@ -691,9 +691,19 @@ class LiveTradingExecutor:
                 )
                 # Close the position since the market is resolved and can't be traded
                 try:
+                    # Calculate final price with proper fallbacks (must be between 0 and 1, exclusive)
+                    # Priority: cur_price > calculated from current_value > avg_price > 0.5
+                    if position.cur_price is not None and 0 < position.cur_price < 1:
+                        final_price = position.cur_price
+                    elif position.shares > 0 and position.current_value and position.current_value > 0:
+                        calculated = position.current_value / position.shares
+                        final_price = calculated if 0 < calculated < 1 else position.avg_price
+                    else:
+                        final_price = position.avg_price if 0 < position.avg_price < 1 else 0.5
+
                     closed_position = await self._position_manager.close_position(
                         position_id=position.id,
-                        final_price=position.current_value / position.shares if position.shares > 0 else 0,
+                        final_price=final_price,
                         market=market,
                     )
                     self._logger.info(

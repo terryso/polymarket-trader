@@ -297,11 +297,10 @@ class RecoveryManager:
         if state.get("consecutive_losses", 0) < 0:
             errors.append(f"Negative consecutive losses: {state['consecutive_losses']}")
 
-        # Check for daily PnL exceeding capital
-        daily_pnl = state.get("daily_pnl", 0)
-        capital = state.get("current_capital", self.initial_capital)
-        if capital > 0 and abs(daily_pnl) > capital:
-            errors.append(f"Daily PnL ({daily_pnl}) exceeds capital ({capital})")
+        # Note: We don't check if daily_pnl exceeds capital because:
+        # - daily_pnl tracks cumulative P&L for the day
+        # - capital reflects current available funds after losses
+        # - It's valid to have daily_pnl=-71 and capital=32 (started with ~103, lost 71)
 
         return errors
 

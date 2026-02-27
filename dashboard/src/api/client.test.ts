@@ -43,7 +43,7 @@ describe('API Client', () => {
 
     expect(axios.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        timeout: 30000,
+        timeout: 60000, // Updated to match actual client config (60 seconds)
         headers: {
           'Content-Type': 'application/json',
         },

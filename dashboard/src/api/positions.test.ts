@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as client from './client';
 
 // Mock the client module
 vi.mock('./client', () => ({
@@ -21,46 +22,53 @@ describe('Positions API', () => {
 
   describe('fetchPositions', () => {
     it('should call the correct endpoint', async () => {
-      const mockPositions = [
-        {
-          id: 1,
-          condition_id: 'market-1',
-          question: 'Will Bitcoin reach $100k?',
-          outcome: 'Yes',
-          size: 100,
-          avg_price: 0.55,
-          current_price: 0.65,
-          pnl: 10,
-          pnl_pct: 0.1,
-        },
-        {
-          id: 2,
-          condition_id: 'market-2',
-          question: 'Will Ethereum reach $5k?',
-          outcome: 'No',
-          size: 50,
-          avg_price: 0.7,
-          current_price: 0.6,
-          pnl: -5,
-          pnl_pct: -0.05,
-        },
-      ];
+      const mockResponse = {
+        positions: [
+          {
+            id: 1,
+            condition_id: 'market-1',
+            question: 'Will Bitcoin reach $100k?',
+            outcome: 'Yes',
+            size: 100,
+            avg_price: 0.55,
+            current_price: 0.65,
+            pnl: 10,
+            pnl_pct: 0.1,
+          },
+          {
+            id: 2,
+            condition_id: 'market-2',
+            question: 'Will Ethereum reach $5k?',
+            outcome: 'No',
+            size: 50,
+            avg_price: 0.7,
+            current_price: 0.6,
+            pnl: -5,
+            pnl_pct: -0.05,
+          },
+        ],
+        cache_freshness: 'FRESH' as const,
+        cache_age_seconds: 0,
+      };
 
-      const mockGet = vi.fn().mockResolvedValue(mockPositions);
-      vi.mocked(await import('./client')).get = mockGet;
+      vi.mocked(client.get).mockResolvedValue(mockResponse);
 
       const { fetchPositions } = await import('./positions');
       const result = await fetchPositions();
 
-      expect(mockGet).toHaveBeenCalledWith('/api/positions');
+      expect(client.get).toHaveBeenCalledWith('/api/positions');
       expect(result).toHaveLength(2);
       expect(result[0].condition_id).toBe('market-1');
       expect(result[1].outcome).toBe('No');
     });
 
     it('should return empty array when no positions', async () => {
-      const mockGet = vi.fn().mockResolvedValue([]);
-      vi.mocked(await import('./client')).get = mockGet;
+      const mockResponse = {
+        positions: [],
+        cache_freshness: 'FRESH' as const,
+        cache_age_seconds: 0,
+      };
+      vi.mocked(client.get).mockResolvedValue(mockResponse);
 
       const { fetchPositions } = await import('./positions');
       const result = await fetchPositions();
@@ -86,13 +94,12 @@ describe('Positions API', () => {
         trades_count: 5,
       };
 
-      const mockGet = vi.fn().mockResolvedValue(mockPosition);
-      vi.mocked(await import('./client')).get = mockGet;
+      vi.mocked(client.get).mockResolvedValue(mockPosition);
 
       const { fetchPosition } = await import('./positions');
       const result = await fetchPosition(1);
 
-      expect(mockGet).toHaveBeenCalledWith('/api/positions/1');
+      expect(client.get).toHaveBeenCalledWith('/api/positions/1');
       expect(result.id).toBe(1);
       expect(result.outcome).toBe('Yes');
       expect(result.trades_count).toBe(5);
