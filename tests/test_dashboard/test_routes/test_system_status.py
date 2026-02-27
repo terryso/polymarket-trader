@@ -94,7 +94,9 @@ def mock_state() -> MagicMock:
 
 
 @pytest.fixture
-def client(mock_state: MagicMock, mock_settings: MagicMock) -> Generator[TestClient, None, None]:
+def client(
+    mock_state: MagicMock, mock_settings: MagicMock
+) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
@@ -115,7 +117,9 @@ def client(mock_state: MagicMock, mock_settings: MagicMock) -> Generator[TestCli
                 # Mock settings in the statistics module
                 with patch("src.dashboard.routes.statistics.settings", mock_settings):
                     # Mock PolymarketClient to avoid real HTTP requests
-                    with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+                    with patch(
+                        "src.dashboard.routes.statistics.PolymarketClient"
+                    ) as mock_client_class:
                         mock_client = MagicMock()
                         mock_client.get_wallet_balance.return_value = WalletBalance(
                             usdc_balance=100.0, error=None

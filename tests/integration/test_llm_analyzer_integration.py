@@ -67,7 +67,9 @@ class TestLLMAnalyzerIntegration:
 
     @requires_llm_api_key
     @pytest.mark.asyncio
-    async def test_analyze_market_returns_prediction_result(self, sample_market: Market) -> None:
+    async def test_analyze_market_returns_prediction_result(
+        self, sample_market: Market
+    ) -> None:
         """Test that analyze_market returns a valid PredictionResult."""
         analyzer = LLMAnalyzer()
         result = await analyzer.analyze_market(sample_market)
@@ -82,7 +84,9 @@ class TestLLMAnalyzerIntegration:
 
     @requires_llm_api_key
     @pytest.mark.asyncio
-    async def test_analyze_market_probability_range(self, sample_market: Market) -> None:
+    async def test_analyze_market_probability_range(
+        self, sample_market: Market
+    ) -> None:
         """Test that predicted probability is within valid range."""
         analyzer = LLMAnalyzer()
         result = await analyzer.analyze_market(sample_market)
@@ -102,7 +106,9 @@ class TestLLMAnalyzerIntegration:
 
     @requires_llm_api_key
     @pytest.mark.asyncio
-    async def test_analyze_market_valid_recommendation(self, sample_market: Market) -> None:
+    async def test_analyze_market_valid_recommendation(
+        self, sample_market: Market
+    ) -> None:
         """Test that recommendation is a valid enum value."""
         analyzer = LLMAnalyzer()
         result = await analyzer.analyze_market(sample_market)
@@ -162,7 +168,9 @@ class TestLLMAnalyzerBatchIntegration:
 
     @requires_llm_api_key
     @pytest.mark.asyncio
-    async def test_analyze_markets_batch(self, sample_market: Market, low_liquidity_market: Market) -> None:
+    async def test_analyze_markets_batch(
+        self, sample_market: Market, low_liquidity_market: Market
+    ) -> None:
         """Test batch analysis of multiple markets."""
         analyzer = LLMAnalyzer()
         markets = [sample_market, low_liquidity_market]
@@ -177,7 +185,9 @@ class TestLLMAnalyzerBatchIntegration:
 
     @requires_llm_api_key
     @pytest.mark.asyncio
-    async def test_analyze_markets_concurrency_control(self, sample_market: Market) -> None:
+    async def test_analyze_markets_concurrency_control(
+        self, sample_market: Market
+    ) -> None:
         """Test that concurrency control works."""
         analyzer = LLMAnalyzer()
         # Create 3 copies of the same market
@@ -240,7 +250,9 @@ class TestLLMAnalyzerEdgeCalculation:
         )
 
         edge = analyzer.calculate_edge(result, 0.65)
-        assert abs(edge - 0.15) < 0.001  # 0.80 - 0.65 (use approximate comparison for float)
+        assert (
+            abs(edge - 0.15) < 0.001
+        )  # 0.80 - 0.65 (use approximate comparison for float)
 
     def test_calculate_edge_buy_no(self) -> None:
         """Test Edge calculation for BUY_NO recommendation."""

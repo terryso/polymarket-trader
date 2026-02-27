@@ -275,9 +275,7 @@ class TestTradingExecutorNotifications:
             mock_settings.risk.max_single_ratio = 0.2
 
             # Setup LLM analyzer to raise exception
-            mock_llm_analyzer.analyze_market.side_effect = RuntimeError(
-                "Network error"
-            )
+            mock_llm_analyzer.analyze_market.side_effect = RuntimeError("Network error")
 
             executor = TradingExecutor(
                 llm_analyzer=mock_llm_analyzer,

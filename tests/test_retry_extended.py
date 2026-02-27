@@ -30,9 +30,7 @@ class TestGetLoggerFallback:
             original_get_logger = retry_module.get_logger
 
         # Patch to raise ImportError
-        with patch.dict(
-            "sys.modules", {"src.utils.logger": None}
-        ):
+        with patch.dict("sys.modules", {"src.utils.logger": None}):
             # Force re-import of the module to hit the fallback
             # The _get_logger function should handle ImportError
             logger = retry_module._get_logger("test_module")

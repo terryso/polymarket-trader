@@ -25,7 +25,12 @@ from datetime import datetime
 
 from src.api.polymarket import BalanceItem, BalanceResult, PolymarketClient
 from src.config import settings
-from src.models.position import CacheFreshness, Position, PositionOutcome, PositionStatus
+from src.models.position import (
+    CacheFreshness,
+    Position,
+    PositionOutcome,
+    PositionStatus,
+)
 from src.storage.repositories.position_repo import PositionRepository
 from src.utils.logger import OPERATION_EMOJIS, get_logger
 
@@ -62,7 +67,12 @@ class CacheRefreshResult:
     @property
     def total_processed(self) -> int:
         """Total number of positions processed."""
-        return self.new_positions + self.updated_positions + self.unchanged_positions + self.closed_positions
+        return (
+            self.new_positions
+            + self.updated_positions
+            + self.unchanged_positions
+            + self.closed_positions
+        )
 
     # Backward compatibility alias
     @property
@@ -223,7 +233,9 @@ class PositionCacheService:
         # Acquire lock for the entire refresh operation
         async with self._refresh_lock:
             self._refreshing = True
-            logger.info(f"{OPERATION_EMOJIS['network']} Starting position cache refresh...")
+            logger.info(
+                f"{OPERATION_EMOJIS['network']} Starting position cache refresh..."
+            )
 
             client = None
             try:
@@ -231,7 +243,9 @@ class PositionCacheService:
                 client = PolymarketClient()
 
                 # Fetch all balances using asyncio.to_thread for sync API call
-                balance_result: BalanceResult = await asyncio.to_thread(client.get_balances)
+                balance_result: BalanceResult = await asyncio.to_thread(
+                    client.get_balances
+                )
 
                 if not balance_result.is_success:
                     result.error = balance_result.error
@@ -259,7 +273,9 @@ class PositionCacheService:
                         # Skip zero balances
                         continue
 
-                    sync_result = await self._sync_single_balance(balance, local_by_market_outcome)
+                    sync_result = await self._sync_single_balance(
+                        balance, local_by_market_outcome
+                    )
                     if sync_result == "new":
                         result.new_positions += 1
                     elif sync_result == "updated":
@@ -303,8 +319,7 @@ class PositionCacheService:
                     client.close()
 
     async def get_positions(
-        self,
-        force_refresh: bool = False
+        self, force_refresh: bool = False
     ) -> tuple[list[Position], CacheFreshness]:
         """Get positions with cache.
 
@@ -407,7 +422,11 @@ class PositionCacheService:
                 existing.cur_price = balance.cur_price
 
             # Recalculate current_value using cur_price (or avg_price as fallback)
-            price_for_value = existing.cur_price if existing.cur_price is not None else existing.avg_price
+            price_for_value = (
+                existing.cur_price
+                if existing.cur_price is not None
+                else existing.avg_price
+            )
             existing.current_value = balance.shares * price_for_value
             if existing.initial_value:
                 existing.pnl = existing.current_value - existing.initial_value

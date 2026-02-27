@@ -106,7 +106,9 @@ class TestApplicationInitialize:
         with (
             patch("src.main.setup_logging"),
             patch("src.main.init_db", new_callable=AsyncMock),
-            patch("src.core.state.ThreadSafeState.restore", new_callable=AsyncMock) as mock_restore,
+            patch(
+                "src.core.state.ThreadSafeState.restore", new_callable=AsyncMock
+            ) as mock_restore,
             patch("src.core.scheduler.Scheduler"),
         ):
             mock_restore.return_value = MagicMock()

@@ -145,9 +145,7 @@ class TestChat:
                 )
 
                 with LLMClient() as client:
-                    response = client.chat(
-                        [{"role": "user", "content": "Hello!"}]
-                    )
+                    response = client.chat([{"role": "user", "content": "Hello!"}])
 
                 assert response == "Test response content"
                 mock_openai.return_value.chat.completions.create.assert_called_once_with(
@@ -385,7 +383,9 @@ class TestRetry:
                 # First call fails, second succeeds
                 mock_request = MagicMock()
                 mock_openai.return_value.chat.completions.create.side_effect = [
-                    APIConnectionError(message="Connection failed", request=mock_request),
+                    APIConnectionError(
+                        message="Connection failed", request=mock_request
+                    ),
                     mock_openai_response,
                 ]
 

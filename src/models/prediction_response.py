@@ -40,7 +40,9 @@ class PredictionListItem(BaseModel):
     market_yes_price: float | None = Field(None, description="Market YES price (0-1)")
     predicted_probability: float = Field(..., description="Predicted probability (0-1)")
     confidence: float = Field(..., description="LLM confidence (0-1)")
-    edge: float | None = Field(None, description="Edge (price gap) between prediction and market (0-1)")
+    edge: float | None = Field(
+        None, description="Edge (price gap) between prediction and market (0-1)"
+    )
     recommendation: str | None = Field(None, description="Trade recommendation")
     actual_outcome: str | None = Field(None, description="Actual outcome")
     is_correct: bool | None = Field(None, description="Prediction correctness")

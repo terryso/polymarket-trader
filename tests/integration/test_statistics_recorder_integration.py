@@ -56,6 +56,7 @@ def _create_trade_with_today_timestamp(
         created_at=datetime.now(timezone.utc),
     )
 
+
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
 
@@ -292,7 +293,9 @@ class TestRecordDailyStats:
         stats = await recorder.record_daily_stats(TradeMode.PAPER)
 
         assert stats.total_trades == 3
-        assert stats.winning_trades >= 1  # At least some winning trades with positive PnL
+        assert (
+            stats.winning_trades >= 1
+        )  # At least some winning trades with positive PnL
         assert stats.win_rate is not None
         assert stats.win_rate > 0
 

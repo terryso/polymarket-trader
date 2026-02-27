@@ -23,7 +23,16 @@ Usage:
 
 from __future__ import annotations
 
-__all__ = ["PolymarketClient", "GammaMarket", "WalletBalance", "OrderHistoryItem", "OrderHistoryResult", "BalanceItem", "BalanceResult", "DataPositionItem"]
+__all__ = [
+    "PolymarketClient",
+    "GammaMarket",
+    "WalletBalance",
+    "OrderHistoryItem",
+    "OrderHistoryResult",
+    "BalanceItem",
+    "BalanceResult",
+    "DataPositionItem",
+]
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -237,7 +246,8 @@ class GammaMarket:
         return Market(
             id=self.condition_id,
             title=self.question,
-            slug=self.event_slug or self.slug,  # Use event_slug for URL, fallback to slug
+            slug=self.event_slug
+            or self.slug,  # Use event_slug for URL, fallback to slug
             category=self._map_category(),
             clob_token_ids=self.clob_token_ids,  # Preserve token IDs for live trading
             yes_price=self.yes_price,
@@ -630,7 +640,11 @@ class PolymarketClient:
         outcome_prices = data.get("outcomePrices")
         if outcome_prices:
             try:
-                prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
+                prices = (
+                    json.loads(outcome_prices)
+                    if isinstance(outcome_prices, str)
+                    else outcome_prices
+                )
                 if isinstance(prices, list) and len(prices) >= 2:
                     if prices[0]:
                         yes_price = float(prices[0])
@@ -770,9 +784,7 @@ class PolymarketClient:
         except Exception as e:
             raise self._map_exception(e, endpoint=f"get_order_book/{token_id}")
 
-    def get_wallet_balance(
-        self, wallet_address: str | None = None
-    ) -> WalletBalance:
+    def get_wallet_balance(self, wallet_address: str | None = None) -> WalletBalance:
         """Get USDC balance for a wallet from Polygon network.
 
         Queries the USDC contract on Polygon directly via RPC to get
@@ -940,9 +952,7 @@ class PolymarketClient:
         try:
             # Use get_trades() to fetch actual trade history (not orders)
             # get_orders() returns unfilled/open orders, get_trades() returns executed trades
-            self._logger.debug(
-                f"{OPERATION_EMOJIS['network']} Calling get_trades()"
-            )
+            self._logger.debug(f"{OPERATION_EMOJIS['network']} Calling get_trades()")
             response = self._client.get_trades()
             self._logger.debug(
                 f"{OPERATION_EMOJIS['network']} get_trades response type: {type(response)}, count: {len(response) if isinstance(response, list) else 0}"
@@ -975,14 +985,14 @@ class PolymarketClient:
                         outcome=trade_data.get("outcome", "YES").upper(),
                         price=float(trade_data.get("price", 0)),
                         size=float(trade_data.get("size", 0)),
-                        original_size=float(trade_data.get("size", 0)),  # Trades don't have original_size
+                        original_size=float(
+                            trade_data.get("size", 0)
+                        ),  # Trades don't have original_size
                         status=trade_data.get("status", "CONFIRMED"),
                         created_at=self._parse_datetime(
                             trade_data.get("match_time")  # Trades use match_time
                         ),
-                        updated_at=self._parse_datetime(
-                            trade_data.get("last_update")
-                        ),
+                        updated_at=self._parse_datetime(trade_data.get("last_update")),
                     )
                     orders.append(trade)
                 except Exception as e:
@@ -1005,6 +1015,7 @@ class PolymarketClient:
 
         except Exception as e:
             import traceback
+
             error_msg = str(e)
             self._logger.warning(
                 f"{OPERATION_EMOJIS['network']} Failed to fetch order history: {error_msg}"
@@ -1085,9 +1096,21 @@ class PolymarketClient:
                             asset=str(item.get("asset", "")),
                             outcome=str(item.get("outcome", "")),
                             shares=float(item.get("size", 0)),
-                            avg_price=float(item.get("avgPrice")) if item.get("avgPrice") is not None else None,
-                            cur_price=float(item.get("curPrice")) if item.get("curPrice") is not None else None,
-                            total_cost=float(item.get("initialValue")) if item.get("initialValue") is not None else None,
+                            avg_price=(
+                                float(item.get("avgPrice"))
+                                if item.get("avgPrice") is not None
+                                else None
+                            ),
+                            cur_price=(
+                                float(item.get("curPrice"))
+                                if item.get("curPrice") is not None
+                                else None
+                            ),
+                            total_cost=(
+                                float(item.get("initialValue"))
+                                if item.get("initialValue") is not None
+                                else None
+                            ),
                             market_title=item.get("title"),
                         )
                         if position.shares > 0:
@@ -1228,7 +1251,10 @@ class PolymarketClient:
                             price = float(trade.get("price", 0))
                             size = float(trade.get("size", 0))
                             if asset_id not in asset_price_info:
-                                asset_price_info[asset_id] = {"total_cost": 0.0, "total_shares": 0.0}
+                                asset_price_info[asset_id] = {
+                                    "total_cost": 0.0,
+                                    "total_shares": 0.0,
+                                }
                             asset_price_info[asset_id]["total_cost"] += price * size
                             asset_price_info[asset_id]["total_shares"] += size
 
@@ -1279,13 +1305,17 @@ class PolymarketClient:
                                             "market_id": market_id,
                                         }
                         except Exception as e:
-                            self._logger.debug(f"Failed to get tokens for market {market_id[:10]}...: {e}")
+                            self._logger.debug(
+                                f"Failed to get tokens for market {market_id[:10]}...: {e}"
+                            )
 
                     self._logger.info(
                         f"{OPERATION_EMOJIS['network']} Total {len(asset_info_map)} unique assets after combining sources"
                     )
             except Exception as e:
-                self._logger.warning(f"Failed to enrich asset info from local trades: {e}")
+                self._logger.warning(
+                    f"Failed to enrich asset info from local trades: {e}"
+                )
 
             if not asset_info_map:
                 self._logger.info(
@@ -1309,7 +1339,10 @@ class PolymarketClient:
                         if asset_id in asset_price_info:
                             price_info = asset_price_info[asset_id]
                             if price_info["total_shares"] > 0:
-                                avg_price = price_info["total_cost"] / price_info["total_shares"]
+                                avg_price = (
+                                    price_info["total_cost"]
+                                    / price_info["total_shares"]
+                                )
 
                         balance = BalanceItem(
                             condition_id=info["market_id"],
@@ -1514,7 +1547,12 @@ class PolymarketClient:
             if outcome_prices:
                 try:
                     import json
-                    prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
+
+                    prices = (
+                        json.loads(outcome_prices)
+                        if isinstance(outcome_prices, str)
+                        else outcome_prices
+                    )
                     if isinstance(prices, list) and len(prices) >= 2:
                         if yes_price is None and prices[0]:
                             yes_price = float(prices[0])
@@ -1622,7 +1660,9 @@ class PolymarketClient:
             return None
 
         # Handle Unix timestamp (integer or string of digits)
-        if isinstance(date_str, int) or (isinstance(date_str, str) and date_str.isdigit()):
+        if isinstance(date_str, int) or (
+            isinstance(date_str, str) and date_str.isdigit()
+        ):
             try:
                 timestamp = int(date_str)
                 return datetime.fromtimestamp(timestamp, tz=timezone.utc)

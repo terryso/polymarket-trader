@@ -208,7 +208,10 @@ class TestPrediction:
         assert prediction.predicted_probability == 0.72
         assert prediction.confidence == 0.85
         assert prediction.reasoning == "Strong technical indicators"
-        assert prediction.key_assumptions == ["Trend continuation", "No regulatory changes"]
+        assert prediction.key_assumptions == [
+            "Trend continuation",
+            "No regulatory changes",
+        ]
         assert prediction.model_used == "glm-4"
         assert prediction.recommendation == Recommendation.BUY_YES
         assert prediction.actual_outcome == "YES"

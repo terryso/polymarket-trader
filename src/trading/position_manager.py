@@ -653,7 +653,9 @@ class PositionManager:
             self._logger.error(
                 f"{OPERATION_EMOJIS['network']} Failed to fetch positions: {error_msg}"
             )
-            raise TradingError(f"Failed to fetch positions from API: {error_msg}") from e
+            raise TradingError(
+                f"Failed to fetch positions from API: {error_msg}"
+            ) from e
 
         finally:
             if client:
@@ -690,7 +692,10 @@ class PositionManager:
 
         # Find the position for this market
         for position in positions:
-            if position.market_id == market_id and position.status == PositionStatus.OPEN:
+            if (
+                position.market_id == market_id
+                and position.status == PositionStatus.OPEN
+            ):
                 self._logger.debug(
                     f"{OPERATION_EMOJIS['data']} Found API position for {market_id}: "
                     f"{position.shares} shares"

@@ -28,7 +28,6 @@ from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.prediction import Prediction, Recommendation
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 
-
 # ==================== Dataclass Tests ====================
 
 
@@ -588,9 +587,7 @@ class TestLearningLogGenerator:
         report = await generator.generate_daily_report(date(2026, 2, 16))
 
         # Should detect bullish bias
-        assert any(
-            "bullish bias" in i.description.lower() for i in report.insights
-        )
+        assert any("bullish bias" in i.description.lower() for i in report.insights)
 
     @pytest.mark.asyncio
     async def test_generate_daily_report_bearish_bias_insight(
@@ -618,9 +615,7 @@ class TestLearningLogGenerator:
         report = await generator.generate_daily_report(date(2026, 2, 16))
 
         # Should detect bearish bias
-        assert any(
-            "bearish bias" in i.description.lower() for i in report.insights
-        )
+        assert any("bearish bias" in i.description.lower() for i in report.insights)
 
     @pytest.mark.asyncio
     async def test_generate_daily_report_today_default(

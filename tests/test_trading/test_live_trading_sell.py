@@ -164,7 +164,9 @@ class TestLiveTradingExecutorSell:
                 status=PositionStatus.OPEN,
             )
 
-        manager.get_position_by_market_from_api = AsyncMock(side_effect=get_position_by_market_from_api)
+        manager.get_position_by_market_from_api = AsyncMock(
+            side_effect=get_position_by_market_from_api
+        )
 
         return manager
 
@@ -260,9 +262,13 @@ class TestLiveTradingExecutorSell:
         assert result.trade.trade_type == TradeType.SELL_YES
         assert result.trade.shares == 100.0
         # Sell price is slightly below market price for quick execution
-        assert result.trade.price == pytest.approx(0.539, rel=1e-2)  # 0.55 * 0.98 discount
+        assert result.trade.price == pytest.approx(
+            0.539, rel=1e-2
+        )  # 0.55 * 0.98 discount
         # Realized PnL adjusted for discount
-        assert result.realized_pnl == pytest.approx(8.9, rel=1e-1)  # (0.539 - 0.45) * 100
+        assert result.realized_pnl == pytest.approx(
+            8.9, rel=1e-1
+        )  # (0.539 - 0.45) * 100
 
         # Verify order was placed with SELL side
         mock_client._client.create_and_post_order.assert_called_once()
@@ -327,7 +333,9 @@ class TestLiveTradingExecutorSell:
         assert result.success is True
         assert result.trade is not None
         assert result.trade.shares == 50.0
-        assert result.realized_pnl == pytest.approx(4.45, rel=1e-1)  # (0.539 - 0.45) * 50
+        assert result.realized_pnl == pytest.approx(
+            4.45, rel=1e-1
+        )  # (0.539 - 0.45) * 50
 
         # Position should NOT be closed
         mock_position_manager.close_position.assert_not_called()
@@ -774,7 +782,10 @@ class TestLiveTradingExecutorSell:
 
         # Should fail since we couldn't close the position
         assert result.success is False
-        assert "orderbook" in result.error_message.lower() or "does not exist" in result.error_message.lower()
+        assert (
+            "orderbook" in result.error_message.lower()
+            or "does not exist" in result.error_message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_sell_orderbook_not_exist_zero_current_value(
@@ -820,7 +831,9 @@ class TestLiveTradingExecutorSell:
             status=PositionStatus.CLOSED,
         )
         mock_position_manager.close_position = AsyncMock(return_value=closed_position)
-        mock_position_manager.get_position_by_market_from_api = AsyncMock(return_value=position_zero_value)
+        mock_position_manager.get_position_by_market_from_api = AsyncMock(
+            return_value=position_zero_value
+        )
 
         executor = LiveTradingExecutor(
             client=mock_client,

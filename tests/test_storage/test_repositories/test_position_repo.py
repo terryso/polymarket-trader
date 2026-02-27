@@ -70,7 +70,9 @@ class TestPositionRepository:
             mock_conn.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_save_position_with_closed_status(self, repo: PositionRepository) -> None:
+    async def test_save_position_with_closed_status(
+        self, repo: PositionRepository
+    ) -> None:
         """测试保存已关闭的持仓."""
         position = Position(
             id=0,
@@ -107,9 +109,7 @@ class TestPositionRepository:
     # ==================== get_by_id tests ====================
 
     @pytest.mark.asyncio
-    async def test_get_by_id_found(
-        self, repo: PositionRepository
-    ) -> None:
+    async def test_get_by_id_found(self, repo: PositionRepository) -> None:
         """测试通过 ID 获取持仓."""
         mock_row = self._create_mock_row(
             position_id=1,
@@ -165,9 +165,7 @@ class TestPositionRepository:
     # ==================== get_by_market tests ====================
 
     @pytest.mark.asyncio
-    async def test_get_by_market_found(
-        self, repo: PositionRepository
-    ) -> None:
+    async def test_get_by_market_found(self, repo: PositionRepository) -> None:
         """测试通过市场 ID 获取持仓."""
         mock_row = self._create_mock_row(
             position_id=1,
@@ -272,9 +270,7 @@ class TestPositionRepository:
     # ==================== get_open_positions tests ====================
 
     @pytest.mark.asyncio
-    async def test_get_open_positions(
-        self, repo: PositionRepository
-    ) -> None:
+    async def test_get_open_positions(self, repo: PositionRepository) -> None:
         """测试获取所有未平仓位."""
         mock_rows = [
             self._create_mock_row(
@@ -317,9 +313,7 @@ class TestPositionRepository:
             assert "ORDER BY opened_at DESC" in call_args[0][0]
 
     @pytest.mark.asyncio
-    async def test_get_open_positions_empty(
-        self, repo: PositionRepository
-    ) -> None:
+    async def test_get_open_positions_empty(self, repo: PositionRepository) -> None:
         """测试获取空列表."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchall = AsyncMock(return_value=[])
@@ -392,9 +386,7 @@ class TestPositionRepository:
     # ==================== delete tests ====================
 
     @pytest.mark.asyncio
-    async def test_delete_position(
-        self, repo: PositionRepository
-    ) -> None:
+    async def test_delete_position(self, repo: PositionRepository) -> None:
         """测试删除持仓."""
         mock_cursor = MagicMock()
         mock_cursor.rowcount = 1
@@ -434,9 +426,7 @@ class TestPositionRepository:
     # ==================== _row_to_position tests ====================
 
     @pytest.mark.asyncio
-    async def test_position_with_no_outcome(
-        self, repo: PositionRepository
-    ) -> None:
+    async def test_position_with_no_outcome(self, repo: PositionRepository) -> None:
         """测试 NO 方向的持仓."""
         mock_row = self._create_mock_row(
             position_id=1,

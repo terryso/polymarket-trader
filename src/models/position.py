@@ -116,7 +116,9 @@ class Position(BaseModel):
     outcome: PositionOutcome = Field(..., description="Position outcome type")
     shares: float = Field(..., ge=0, description="Number of shares")
     avg_price: float = Field(..., ge=0, le=1, description="Average price (0-1)")
-    cur_price: float | None = Field(default=None, ge=0, le=1, description="Current price (0-1)")
+    cur_price: float | None = Field(
+        default=None, ge=0, le=1, description="Current price (0-1)"
+    )
     initial_value: float | None = Field(default=None, description="Initial value (USD)")
     current_value: float | None = Field(default=None, description="Current value (USD)")
     pnl: float | None = Field(default=None, description="Profit/Loss (USD)")

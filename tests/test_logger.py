@@ -80,7 +80,9 @@ class TestSanitizingFilter:
 
     def test_sanitizes_wallet_address(self) -> None:
         """Test wallet addresses are partially masked."""
-        record = self._create_log_record("Wallet: 0x1234567890abcdef1234567890abcdef12345678")
+        record = self._create_log_record(
+            "Wallet: 0x1234567890abcdef1234567890abcdef12345678"
+        )
         self.filter.filter(record)
         # Wallet addresses should be partially masked with ...
         assert "..." in record.msg
@@ -294,7 +296,9 @@ class TestLogFormatWithEmoji:
 
             try:
                 with tempfile.TemporaryDirectory() as tmpdir:
-                    logger = get_logger(f"emoji_{level}_test", log_level="DEBUG", log_dir=tmpdir)
+                    logger = get_logger(
+                        f"emoji_{level}_test", log_level="DEBUG", log_dir=tmpdir
+                    )
                     getattr(logger, method)(f"{level} message")
                 outputs[level] = captured_output.getvalue()
             finally:
@@ -351,7 +355,9 @@ class TestFileOutputWithEmoji:
                 ("ERROR", "error"),
                 ("CRITICAL", "critical"),
             ]:
-                logger = get_logger(f"file_{level}_test", log_level="DEBUG", log_dir=tmpdir)
+                logger = get_logger(
+                    f"file_{level}_test", log_level="DEBUG", log_dir=tmpdir
+                )
                 getattr(logger, method)(f"{level} file message")
 
             log_file = Path(tmpdir) / "polymarket_trader.log"

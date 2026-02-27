@@ -136,14 +136,10 @@ class TaskManager:
         job_ids.append(register_check_positions_job(scheduler, position_manager))
 
         # Register daily statistics task
-        job_ids.append(
-            register_daily_statistics_job(scheduler, state, statistics_repo)
-        )
+        job_ids.append(register_daily_statistics_job(scheduler, state, statistics_repo))
 
         # Register prediction validation task
-        job_ids.append(
-            register_validate_predictions_job(scheduler, prediction_tracker)
-        )
+        job_ids.append(register_validate_predictions_job(scheduler, prediction_tracker))
 
         # Register daily state reset task
         job_ids.append(register_reset_daily_state_job(scheduler, state))
@@ -222,9 +218,7 @@ def register_fetch_markets_job(
     Example:
         >>> job_id = register_fetch_markets_job(scheduler, client, analyzer)
     """
-    trigger = IntervalTrigger(
-        hours=settings.task_schedule.fetch_markets_interval_hours
-    )
+    trigger = IntervalTrigger(hours=settings.task_schedule.fetch_markets_interval_hours)
 
     job_id = scheduler.add_job(
         func=lambda: asyncio.run(
@@ -410,7 +404,9 @@ async def _check_positions_task(manager: "PositionManager") -> None:
 
         if not positions:
             elapsed = time.time() - start_time
-            logger.debug(f"Job 'check_positions' completed: 0 positions in {elapsed:.2f}s")
+            logger.debug(
+                f"Job 'check_positions' completed: 0 positions in {elapsed:.2f}s"
+            )
             return
 
         # Note: In a real implementation, we would fetch current prices
@@ -512,7 +508,9 @@ async def _daily_statistics_task(
         stats = Statistics(
             id=0,  # Will be assigned by database
             date=datetime.now().date(),
-            mode=TradeMode.PAPER if settings.trading_mode == "paper" else TradeMode.LIVE,
+            mode=(
+                TradeMode.PAPER if settings.trading_mode == "paper" else TradeMode.LIVE
+            ),
             starting_capital=settings.initial_capital,
             ending_capital=current_state.current_capital,
             total_pnl=current_state.daily_pnl,

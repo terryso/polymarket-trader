@@ -172,6 +172,7 @@ def client(
     """Create test client with mocked dependencies."""
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
+
             def mock_get_statistics_repository() -> MagicMock:
                 return mock_statistics_repo
 
@@ -192,9 +193,13 @@ def client(
                 get_trade_repository,
             )
 
-            app.dependency_overrides[get_statistics_repository] = mock_get_statistics_repository
+            app.dependency_overrides[get_statistics_repository] = (
+                mock_get_statistics_repository
+            )
             app.dependency_overrides[get_trade_repository] = mock_get_trade_repository
-            app.dependency_overrides[get_position_repository] = mock_get_position_repository
+            app.dependency_overrides[get_position_repository] = (
+                mock_get_position_repository
+            )
             app.dependency_overrides[get_state] = mock_get_state
 
             with TestClient(app, raise_server_exceptions=False) as c:
@@ -221,7 +226,9 @@ class TestGetOverview:
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
 
-        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+        with patch(
+            "src.dashboard.routes.statistics.PolymarketClient"
+        ) as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_wallet_balance.return_value = WalletBalance(
                 usdc_balance=100.0, error=None
@@ -246,7 +253,9 @@ class TestGetOverview:
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
 
-        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+        with patch(
+            "src.dashboard.routes.statistics.PolymarketClient"
+        ) as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_wallet_balance.return_value = WalletBalance(
                 usdc_balance=100.0, error=None
@@ -282,7 +291,9 @@ class TestGetOverview:
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
 
-        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+        with patch(
+            "src.dashboard.routes.statistics.PolymarketClient"
+        ) as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_wallet_balance.return_value = WalletBalance(
                 usdc_balance=150.0, error=None
@@ -317,7 +328,9 @@ class TestGetOverview:
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
 
-        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+        with patch(
+            "src.dashboard.routes.statistics.PolymarketClient"
+        ) as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_wallet_balance.return_value = WalletBalance(
                 usdc_balance=100.0, error=None
@@ -344,7 +357,9 @@ class TestGetOverview:
         mock_position_repo.get_open_positions.return_value = sample_positions
         mock_state.get_state.return_value = sample_state_snapshot
 
-        with patch("src.dashboard.routes.statistics.PolymarketClient") as mock_client_class:
+        with patch(
+            "src.dashboard.routes.statistics.PolymarketClient"
+        ) as mock_client_class:
             mock_client = MagicMock()
             mock_client.get_wallet_balance.return_value = WalletBalance(
                 usdc_balance=None, error="Network error"
@@ -361,7 +376,10 @@ class TestGetDailyStats:
     """Tests for GET /api/statistics/daily endpoint."""
 
     def test_get_daily_stats_returns_200(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test daily stats endpoint returns 200."""
         mock_statistics_repo.get_all.return_value = sample_statistics
@@ -369,7 +387,10 @@ class TestGetDailyStats:
         assert response.status_code == 200
 
     def test_get_daily_stats_format(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test response format."""
         mock_statistics_repo.get_all.return_value = sample_statistics
@@ -382,7 +403,10 @@ class TestGetDailyStats:
         assert isinstance(data["data"], list)
 
     def test_get_daily_stats_pagination(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test pagination functionality."""
         mock_statistics_repo.get_all.return_value = sample_statistics
@@ -393,7 +417,10 @@ class TestGetDailyStats:
         assert data["meta"]["per_page"] == 10
 
     def test_get_daily_stats_sorted_desc(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test daily stats are sorted by date descending."""
         mock_statistics_repo.get_all.return_value = sample_statistics
@@ -418,7 +445,10 @@ class TestGetPerformance:
     """Tests for GET /api/statistics/performance endpoint."""
 
     def test_get_performance_returns_200(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test performance endpoint returns 200."""
         mock_statistics_repo.get_by_date_range.return_value = sample_statistics
@@ -426,7 +456,10 @@ class TestGetPerformance:
         assert response.status_code == 200
 
     def test_get_performance_format(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test response format."""
         mock_statistics_repo.get_by_date_range.return_value = sample_statistics
@@ -439,7 +472,10 @@ class TestGetPerformance:
         assert "trades_by_day" in data["data"]
 
     def test_get_performance_days_parameter(
-        self, client: TestClient, mock_statistics_repo: MagicMock, sample_statistics: list[Statistics]
+        self,
+        client: TestClient,
+        mock_statistics_repo: MagicMock,
+        sample_statistics: list[Statistics],
     ) -> None:
         """Test days parameter."""
         mock_statistics_repo.get_by_date_range.return_value = sample_statistics

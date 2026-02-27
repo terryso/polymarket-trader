@@ -34,7 +34,13 @@ class TestLLMSettings:
             clear=False,
         ):
             # Remove the env vars if they exist
-            for key in ["LLM_API_BASE", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT", "THINKING_ENABLED"]:
+            for key in [
+                "LLM_API_BASE",
+                "LLM_API_KEY",
+                "LLM_MODEL",
+                "LLM_TIMEOUT",
+                "THINKING_ENABLED",
+            ]:
                 os.environ.pop(key, None)
             settings = LLMSettings()
             assert settings.api_base == "https://open.bigmodel.cn/api/paas/v4"
@@ -953,7 +959,9 @@ class TestTelegramSettings:
 
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
-                _settings = TelegramSettings()  # noqa: F841 - needed to trigger validation
+                _settings = (
+                    TelegramSettings()
+                )  # noqa: F841 - needed to trigger validation
                 # The validator should emit a warning
                 assert len(w) >= 1
                 assert "TELEGRAM_BOT_TOKEN is not set" in str(w[0].message)

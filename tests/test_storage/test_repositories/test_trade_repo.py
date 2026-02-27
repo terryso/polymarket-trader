@@ -695,7 +695,9 @@ class TestTradeRepository:
             assert trades == []
 
     @pytest.mark.asyncio
-    async def test_get_trades_by_date_database_error(self, repo: TradeRepository) -> None:
+    async def test_get_trades_by_date_database_error(
+        self, repo: TradeRepository
+    ) -> None:
         """Test that database errors are properly wrapped for get_trades_by_date (Story 6.3)."""
         import aiosqlite
 

@@ -202,9 +202,7 @@ class ErrorHandler:
         """
         return {
             "error_counts": self._error_counts.copy(),
-            "last_errors": {
-                k: v.isoformat() for k, v in self._last_errors.items()
-            },
+            "last_errors": {k: v.isoformat() for k, v in self._last_errors.items()},
         }
 
     def reset_counts(self) -> None:
@@ -281,7 +279,11 @@ def setup_global_exception_handler() -> None:
         # Get error handler and process
         error_handler = get_error_handler()
         error_handler.handle_exception(
-            exc_value if isinstance(exc_value, Exception) else Exception(str(exc_value)),
+            (
+                exc_value
+                if isinstance(exc_value, Exception)
+                else Exception(str(exc_value))
+            ),
             {
                 "source": "global",
                 "traceback": "".join(traceback.format_tb(exc_traceback)),
@@ -305,7 +307,9 @@ def setup_async_exception_handler() -> None:
         logger.debug("No running event loop, async handler will be set up later")
         return
 
-    def handle_loop_exception(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+    def handle_loop_exception(
+        loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+    ) -> None:
         """Handle async loop exceptions."""
         exception = context.get("exception")
         message = context.get("message", "Unknown async error")

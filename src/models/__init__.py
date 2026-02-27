@@ -20,7 +20,11 @@ from src.models.api_response import (
     PaginationMeta,
 )
 from src.models.market import Market, MarketCategory
-from src.models.market_response import MarketListItem, MarketListQueryParams, MarketResponse
+from src.models.market_response import (
+    MarketListItem,
+    MarketListQueryParams,
+    MarketResponse,
+)
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.position_response import PositionListItem, PositionResponse
 from src.models.prediction import Prediction, PredictionResult, Recommendation

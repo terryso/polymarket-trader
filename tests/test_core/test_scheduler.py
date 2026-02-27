@@ -213,6 +213,7 @@ class TestSchedulerConfiguration:
         # Verify timezone is set (default is UTC from config)
         # datetime.timezone.utc has no 'zone' attribute, check via str()
         import datetime
+
         assert scheduler_instance.timezone == datetime.timezone.utc
 
     def test_scheduler_configuration_creates_data_dir(self, tmp_path: Path) -> None:

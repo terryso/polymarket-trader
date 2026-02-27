@@ -101,7 +101,9 @@ class TestLogAlertChannel:
         assert Path(log_file).exists()
 
     @pytest.mark.asyncio
-    async def test_send_alert_json_format(self, channel: LogAlertChannel, tmp_path: Path) -> None:
+    async def test_send_alert_json_format(
+        self, channel: LogAlertChannel, tmp_path: Path
+    ) -> None:
         """Test that alert is written as JSON."""
         alert = Alert(
             level="ERROR",
@@ -189,12 +191,16 @@ class TestAlertManager:
         level = alert_manager._determine_level(NetworkError("Test"), {})
         assert level == AlertLevel.ERROR.value
 
-    def test_determine_level_unexpected_error(self, alert_manager: AlertManager) -> None:
+    def test_determine_level_unexpected_error(
+        self, alert_manager: AlertManager
+    ) -> None:
         """Test unexpected exception level determination."""
         level = alert_manager._determine_level(RuntimeError("Test"), {})
         assert level == AlertLevel.CRITICAL.value
 
-    def test_determine_level_consecutive_failures(self, alert_manager: AlertManager) -> None:
+    def test_determine_level_consecutive_failures(
+        self, alert_manager: AlertManager
+    ) -> None:
         """Test level escalation for consecutive failures."""
         # Record failures to reach threshold
         alert_manager._consecutive_failures["test_source"] = 3
@@ -227,7 +233,9 @@ class TestAlertManager:
         alert_manager.check_and_alert(exception, {"source": "test"})
         assert len(alert_manager._alert_history) == 1
 
-    def test_check_and_alert_after_throttle_expiry(self, alert_manager: AlertManager) -> None:
+    def test_check_and_alert_after_throttle_expiry(
+        self, alert_manager: AlertManager
+    ) -> None:
         """Test that alerts are sent after throttle period expires."""
         alert_manager.throttle_seconds = 1  # 1 second for testing
         exception = TradingError("Test")
@@ -254,7 +262,9 @@ class TestAlertManager:
         count = alert_manager.record_failure("test_source")
         assert count == 2
 
-    def test_consecutive_failures_trigger_alert(self, alert_manager: AlertManager) -> None:
+    def test_consecutive_failures_trigger_alert(
+        self, alert_manager: AlertManager
+    ) -> None:
         """Test that consecutive failures trigger alert."""
         for _ in range(3):
             alert_manager.record_failure("test_source")

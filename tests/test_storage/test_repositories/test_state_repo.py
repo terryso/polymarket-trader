@@ -139,7 +139,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             await state_repo.save_state(state)
@@ -158,7 +160,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             state = await state_repo.load_state()
@@ -171,6 +175,7 @@ class TestStateRepository:
         self, state_repo: StateRepository, mock_connection: MagicMock
     ) -> None:
         """Test loading state with data."""
+
         # Create mock rows with proper dictionary-like access
         class MockRow:
             def __init__(self, data: dict):
@@ -179,8 +184,20 @@ class TestStateRepository:
             def __getitem__(self, key: str):
                 return self._data[key]
 
-        mock_row1 = MockRow({"key": "current_capital", "value": "150.0", "updated_at": "2026-02-17T12:00:00"})
-        mock_row2 = MockRow({"key": "trading_enabled", "value": "true", "updated_at": "2026-02-17T12:00:00"})
+        mock_row1 = MockRow(
+            {
+                "key": "current_capital",
+                "value": "150.0",
+                "updated_at": "2026-02-17T12:00:00",
+            }
+        )
+        mock_row2 = MockRow(
+            {
+                "key": "trading_enabled",
+                "value": "true",
+                "updated_at": "2026-02-17T12:00:00",
+            }
+        )
 
         # Create a mock cursor that returns the rows
         mock_cursor = AsyncMock()
@@ -195,7 +212,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             state = await state_repo.load_state()
@@ -208,6 +227,7 @@ class TestStateRepository:
         self, state_repo: StateRepository, mock_connection: MagicMock
     ) -> None:
         """Test getting a single state value."""
+
         # Create a mock row with proper __getitem__ support
         class MockRow:
             def __init__(self, data: dict):
@@ -231,7 +251,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             value = await state_repo.get_state_value("current_capital")
@@ -248,7 +270,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             value = await state_repo.get_state_value("nonexistent")
@@ -263,7 +287,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             await state_repo.set_state_value("current_capital", 150.0)
@@ -279,7 +305,9 @@ class TestStateRepository:
         with patch(
             "src.storage.repositories.state_repo.get_connection"
         ) as mock_get_conn:
-            mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
+            mock_get_conn.return_value.__aenter__ = AsyncMock(
+                return_value=mock_connection
+            )
             mock_get_conn.return_value.__aexit__ = AsyncMock()
 
             await state_repo.clear_state()

@@ -213,7 +213,9 @@ class TestListMarkets:
         sample_markets: list[Market],
     ) -> None:
         """Test list markets with status=resolved filter."""
-        resolved_markets = [m for m in sample_markets if m.resolution_status == "RESOLVED"]
+        resolved_markets = [
+            m for m in sample_markets if m.resolution_status == "RESOLVED"
+        ]
         mock_market_repo.get_resolved_markets.return_value = resolved_markets
 
         response = client.get("/api/markets?status=resolved")
@@ -245,7 +247,9 @@ class TestListMarkets:
     ) -> None:
         """Test list markets with category filter."""
         # When status=all and category is specified, get_markets_by_category is called
-        politics_markets = [m for m in sample_markets if m.category == MarketCategory.POLITICS]
+        politics_markets = [
+            m for m in sample_markets if m.category == MarketCategory.POLITICS
+        ]
         mock_market_repo.get_markets_by_category.return_value = politics_markets
 
         response = client.get("/api/markets?category=politics")
@@ -263,7 +267,9 @@ class TestListMarkets:
     ) -> None:
         """Test list markets with crypto category filter."""
         # When status=all and category is specified, get_markets_by_category is called
-        crypto_markets = [m for m in sample_markets if m.category == MarketCategory.CRYPTO]
+        crypto_markets = [
+            m for m in sample_markets if m.category == MarketCategory.CRYPTO
+        ]
         mock_market_repo.get_markets_by_category.return_value = crypto_markets
 
         response = client.get("/api/markets?category=crypto")

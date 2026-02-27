@@ -419,7 +419,7 @@ class TestParseLLMAnalysisResponse:
 
     def test_parse_json_block(self) -> None:
         """Test parsing JSON code block."""
-        response = '''```json
+        response = """```json
 {
     "predicted_probability": 0.75,
     "confidence": 0.85,
@@ -427,7 +427,7 @@ class TestParseLLMAnalysisResponse:
     "key_assumptions": ["Assumption 1", "Assumption 2"],
     "recommendation": "BUY_YES"
 }
-```'''
+```"""
         result = parse_llm_analysis_response(response)
         assert result.predicted_probability == 0.75
         assert result.confidence == 0.85
@@ -436,7 +436,7 @@ class TestParseLLMAnalysisResponse:
 
     def test_parse_json_block_without_language(self) -> None:
         """Test parsing JSON code block without json language tag."""
-        response = '''```
+        response = """```
 {
     "predicted_probability": 0.65,
     "confidence": 0.80,
@@ -444,7 +444,7 @@ class TestParseLLMAnalysisResponse:
     "key_assumptions": [],
     "recommendation": "BUY_NO"
 }
-```'''
+```"""
         result = parse_llm_analysis_response(response)
         assert result.predicted_probability == 0.65
         assert result.recommendation == Recommendation.BUY_NO
@@ -458,11 +458,11 @@ class TestParseLLMAnalysisResponse:
 
     def test_parse_json_with_whitespace(self) -> None:
         """Test parsing JSON with surrounding whitespace."""
-        response = '''
+        response = """
 
         {"predicted_probability": 0.5, "confidence": 0.75, "reasoning": "Valid reasoning", "recommendation": "NO_TRADE"}
 
-        '''
+        """
         result = parse_llm_analysis_response(response)
         assert result.predicted_probability == 0.5
 
@@ -642,7 +642,9 @@ class TestValidateAnalysisResult:
         assert is_valid is False
 
         # Should pass with lower threshold
-        is_valid, _ = validate_analysis_result(result, market_yes_price=0.65, min_edge=0.05)
+        is_valid, _ = validate_analysis_result(
+            result, market_yes_price=0.65, min_edge=0.05
+        )
         assert is_valid is True
 
     def test_no_market_price_check(self) -> None:
@@ -700,7 +702,7 @@ class TestIntegration:
         assert "crypto" in prompt.lower()
 
         # Simulate LLM response
-        llm_response = '''```json
+        llm_response = """```json
 {
     "predicted_probability": 0.55,
     "confidence": 0.80,
@@ -708,7 +710,7 @@ class TestIntegration:
     "key_assumptions": ["Institutional adoption continues", "No major regulatory crackdown"],
     "recommendation": "BUY_YES"
 }
-```'''
+```"""
 
         # Parse response
         result = parse_llm_analysis_response(llm_response)

@@ -98,9 +98,7 @@ class TestRecoveryManager:
         assert "open_positions_count" in recovery_manager.DEFAULT_SAFE_STATE
         assert "reduced_mode" in recovery_manager.DEFAULT_SAFE_STATE
 
-    def test_initial_capital_from_settings(
-        self, mock_state_repo: MagicMock
-    ) -> None:
+    def test_initial_capital_from_settings(self, mock_state_repo: MagicMock) -> None:
         """Test initial capital is set from settings when not provided."""
         with patch("src.core.recovery.settings") as mock_settings:
             mock_settings.initial_capital = 300.0
@@ -274,9 +272,7 @@ class TestRecoveryManager:
         assert result.recovered_state["trading_enabled"] is False
         assert result.recovered_state["current_capital"] == 200.0
 
-    def test_merge_with_defaults_empty(
-        self, recovery_manager: RecoveryManager
-    ) -> None:
+    def test_merge_with_defaults_empty(self, recovery_manager: RecoveryManager) -> None:
         """Test merging empty state with defaults."""
         merged = recovery_manager._merge_with_defaults({})
 
@@ -289,10 +285,12 @@ class TestRecoveryManager:
         self, recovery_manager: RecoveryManager
     ) -> None:
         """Test merging partial state with defaults."""
-        merged = recovery_manager._merge_with_defaults({
-            "current_capital": 150.0,
-            "consecutive_losses": 2,
-        })
+        merged = recovery_manager._merge_with_defaults(
+            {
+                "current_capital": 150.0,
+                "consecutive_losses": 2,
+            }
+        )
 
         assert merged["current_capital"] == 150.0  # From saved
         assert merged["consecutive_losses"] == 2  # From saved
@@ -303,9 +301,11 @@ class TestRecoveryManager:
         self, recovery_manager: RecoveryManager
     ) -> None:
         """Test merging state with unknown keys."""
-        merged = recovery_manager._merge_with_defaults({
-            "custom_key": "custom_value",
-        })
+        merged = recovery_manager._merge_with_defaults(
+            {
+                "custom_key": "custom_value",
+            }
+        )
 
         # Unknown keys should be preserved
         assert merged["custom_key"] == "custom_value"
@@ -314,11 +314,13 @@ class TestRecoveryManager:
         self, recovery_manager: RecoveryManager
     ) -> None:
         """Test consistency check with normal state."""
-        errors = recovery_manager._check_consistency({
-            "current_capital": 100.0,
-            "daily_pnl": 10.0,
-            "consecutive_losses": 1,
-        })
+        errors = recovery_manager._check_consistency(
+            {
+                "current_capital": 100.0,
+                "daily_pnl": 10.0,
+                "consecutive_losses": 1,
+            }
+        )
 
         assert len(errors) == 0
 
@@ -326,11 +328,13 @@ class TestRecoveryManager:
         self, recovery_manager: RecoveryManager
     ) -> None:
         """Test consistency check with negative capital."""
-        errors = recovery_manager._check_consistency({
-            "current_capital": -50.0,
-            "daily_pnl": 0.0,
-            "consecutive_losses": 0,
-        })
+        errors = recovery_manager._check_consistency(
+            {
+                "current_capital": -50.0,
+                "daily_pnl": 0.0,
+                "consecutive_losses": 0,
+            }
+        )
 
         assert len(errors) > 0
         assert any("Negative capital" in e for e in errors)
@@ -339,11 +343,13 @@ class TestRecoveryManager:
         self, recovery_manager: RecoveryManager
     ) -> None:
         """Test consistency check with negative consecutive losses."""
-        errors = recovery_manager._check_consistency({
-            "current_capital": 100.0,
-            "daily_pnl": 0.0,
-            "consecutive_losses": -1,
-        })
+        errors = recovery_manager._check_consistency(
+            {
+                "current_capital": 100.0,
+                "daily_pnl": 0.0,
+                "consecutive_losses": -1,
+            }
+        )
 
         assert len(errors) > 0
         assert any("Negative consecutive losses" in e for e in errors)
@@ -359,11 +365,13 @@ class TestRecoveryManager:
         - Example: Started with 250, gained 150 profit, now have 250+150=400 capital
           with daily_pnl=150 (valid scenario)
         """
-        errors = recovery_manager._check_consistency({
-            "current_capital": 100.0,
-            "daily_pnl": 150.0,  # Valid: could have started with 250 and gained 150
-            "consecutive_losses": 0,
-        })
+        errors = recovery_manager._check_consistency(
+            {
+                "current_capital": 100.0,
+                "daily_pnl": 150.0,  # Valid: could have started with 250 and gained 150
+                "consecutive_losses": 0,
+            }
+        )
 
         # Should NOT report errors - this is valid
         assert len(errors) == 0

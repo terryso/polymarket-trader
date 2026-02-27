@@ -110,7 +110,9 @@ def client(
 
             # Override the dependencies
             app.dependency_overrides[trade_repo_dependency] = mock_get_trade_repo
-            app.dependency_overrides[prediction_repo_dependency] = mock_get_prediction_repo
+            app.dependency_overrides[prediction_repo_dependency] = (
+                mock_get_prediction_repo
+            )
 
             with TestClient(app, raise_server_exceptions=False) as c:
                 yield c
@@ -127,9 +129,7 @@ class TestGetActivities:
         response = client.get("/api/activities")
         assert response.status_code == 200
 
-    def test_get_activities_response_format(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_response_format(self, client: TestClient) -> None:
         """Test that the response has correct format."""
         response = client.get("/api/activities")
         data = response.json()
@@ -140,9 +140,7 @@ class TestGetActivities:
         assert "items" in data["data"]
         assert "total" in data["data"]
 
-    def test_get_activities_includes_trades(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_includes_trades(self, client: TestClient) -> None:
         """Test that activities include trade records."""
         response = client.get("/api/activities")
         data = response.json()
@@ -160,9 +158,7 @@ class TestGetActivities:
         assert "amount" in trade_item
         assert trade_item["amount"] is not None
 
-    def test_get_activities_includes_predictions(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_includes_predictions(self, client: TestClient) -> None:
         """Test that activities include prediction records."""
         response = client.get("/api/activities")
         data = response.json()
@@ -181,9 +177,7 @@ class TestGetActivities:
         # Predictions don't have amount
         assert pred_item["amount"] is None
 
-    def test_get_activities_includes_system_events(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_includes_system_events(self, client: TestClient) -> None:
         """Test that activities include system events."""
         response = client.get("/api/activities")
         data = response.json()
@@ -199,9 +193,7 @@ class TestGetActivities:
             assert "type" in sys_item
             assert "description" in sys_item
 
-    def test_get_activities_sorted_by_time(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_sorted_by_time(self, client: TestClient) -> None:
         """Test that activities are sorted by time (most recent first)."""
         response = client.get("/api/activities")
         data = response.json()
@@ -209,18 +201,14 @@ class TestGetActivities:
         items = data["data"]["items"]
 
         # Get timestamps for items that have them
-        timestamps = [
-            item.get("timestamp") for item in items if item.get("timestamp")
-        ]
+        timestamps = [item.get("timestamp") for item in items if item.get("timestamp")]
 
         # Verify timestamps are in descending order (most recent first)
         if len(timestamps) > 1:
             for i in range(len(timestamps) - 1):
                 assert timestamps[i] >= timestamps[i + 1]
 
-    def test_get_activities_limit_parameter(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_limit_parameter(self, client: TestClient) -> None:
         """Test that limit parameter works correctly."""
         # Test with limit=2
         response = client.get("/api/activities?limit=2")
@@ -229,9 +217,7 @@ class TestGetActivities:
         items = data["data"]["items"]
         assert len(items) <= 2
 
-    def test_get_activities_default_limit(
-        self, client: TestClient
-    ) -> None:
+    def test_get_activities_default_limit(self, client: TestClient) -> None:
         """Test that default limit is 10."""
         response = client.get("/api/activities")
         data = response.json()
@@ -264,7 +250,9 @@ class TestGetActivities:
                     return empty_prediction_repo
 
                 app.dependency_overrides[trade_repo_dependency] = mock_empty_trade_repo
-                app.dependency_overrides[prediction_repo_dependency] = mock_empty_prediction_repo
+                app.dependency_overrides[prediction_repo_dependency] = (
+                    mock_empty_prediction_repo
+                )
 
                 with TestClient(app, raise_server_exceptions=False) as test_client:
                     response = test_client.get("/api/activities")
@@ -282,9 +270,7 @@ class TestGetActivities:
 class TestActivityTypes:
     """Tests for activity type validation."""
 
-    def test_trade_activity_has_correct_type(
-        self, client: TestClient
-    ) -> None:
+    def test_trade_activity_has_correct_type(self, client: TestClient) -> None:
         """Test that trade activities have type='trade'."""
         response = client.get("/api/activities")
         data = response.json()
@@ -293,9 +279,7 @@ class TestActivityTypes:
         for item in trade_items:
             assert item["type"] == "trade"
 
-    def test_prediction_activity_has_correct_type(
-        self, client: TestClient
-    ) -> None:
+    def test_prediction_activity_has_correct_type(self, client: TestClient) -> None:
         """Test that prediction activities have type='prediction'."""
         response = client.get("/api/activities")
         data = response.json()

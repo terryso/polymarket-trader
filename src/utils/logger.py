@@ -27,7 +27,6 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import colorlog
 
-
 # Emoji mappings for log levels
 LOG_EMOJIS: dict[str, str] = {
     "DEBUG": "🔍",
@@ -53,13 +52,16 @@ OPERATION_EMOJIS: dict[str, str] = {
 # Sensitive patterns for log sanitization
 SENSITIVE_PATTERNS = [
     # API Keys - show only first 4 characters (matches api_key, api-key, apiKey, ApiKey)
-    (r'(api[_-]?key|apiKey|ApiKey)["\s:=]+["\']?([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*["\']?', r'\1"\2****"'),
-    (r'(LLM_API_KEY=["\']?)([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*', r'\g<1>\2****'),
+    (
+        r'(api[_-]?key|apiKey|ApiKey)["\s:=]+["\']?([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*["\']?',
+        r'\1"\2****"',
+    ),
+    (r'(LLM_API_KEY=["\']?)([a-zA-Z0-9_-]{4})[a-zA-Z0-9_-]*', r"\g<1>\2****"),
     # Private keys - completely hide
-    (r'(pk|private[_-]?key["\s:=]+)["\']?[a-zA-Z0-9]+["\']?', r'\1[PRIVATE_KEY]'),
-    (r'(PK=["\']?)[a-zA-Z0-9]+', r'\g<1>[PRIVATE_KEY]'),
+    (r'(pk|private[_-]?key["\s:=]+)["\']?[a-zA-Z0-9]+["\']?', r"\1[PRIVATE_KEY]"),
+    (r'(PK=["\']?)[a-zA-Z0-9]+', r"\g<1>[PRIVATE_KEY]"),
     # Wallet addresses - show first 6 and last 4 characters
-    (r'(0x[a-fA-F0-9]{6})[a-fA-F0-9]+([a-fA-F0-9]{4})', r'\1...\2'),
+    (r"(0x[a-fA-F0-9]{6})[a-fA-F0-9]+([a-fA-F0-9]{4})", r"\1...\2"),
 ]
 
 
@@ -142,9 +144,7 @@ class ErrorLogFormatter(logging.Formatter):
 
 
 def get_logger(
-    name: str,
-    log_level: str | None = None,
-    log_dir: str | None = None
+    name: str, log_level: str | None = None, log_dir: str | None = None
 ) -> logging.Logger:
     """Get a configured logger instance.
 
@@ -166,7 +166,9 @@ def get_logger(
     logger.propagate = False
 
     # Get configuration from environment or defaults
-    effective_log_level = log_level if log_level is not None else os.getenv("LOG_LEVEL", "INFO")
+    effective_log_level = (
+        log_level if log_level is not None else os.getenv("LOG_LEVEL", "INFO")
+    )
     effective_log_dir = log_dir if log_dir is not None else os.getenv("LOG_DIR", "logs")
 
     # Set logger level
@@ -185,11 +187,11 @@ def get_logger(
         "CRITICAL": "red,bg_white",
     }
     console_handler = colorlog.StreamHandler()
-    console_handler.setFormatter(EmojiFormatter(
-        console_format,
-        log_colors=console_colors,
-        datefmt="%Y-%m-%d %H:%M:%S"
-    ))
+    console_handler.setFormatter(
+        EmojiFormatter(
+            console_format, log_colors=console_colors, datefmt="%Y-%m-%d %H:%M:%S"
+        )
+    )
     console_handler.addFilter(SanitizingFilter())
     logger.addHandler(console_handler)
 
@@ -205,12 +207,11 @@ def get_logger(
         log_path / "polymarket_trader.log",
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
-        encoding="utf-8"
+        encoding="utf-8",
     )
-    file_handler.setFormatter(FileEmojiFormatter(
-        file_format,
-        datefmt="%Y-%m-%d %H:%M:%S"
-    ))
+    file_handler.setFormatter(
+        FileEmojiFormatter(file_format, datefmt="%Y-%m-%d %H:%M:%S")
+    )
     file_handler.addFilter(SanitizingFilter())
     logger.addHandler(file_handler)
 
@@ -266,7 +267,9 @@ def setup_error_log_handler(log_dir: str = "logs") -> RotatingFileHandler:
 
     # Use special formatter with extra context
     error_format = "%(asctime)s | %(levelname)-8s | %(name)s | %(emoji)s %(message)s"
-    error_handler.setFormatter(ErrorLogFormatter(error_format, datefmt="%Y-%m-%d %H:%M:%S"))
+    error_handler.setFormatter(
+        ErrorLogFormatter(error_format, datefmt="%Y-%m-%d %H:%M:%S")
+    )
     error_handler.addFilter(SanitizingFilter())
 
     return error_handler

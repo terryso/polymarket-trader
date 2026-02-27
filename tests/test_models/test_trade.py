@@ -29,7 +29,9 @@ class TestTradeType:
 
     def test_type_count(self) -> None:
         """Test total number of trade types."""
-        assert len(TradeType) == 5  # 4 specific types + SELL for backwards compatibility
+        assert (
+            len(TradeType) == 5
+        )  # 4 specific types + SELL for backwards compatibility
 
     def test_type_is_str_enum(self) -> None:
         """Test TradeType is string enum."""

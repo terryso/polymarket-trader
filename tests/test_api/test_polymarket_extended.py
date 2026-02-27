@@ -319,7 +319,8 @@ class TestGetActiveMarketsExtended:
     """Extended tests for get_active_markets method."""
 
     def test_get_active_markets_empty_response(
-        self, mock_settings: MagicMock,
+        self,
+        mock_settings: MagicMock,
     ) -> None:
         """Test get_active_markets with empty response."""
         mock_http_response = MagicMock()
@@ -339,20 +340,23 @@ class TestGetActiveMarketsExtended:
         assert markets == []
 
     def test_get_active_markets_with_end_date(
-        self, mock_settings: MagicMock,
+        self,
+        mock_settings: MagicMock,
     ) -> None:
         """Test get_active_markets parses end_date correctly."""
-        mock_response = [{
-            "conditionId": "0x123",
-            "question": "Test?",
-            "slug": "test",
-            "active": True,
-            "closed": False,
-            "acceptingOrders": True,
-            "enableOrderBook": True,
-            "clobTokenIds": "[]",
-            "endDateIso": "2026-12-31T23:59:59Z",
-        }]
+        mock_response = [
+            {
+                "conditionId": "0x123",
+                "question": "Test?",
+                "slug": "test",
+                "active": True,
+                "closed": False,
+                "acceptingOrders": True,
+                "enableOrderBook": True,
+                "clobTokenIds": "[]",
+                "endDateIso": "2026-12-31T23:59:59Z",
+            }
+        ]
 
         mock_http_response = MagicMock()
         mock_http_response.json.return_value = mock_response

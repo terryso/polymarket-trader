@@ -103,7 +103,9 @@ def mock_settings():
 
 
 @pytest.fixture
-def client(mock_trade_repo: MagicMock, mock_settings: MagicMock) -> Generator[TestClient, None, None]:
+def client(
+    mock_trade_repo: MagicMock, mock_settings: MagicMock
+) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
     # Patch init_db and close_db to avoid database operations
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):

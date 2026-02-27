@@ -262,10 +262,14 @@ class TradingExecutor:
                 prediction_id = cursor.lastrowid or 0
                 # Note: commit is handled by context manager
 
-            self._logger.debug(f"Saved prediction {prediction_id} for market {market.id}")
+            self._logger.debug(
+                f"Saved prediction {prediction_id} for market {market.id}"
+            )
             return prediction_id
         except Exception as e:
-            self._logger.warning(f"Failed to save prediction for market {market.id}: {e}")
+            self._logger.warning(
+                f"Failed to save prediction for market {market.id}: {e}"
+            )
             return None
 
     async def process_market(self, market: "Market") -> TradingDecision:

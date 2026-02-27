@@ -76,7 +76,10 @@ class TradeListItem(BaseModel):
     price: float = Field(..., ge=0, le=1, description="Price per share (0-1)")
     shares: float | None = Field(None, ge=0, description="Number of shares")
     status: TradeStatus = Field(..., description="Trade status")
-    exit_type: str | None = Field(None, description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)")
+    exit_type: str | None = Field(
+        None,
+        description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)",
+    )
     created_at: datetime | None = Field(None, description="Creation timestamp")
 
     @field_serializer("created_at")
@@ -147,7 +150,10 @@ class TradeResponse(BaseModel):
     status: TradeStatus = Field(..., description="Trade status")
     llm_prediction_id: int | None = Field(None, description="LLM prediction reference")
     position_id: int | None = Field(None, description="Position reference")
-    exit_type: str | None = Field(None, description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)")
+    exit_type: str | None = Field(
+        None,
+        description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)",
+    )
     created_at: datetime | None = Field(None, description="Creation timestamp")
 
     @field_serializer("created_at")

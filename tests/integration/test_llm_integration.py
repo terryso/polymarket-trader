@@ -44,7 +44,9 @@ class TestLLMClientIntegration:
     def test_simple_chat_returns_response(self) -> None:
         """Test simple chat request returns a response."""
         with LLMClient() as client:
-            response = client.chat([{"role": "user", "content": "Hello, say 'hi' back in one word."}])
+            response = client.chat(
+                [{"role": "user", "content": "Hello, say 'hi' back in one word."}]
+            )
 
             assert isinstance(response, str)
             assert len(response) > 0

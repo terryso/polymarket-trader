@@ -108,7 +108,9 @@ class MarketFilter:
 
     # Hard exclusion thresholds
     HARD_EXCLUDE_LIQUIDITY: float = 5000.0
-    HARD_EXCLUDE_DEADLINE_HOURS: int = 1  # Same as min_deadline_hours for short-term markets
+    HARD_EXCLUDE_DEADLINE_HOURS: int = (
+        1  # Same as min_deadline_hours for short-term markets
+    )
 
     # Default excluded keywords for title (case insensitive)
     DEFAULT_EXCLUDED_KEYWORDS: list[str] = ["price", "USD", "tomorrow"]

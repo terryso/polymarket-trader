@@ -742,9 +742,7 @@ class TestPositionManager:
         assert result.pnl_pct == 0.0  # Safe default when initial_value is None
 
     @pytest.mark.asyncio
-    async def test_calculate_pnl_invalid_price(
-        self, manager: PositionManager
-    ) -> None:
+    async def test_calculate_pnl_invalid_price(self, manager: PositionManager) -> None:
         """测试 calculate_pnl - 无效价格."""
         position = Position(
             id=1,
@@ -761,19 +759,27 @@ class TestPositionManager:
         )
 
         # Price <= 0
-        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+        with pytest.raises(
+            ValidationError, match="Current price must be between 0 and 1"
+        ):
             manager.calculate_pnl(position, current_price=0.0)
 
         # Price >= 1
-        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+        with pytest.raises(
+            ValidationError, match="Current price must be between 0 and 1"
+        ):
             manager.calculate_pnl(position, current_price=1.0)
 
         # Negative price
-        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+        with pytest.raises(
+            ValidationError, match="Current price must be between 0 and 1"
+        ):
             manager.calculate_pnl(position, current_price=-0.5)
 
         # Price > 1
-        with pytest.raises(ValidationError, match="Current price must be between 0 and 1"):
+        with pytest.raises(
+            ValidationError, match="Current price must be between 0 and 1"
+        ):
             manager.calculate_pnl(position, current_price=1.5)
 
     @pytest.mark.asyncio

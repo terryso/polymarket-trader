@@ -294,4 +294,6 @@ class TelegramClient:
             await self._application.updater.stop()
             self._logger.info("Stopped polling for Telegram updates")
         except Exception as e:
-            self._logger.debug(f"Error stopping polling (may not have been started): {e}")
+            self._logger.debug(
+                f"Error stopping polling (may not have been started): {e}"
+            )

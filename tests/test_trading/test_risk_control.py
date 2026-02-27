@@ -486,7 +486,9 @@ class TestCircuitBreakerIntegration:
     async def test_circuit_breaker_stops_trade(self):
         """Test that circuit breaker can stop trades."""
         mock_state = create_mock_state()
-        mock_breaker = create_mock_circuit_breaker(allowed=False, reasons=["Daily loss limit exceeded"])
+        mock_breaker = create_mock_circuit_breaker(
+            allowed=False, reasons=["Daily loss limit exceeded"]
+        )
         controller = RiskController(mock_state, mock_breaker)
 
         prediction = create_prediction()
@@ -638,7 +640,11 @@ class TestCombinedChecks:
         mock_state = create_mock_state(open_positions_count=3)
         mock_breaker = create_mock_circuit_breaker()
         controller = RiskController(
-            mock_state, mock_breaker, min_confidence=0.75, min_edge=0.10, max_open_markets=3
+            mock_state,
+            mock_breaker,
+            min_confidence=0.75,
+            min_edge=0.10,
+            max_open_markets=3,
         )
 
         # Bad prediction: low confidence, low edge, NO_TRADE
@@ -671,7 +677,10 @@ class TestInsufficientCapital:
         mock_state = create_mock_state(current_capital=5.0)  # Very low capital
         mock_breaker = create_mock_circuit_breaker()
         controller = RiskController(
-            mock_state, mock_breaker, max_single_ratio=2.0, min_bet=1.0  # Allow 200% ratio to trigger the check
+            mock_state,
+            mock_breaker,
+            max_single_ratio=2.0,
+            min_bet=1.0,  # Allow 200% ratio to trigger the check
         )
 
         prediction = create_prediction()

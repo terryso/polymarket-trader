@@ -10,7 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.api.polymarket import BalanceItem, BalanceResult
-from src.models.position import CacheFreshness, Position, PositionOutcome, PositionStatus
+from src.models.position import (
+    CacheFreshness,
+    Position,
+    PositionOutcome,
+    PositionStatus,
+)
 from src.trading.position_sync import (
     CacheRefreshResult,
     PositionCacheService,
@@ -73,7 +78,7 @@ class TestCacheStatus:
         status = CacheStatus(cache_updated_at=datetime(2024, 1, 1, 12, 0, 0))
         # Access through deprecated property - this should work
         assert status.last_sync_at == datetime(2024, 1, 1, 12, 0, 0)
-        assert hasattr(status, 'last_sync_at')
+        assert hasattr(status, "last_sync_at")
 
 
 class TestPositionCacheService:
@@ -118,7 +123,9 @@ class TestPositionCacheService:
             assert service.can_refresh is False
 
     @pytest.mark.asyncio
-    async def test_refresh_cache_paper_mode(self, service: PositionCacheService) -> None:
+    async def test_refresh_cache_paper_mode(
+        self, service: PositionCacheService
+    ) -> None:
         """测试 Paper 模式下返回提示信息."""
         with patch("src.trading.position_sync.settings") as mock_settings:
             mock_settings.trading_mode = "paper"
@@ -168,9 +175,7 @@ class TestPositionCacheService:
             assert "not configured" in result.error
 
     @pytest.mark.asyncio
-    async def test_refresh_cache_throttled(
-        self, service: PositionCacheService
-    ) -> None:
+    async def test_refresh_cache_throttled(self, service: PositionCacheService) -> None:
         """测试刷新限流."""
         with patch("src.trading.position_sync.settings") as mock_settings:
             mock_settings.trading_mode = "live"
@@ -180,9 +185,7 @@ class TestPositionCacheService:
             with patch("src.trading.position_sync.PolymarketClient"):
                 pass
                 # Mock _get_cache_updated_time to return recent time
-                service._get_cache_updated_time = AsyncMock(
-                    return_value=datetime.now()
-                )
+                service._get_cache_updated_time = AsyncMock(return_value=datetime.now())
                 result = await service.refresh_cache()
                 assert result.is_success is False
                 assert "throttled" in result.error.lower()
@@ -218,7 +221,9 @@ class TestPositionCacheService:
         assert status.cache_freshness == CacheFreshness.FRESH
 
     @pytest.mark.asyncio
-    async def test_get_cache_status_stale(self, service: PositionCacheService, mock_position_repo: AsyncMock) -> None:
+    async def test_get_cache_status_stale(
+        self, service: PositionCacheService, mock_position_repo: AsyncMock
+    ) -> None:
         """测试过期缓存状态."""
         mock_position_repo.get_open_positions.return_value = []
 
@@ -233,15 +238,17 @@ class TestPositionCacheService:
         assert status.cache_freshness == CacheFreshness.STALE
         assert status.cache_age_seconds > 60
 
-
     @pytest.mark.asyncio
-    async def test_get_cache_status_expired(self, service: PositionCacheService, mock_position_repo: AsyncMock) -> None:
+    async def test_get_cache_status_expired(
+        self, service: PositionCacheService, mock_position_repo: AsyncMock
+    ) -> None:
         """测试无缓存状态."""
         mock_position_repo.get_open_positions.return_value = []
 
         # Mock _get_cache_updated_time to return None
         async def mock_get_cache_updated() -> datetime | None:
             return None
+
         service._get_cache_updated_time = mock_get_cache_updated
 
         status = await service.get_cache_status()
@@ -283,6 +290,7 @@ class TestPositionCacheServiceIntegration:
             opened_at=datetime(2024, 1, 1, 12, 0, 0),
         )
         return repo
+
     @pytest.fixture
     def service(self, mock_position_repo: AsyncMock) -> PositionCacheService:
         """创建测试用服务."""
@@ -310,8 +318,12 @@ class TestPositionCacheServiceIntegration:
             mock_settings.trading_mode = "live"
             mock_settings.polymarket.pk = "test-pk"
             mock_settings.polymarket.proxy_wallet = "0x1234"
-            mock_settings.position_cache.min_refresh_interval = 10  # Required for throttling check
-            with patch("src.trading.position_sync.PolymarketClient") as mock_client_class:
+            mock_settings.position_cache.min_refresh_interval = (
+                10  # Required for throttling check
+            )
+            with patch(
+                "src.trading.position_sync.PolymarketClient"
+            ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get_balances.return_value = mock_balance_result
                 mock_client_class.return_value = mock_client
@@ -363,8 +375,12 @@ class TestPositionCacheServiceIntegration:
             mock_settings.trading_mode = "live"
             mock_settings.polymarket.pk = "test-pk"
             mock_settings.polymarket.proxy_wallet = "0x1234"
-            mock_settings.position_cache.min_refresh_interval = 10  # Required for throttling check
-            with patch("src.trading.position_sync.PolymarketClient") as mock_client_class:
+            mock_settings.position_cache.min_refresh_interval = (
+                10  # Required for throttling check
+            )
+            with patch(
+                "src.trading.position_sync.PolymarketClient"
+            ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get_balances.return_value = mock_balance_result
                 mock_client_class.return_value = mock_client
@@ -376,6 +392,7 @@ class TestPositionCacheServiceIntegration:
                 assert result.closed_positions == 1
                 # Backward compatibility
                 assert isinstance(result, PositionSyncResult)
+
     @pytest.mark.asyncio
     async def test_refresh_updates_changed_positions(
         self, service: PositionCacheService, mock_position_repo: AsyncMock
@@ -410,13 +427,19 @@ class TestPositionCacheServiceIntegration:
             mock_settings.trading_mode = "live"
             mock_settings.polymarket.pk = "test-pk"
             mock_settings.polymarket.proxy_wallet = "0x1234"
-            mock_settings.position_cache.min_refresh_interval = 10  # Required for throttling check
-            with patch("src.trading.position_sync.PolymarketClient") as mock_client_class:
+            mock_settings.position_cache.min_refresh_interval = (
+                10  # Required for throttling check
+            )
+            with patch(
+                "src.trading.position_sync.PolymarketClient"
+            ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get_balances.return_value = mock_balance_result
                 mock_client_class.return_value = mock_client
                 service._set_cache_updated_time = AsyncMock()
-                service._get_cache_updated_time = AsyncMock(return_value=datetime(2024, 1, 1, 12, 0, 0))
+                service._get_cache_updated_time = AsyncMock(
+                    return_value=datetime(2024, 1, 1, 12, 0, 0)
+                )
                 result = await service.refresh_cache()
 
                 assert result.is_success is True

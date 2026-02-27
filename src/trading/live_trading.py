@@ -350,7 +350,9 @@ class LiveTradingExecutor:
         try:
             # 0. Check for existing open position from API (prevent duplicate trades)
             # Tech-Spec: Use API to check for positions (fresh data)
-            existing_position = await self._position_manager.get_position_by_market_from_api(market.id)
+            existing_position = (
+                await self._position_manager.get_position_by_market_from_api(market.id)
+            )
             if existing_position:
                 self._logger.warning(
                     f"{OPERATION_EMOJIS['warning']} Skipping trade: open position already exists "
@@ -367,7 +369,9 @@ class LiveTradingExecutor:
                 raise ValidationError(f"Invalid trade amount: {amount}")
 
             if prediction.recommendation == Recommendation.NO_TRADE:
-                raise ValidationError("Cannot execute trade with NO_TRADE recommendation")
+                raise ValidationError(
+                    "Cannot execute trade with NO_TRADE recommendation"
+                )
 
             # 2. Determine trade type and token
             trade_type = self._get_trade_type(prediction.recommendation)
@@ -396,7 +400,9 @@ class LiveTradingExecutor:
 
             # Extract order ID from result
             if isinstance(result, dict):
-                order_id = result.get("orderID") or result.get("order_id") or result.get("id")
+                order_id = (
+                    result.get("orderID") or result.get("order_id") or result.get("id")
+                )
                 success = result.get("success", False)
                 if not success:
                     error_msg = result.get("errorMsg", "Unknown error")
@@ -451,7 +457,9 @@ class LiveTradingExecutor:
             # 9. Mark cache as stale (Tech-Spec: Single Source of Truth)
             if self._cache_service:
                 await self._cache_service.mark_stale()
-                self._logger.debug(f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade")
+                self._logger.debug(
+                    f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade"
+                )
 
             self._logger.info(
                 f"{OPERATION_EMOJIS['success']} Live trade completed: trade_id={saved_trade.id}, "
@@ -473,7 +481,9 @@ class LiveTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in live trade: {e}")
+            self._logger.error(
+                f"{OPERATION_EMOJIS['error']} Unexpected error in live trade: {e}"
+            )
             return LiveTradeResult(
                 trade=None,
                 success=False,
@@ -515,7 +525,9 @@ class LiveTradingExecutor:
 
         try:
             # 0. Get fresh position data from API (Tech-Spec: Single Source of Truth)
-            api_position = await self._position_manager.get_position_by_market_from_api(market.id)
+            api_position = await self._position_manager.get_position_by_market_from_api(
+                market.id
+            )
             if api_position is None:
                 return SellResult(
                     trade=None,
@@ -590,7 +602,9 @@ class LiveTradingExecutor:
 
             # Extract order ID from result
             if isinstance(result, dict):
-                order_id = result.get("orderID") or result.get("order_id") or result.get("id")
+                order_id = (
+                    result.get("orderID") or result.get("order_id") or result.get("id")
+                )
                 success = result.get("success", False)
                 if not success:
                     error_msg = result.get("errorMsg", "Unknown error")
@@ -618,7 +632,9 @@ class LiveTradingExecutor:
 
             # 6. Save trade
             saved_trade = await self._trade_repo.save(trade)
-            self._logger.info(f"Sell trade saved: id={saved_trade.id}, order_id={order_id}")
+            self._logger.info(
+                f"Sell trade saved: id={saved_trade.id}, order_id={order_id}"
+            )
 
             # 7. Update or close position
             is_full_sell = shares_to_sell >= actual_shares
@@ -657,7 +673,9 @@ class LiveTradingExecutor:
             # 9. Mark cache as stale (Tech-Spec: Single Source of Truth)
             if self._cache_service:
                 await self._cache_service.mark_stale()
-                self._logger.debug(f"{OPERATION_EMOJIS['data']} Cache marked as stale after sell")
+                self._logger.debug(
+                    f"{OPERATION_EMOJIS['data']} Cache marked as stale after sell"
+                )
 
             self._logger.info(
                 f"{OPERATION_EMOJIS['success']} Sell completed: trade_id={saved_trade.id}, "
@@ -681,10 +699,15 @@ class LiveTradingExecutor:
             )
         except Exception as e:
             error_str = str(e)
-            self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in sell position: {e}")
+            self._logger.error(
+                f"{OPERATION_EMOJIS['error']} Unexpected error in sell position: {e}"
+            )
 
             # Check if market was resolved (orderbook no longer exists)
-            if "orderbook" in error_str.lower() and "does not exist" in error_str.lower():
+            if (
+                "orderbook" in error_str.lower()
+                and "does not exist" in error_str.lower()
+            ):
                 self._logger.warning(
                     f"{OPERATION_EMOJIS['warning']} Market appears to be resolved "
                     f"(orderbook not found), closing position {position.id}"
@@ -695,11 +718,19 @@ class LiveTradingExecutor:
                     # Priority: cur_price > calculated from current_value > avg_price > 0.5
                     if position.cur_price is not None and 0 < position.cur_price < 1:
                         final_price = position.cur_price
-                    elif position.shares > 0 and position.current_value and position.current_value > 0:
+                    elif (
+                        position.shares > 0
+                        and position.current_value
+                        and position.current_value > 0
+                    ):
                         calculated = position.current_value / position.shares
-                        final_price = calculated if 0 < calculated < 1 else position.avg_price
+                        final_price = (
+                            calculated if 0 < calculated < 1 else position.avg_price
+                        )
                     else:
-                        final_price = position.avg_price if 0 < position.avg_price < 1 else 0.5
+                        final_price = (
+                            position.avg_price if 0 < position.avg_price < 1 else 0.5
+                        )
 
                     closed_position = await self._position_manager.close_position(
                         position_id=position.id,

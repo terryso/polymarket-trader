@@ -16,7 +16,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from telegram import User
-from telegram.error import InvalidToken, NetworkError as TelegramNetworkError, TelegramError
+from telegram.error import (
+    InvalidToken,
+    NetworkError as TelegramNetworkError,
+    TelegramError,
+)
 
 from src.api.telegram import TelegramClient
 from src.exceptions import ConfigurationError, NetworkError
@@ -71,9 +75,7 @@ class TestTelegramClientInit:
             assert client._token == "test-token-1234567890:ABC-DEF"
             assert client._chat_id == "123456789"
 
-    def test_init_logs_masked_token(
-        self, mock_settings_enabled: MagicMock
-    ) -> None:
+    def test_init_logs_masked_token(self, mock_settings_enabled: MagicMock) -> None:
         """Test that token is masked in logs."""
         with patch("src.api.telegram.settings", mock_settings_enabled):
             with patch("src.api.telegram.get_logger") as mock_logger:
@@ -145,14 +147,14 @@ class TestTelegramClientInitialize:
     """Tests for initialize method."""
 
     @pytest.mark.asyncio
-    async def test_initialize_success(
-        self, mock_settings_enabled: MagicMock
-    ) -> None:
+    async def test_initialize_success(self, mock_settings_enabled: MagicMock) -> None:
         """Test successful initialization."""
         with patch("src.api.telegram.settings", mock_settings_enabled):
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
                 mock_bot = MagicMock()
                 mock_instance.bot = mock_bot
 
@@ -185,7 +187,9 @@ class TestTelegramClientInitialize:
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
                 mock_instance.initialize.side_effect = InvalidToken()
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
 
                 client = TelegramClient()
                 with pytest.raises(ConfigurationError) as exc_info:
@@ -202,8 +206,12 @@ class TestTelegramClientInitialize:
         with patch("src.api.telegram.settings", mock_settings_enabled):
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
-                mock_instance.initialize.side_effect = TelegramNetworkError("Network failed")
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_instance.initialize.side_effect = TelegramNetworkError(
+                    "Network failed"
+                )
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
 
                 client = TelegramClient()
                 with pytest.raises(NetworkError) as exc_info:
@@ -221,7 +229,9 @@ class TestTelegramClientInitialize:
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
                 mock_instance.initialize.side_effect = TelegramError("API error")
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
 
                 client = TelegramClient()
                 with pytest.raises(NetworkError) as exc_info:
@@ -234,14 +244,14 @@ class TestTelegramClientShutdown:
     """Tests for shutdown method."""
 
     @pytest.mark.asyncio
-    async def test_shutdown_success(
-        self, mock_settings_enabled: MagicMock
-    ) -> None:
+    async def test_shutdown_success(self, mock_settings_enabled: MagicMock) -> None:
         """Test successful shutdown."""
         with patch("src.api.telegram.settings", mock_settings_enabled):
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
 
                 client = TelegramClient()
                 await client.initialize()
@@ -271,7 +281,9 @@ class TestTelegramClientShutdown:
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
                 mock_instance.shutdown.side_effect = Exception("Shutdown error")
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
 
                 client = TelegramClient()
                 await client.initialize()
@@ -292,7 +304,9 @@ class TestTelegramClientContextManager:
         with patch("src.api.telegram.settings", mock_settings_enabled):
             with patch("src.api.telegram.Application") as mock_app:
                 mock_instance = AsyncMock()
-                mock_app.builder.return_value.token.return_value.build.return_value = mock_instance
+                mock_app.builder.return_value.token.return_value.build.return_value = (
+                    mock_instance
+                )
 
                 async with TelegramClient() as client:
                     mock_instance.initialize.assert_called_once()
@@ -334,9 +348,7 @@ class TestTelegramClientGetMe:
             mock_bot.get_me.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_me_not_enabled(
-        self, mock_settings_disabled: MagicMock
-    ) -> None:
+    async def test_get_me_not_enabled(self, mock_settings_disabled: MagicMock) -> None:
         """Test get_me when client not enabled."""
         with patch("src.api.telegram.settings", mock_settings_disabled):
             client = TelegramClient()
@@ -359,9 +371,7 @@ class TestTelegramClientGetMe:
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_me_network_error(
-        self, mock_settings_enabled: MagicMock
-    ) -> None:
+    async def test_get_me_network_error(self, mock_settings_enabled: MagicMock) -> None:
         """Test get_me with network error raises NetworkError."""
         with patch("src.api.telegram.settings", mock_settings_enabled):
             client = TelegramClient()
@@ -397,9 +407,7 @@ class TestTelegramClientGetMe:
 class TestTelegramClientIsAuthorizedChat:
     """Tests for is_authorized_chat method."""
 
-    def test_is_authorized_chat_match(
-        self, mock_settings_enabled: MagicMock
-    ) -> None:
+    def test_is_authorized_chat_match(self, mock_settings_enabled: MagicMock) -> None:
         """Test authorized chat ID matches."""
         with patch("src.api.telegram.settings", mock_settings_enabled):
             client = TelegramClient()
@@ -457,18 +465,14 @@ class TestTelegramClientProperties:
 
             assert client.is_enabled is False
 
-    def test_authorized_chat_id(
-        self, mock_settings_enabled: MagicMock
-    ) -> None:
+    def test_authorized_chat_id(self, mock_settings_enabled: MagicMock) -> None:
         """Test authorized_chat_id property."""
         with patch("src.api.telegram.settings", mock_settings_enabled):
             client = TelegramClient()
 
             assert client.authorized_chat_id == "123456789"
 
-    def test_authorized_chat_id_none(
-        self, mock_settings_disabled: MagicMock
-    ) -> None:
+    def test_authorized_chat_id_none(self, mock_settings_disabled: MagicMock) -> None:
         """Test authorized_chat_id property when None."""
         with patch("src.api.telegram.settings", mock_settings_disabled):
             client = TelegramClient()

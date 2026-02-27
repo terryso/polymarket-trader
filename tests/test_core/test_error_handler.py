@@ -38,7 +38,9 @@ class TestErrorHandler:
 
         assert error_handler._error_counts.get("TradingError") == 1
 
-    def test_handle_exception_unexpected_error(self, error_handler: ErrorHandler) -> None:
+    def test_handle_exception_unexpected_error(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test handling unexpected exceptions."""
         exception = RuntimeError("Unexpected error")
         error_handler.handle_exception(exception, {"task": "test"})
@@ -61,7 +63,9 @@ class TestErrorHandler:
         assert error_handler._error_counts["RuntimeError"] == 2
         assert error_handler._error_counts["ValidationError"] == 1
 
-    def test_handle_exception_records_last_error_time(self, error_handler: ErrorHandler) -> None:
+    def test_handle_exception_records_last_error_time(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test that last error times are recorded."""
         error_handler.handle_exception(RuntimeError("Error"), {})
 
@@ -70,6 +74,7 @@ class TestErrorHandler:
     @pytest.mark.asyncio
     async def test_task_wrapper_success(self, error_handler: ErrorHandler) -> None:
         """Test successful task execution through wrapper."""
+
         @error_handler.task_wrapper("test_task")
         async def successful_task() -> str:
             return "success"
@@ -78,7 +83,9 @@ class TestErrorHandler:
         assert result == "success"
 
     @pytest.mark.asyncio
-    async def test_task_wrapper_retry_on_network_error(self, error_handler: ErrorHandler) -> None:
+    async def test_task_wrapper_retry_on_network_error(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test retry on network errors."""
         call_count = 0
 
@@ -95,8 +102,11 @@ class TestErrorHandler:
         assert call_count == 3
 
     @pytest.mark.asyncio
-    async def test_task_wrapper_max_retries_exceeded(self, error_handler: ErrorHandler) -> None:
+    async def test_task_wrapper_max_retries_exceeded(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test that exception is raised after max retries."""
+
         @error_handler.task_wrapper("test_task", retry_exceptions=(NetworkError,))
         async def always_failing_task() -> str:
             raise NetworkError("Always fails")
@@ -105,8 +115,11 @@ class TestErrorHandler:
             await always_failing_task()
 
     @pytest.mark.asyncio
-    async def test_task_wrapper_non_retry_exception(self, error_handler: ErrorHandler) -> None:
+    async def test_task_wrapper_non_retry_exception(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test that non-retry exceptions are re-raised immediately."""
+
         @error_handler.task_wrapper("test_task", retry_exceptions=(NetworkError,))
         async def non_retry_task() -> str:
             raise ValidationError("Invalid input")
@@ -115,7 +128,9 @@ class TestErrorHandler:
             await non_retry_task()
 
     @pytest.mark.asyncio
-    async def test_task_wrapper_resets_failure_on_success(self, error_handler: ErrorHandler) -> None:
+    async def test_task_wrapper_resets_failure_on_success(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test that failure count is reset on success."""
         # Record a previous failure
         error_handler.alert_manager.record_failure("test_task")
@@ -130,8 +145,11 @@ class TestErrorHandler:
         error_handler.alert_manager.reset_failures.assert_called_with("test_task")
 
     @pytest.mark.asyncio
-    async def test_task_wrapper_records_failure_on_error(self, error_handler: ErrorHandler) -> None:
+    async def test_task_wrapper_records_failure_on_error(
+        self, error_handler: ErrorHandler
+    ) -> None:
         """Test that failure is recorded on non-retry error."""
+
         @error_handler.task_wrapper("test_task", retry_exceptions=(NetworkError,))
         async def failing_task() -> str:
             raise ValidationError("Invalid")
@@ -203,6 +221,7 @@ class TestGetErrorHandler:
         """Test that get creates a handler if one doesn't exist."""
         # Import and reset the global handler
         import src.core.error_handler as eh
+
         eh._global_handler = None
 
         handler = get_error_handler()
@@ -218,6 +237,7 @@ class TestGlobalExceptionHandler:
         original_excepthook = None
         try:
             import sys
+
             original_excepthook = sys.excepthook
 
             setup_global_exception_handler()
@@ -227,6 +247,7 @@ class TestGlobalExceptionHandler:
         finally:
             if original_excepthook:
                 import sys
+
                 sys.excepthook = original_excepthook
 
     def test_setup_async_exception_handler(self) -> None:

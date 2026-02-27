@@ -236,7 +236,9 @@ class AlertManager:
             consecutive_failure_threshold: Failures before escalation
         """
         self.channels = channels or [LogAlertChannel()]
-        self.min_level = min_level.value if isinstance(min_level, AlertLevel) else min_level
+        self.min_level = (
+            min_level.value if isinstance(min_level, AlertLevel) else min_level
+        )
         self.throttle_seconds = throttle_seconds
         self.consecutive_failure_threshold = consecutive_failure_threshold
 
@@ -269,7 +271,9 @@ class AlertManager:
         if self.LEVEL_THRESHOLD.get(level, 0) < self.LEVEL_THRESHOLD.get(
             self.min_level, 1
         ):
-            logger.debug(f"Alert level {level} below minimum {self.min_level}, skipping")
+            logger.debug(
+                f"Alert level {level} below minimum {self.min_level}, skipping"
+            )
             return
 
         # Generate alert key for throttling
@@ -305,7 +309,9 @@ class AlertManager:
         Returns:
             Current consecutive failure count
         """
-        self._consecutive_failures[source] = self._consecutive_failures.get(source, 0) + 1
+        self._consecutive_failures[source] = (
+            self._consecutive_failures.get(source, 0) + 1
+        )
         count = self._consecutive_failures[source]
 
         logger.warning(
@@ -357,7 +363,10 @@ class AlertManager:
         source = context.get("source", "")
 
         # Escalate if consecutive failures exceed threshold
-        if self._consecutive_failures.get(source, 0) >= self.consecutive_failure_threshold:
+        if (
+            self._consecutive_failures.get(source, 0)
+            >= self.consecutive_failure_threshold
+        ):
             return AlertLevel.ERROR.value
 
         # Network/connection errors are errors (check before BotError since NetworkError inherits from it)

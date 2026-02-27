@@ -8,7 +8,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.dashboard.middleware.error_middleware import ErrorMiddleware, setup_exception_handlers
+from src.dashboard.middleware.error_middleware import (
+    ErrorMiddleware,
+    setup_exception_handlers,
+)
 from src.exceptions import (
     BotError,
     ConfigurationError,

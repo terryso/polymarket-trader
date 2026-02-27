@@ -556,7 +556,8 @@ class TestExitChecker:
             current_value=50.0,
             pnl=5.0,
             status=PositionStatus.OPEN,
-            opened_at=datetime.now(timezone.utc) - timedelta(hours=73),  # Would trigger if enabled
+            opened_at=datetime.now(timezone.utc)
+            - timedelta(hours=73),  # Would trigger if enabled
         )
 
         result = await checker.check_exit_conditions(position, sample_market)
@@ -615,7 +616,8 @@ class TestExitChecker:
             current_value=50.0,
             pnl=5.0,
             status=PositionStatus.OPEN,
-            opened_at=datetime.now(timezone.utc) - timedelta(hours=24),  # Exactly 24 hours
+            opened_at=datetime.now(timezone.utc)
+            - timedelta(hours=24),  # Exactly 24 hours
         )
 
         result = await checker.check_exit_conditions(position, sample_market)
@@ -760,7 +762,9 @@ class TestExitChecker:
         assert result.should_exit is False
 
     @pytest.mark.asyncio
-    async def test_signal_exit_no_trade_recommendation(self, sample_market: Market) -> None:
+    async def test_signal_exit_no_trade_recommendation(
+        self, sample_market: Market
+    ) -> None:
         """测试 NO_TRADE 建议时不触发信号退出."""
         config = create_exit_config(
             take_profit_enabled=False,
@@ -792,7 +796,9 @@ class TestExitChecker:
             recommendation=Recommendation.NO_TRADE,
         )
 
-        result = await checker.check_exit_conditions(position, sample_market, prediction)
+        result = await checker.check_exit_conditions(
+            position, sample_market, prediction
+        )
 
         assert result.should_exit is False
 
@@ -829,7 +835,9 @@ class TestExitChecker:
             recommendation=None,  # No recommendation
         )
 
-        result = await checker.check_exit_conditions(position, sample_market, prediction)
+        result = await checker.check_exit_conditions(
+            position, sample_market, prediction
+        )
 
         assert result.should_exit is False
 

@@ -433,9 +433,7 @@ class TestPositionsHandler:
             patch(
                 "src.telegram_commands.handlers.PositionRepository"
             ) as MockPositionRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             # Setup mocks
             mock_position_repo = MagicMock()
@@ -544,9 +542,7 @@ class TestPositionsHandler:
             patch(
                 "src.telegram_commands.handlers.PositionRepository"
             ) as MockPositionRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             # Setup mocks
             mock_position_repo = MagicMock()
@@ -981,9 +977,7 @@ class TestStatsHandler:
             )
 
     @pytest.mark.asyncio
-    async def test_stats_handler_with_predictions(
-        self, mock_update: MagicMock
-    ) -> None:
+    async def test_stats_handler_with_predictions(self, mock_update: MagicMock) -> None:
         """Test stats handler with validated predictions."""
         mock_context = MagicMock()
         mock_context.args = []
@@ -1305,9 +1299,7 @@ class TestMarketsHandler:
         self, mock_update: MagicMock, mock_context: MagicMock
     ) -> None:
         """Test markets handler with default 5 limit."""
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             # Setup mock market repo
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(
@@ -1335,16 +1327,12 @@ class TestMarketsHandler:
             assert call_args.kwargs.get("parse_mode") == "Markdown"
 
     @pytest.mark.asyncio
-    async def test_markets_handler_custom_limit(
-        self, mock_update: MagicMock
-    ) -> None:
+    async def test_markets_handler_custom_limit(self, mock_update: MagicMock) -> None:
         """Test markets handler with custom limit parameter."""
         mock_context = MagicMock()
         mock_context.args = ["10"]
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(return_value=[])
             MockMarketRepo.return_value = mock_market_repo
@@ -1362,9 +1350,7 @@ class TestMarketsHandler:
         mock_context = MagicMock()
         mock_context.args = ["politics"]
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_markets_by_category = AsyncMock(return_value=[])
             MockMarketRepo.return_value = mock_market_repo
@@ -1381,9 +1367,7 @@ class TestMarketsHandler:
         self, mock_update: MagicMock, mock_context: MagicMock
     ) -> None:
         """Test markets handler with no active markets."""
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(return_value=[])
             MockMarketRepo.return_value = mock_market_repo
@@ -1412,9 +1396,7 @@ class TestMarketsHandler:
         self, mock_update: MagicMock, mock_context: MagicMock
     ) -> None:
         """Test markets handler with no chat ID restriction."""
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(return_value=[])
             MockMarketRepo.return_value = mock_market_repo
@@ -1448,9 +1430,7 @@ class TestMarketsHandler:
         mock_context = MagicMock()
         mock_context.args = ["100"]  # Over 20
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(return_value=[])
             MockMarketRepo.return_value = mock_market_repo
@@ -1468,9 +1448,7 @@ class TestMarketsHandler:
         mock_context = MagicMock()
         mock_context.args = ["invalid"]
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(return_value=[])
             MockMarketRepo.return_value = mock_market_repo
@@ -1488,9 +1466,7 @@ class TestMarketsHandler:
         mock_context = MagicMock()
         mock_context.args = ["politics"]
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             # Return mix of active and resolved markets
             mock_market_repo.get_markets_by_category = AsyncMock(
@@ -1530,9 +1506,7 @@ class TestMarketsHandler:
         self, mock_update: MagicMock, mock_context: MagicMock
     ) -> None:
         """Test markets handler sorts markets by liquidity (highest first)."""
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(
                 return_value=[
@@ -1835,12 +1809,8 @@ class TestHistoryHandler:
     ) -> None:
         """Test history handler with default 10 limit."""
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             # Setup mock trade repo
             mock_trade_repo = MagicMock()
@@ -1881,20 +1851,14 @@ class TestHistoryHandler:
             assert call_args.kwargs.get("parse_mode") == "Markdown"
 
     @pytest.mark.asyncio
-    async def test_history_handler_custom_limit(
-        self, mock_update: MagicMock
-    ) -> None:
+    async def test_history_handler_custom_limit(self, mock_update: MagicMock) -> None:
         """Test history handler with custom limit parameter."""
         mock_context = MagicMock()
         mock_context.args = ["20"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(return_value=[])
@@ -1920,12 +1884,8 @@ class TestHistoryHandler:
         mock_context.args = ["paper"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_by_mode = AsyncMock(return_value=[])
@@ -1951,12 +1911,8 @@ class TestHistoryHandler:
         mock_context.args = ["live"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_by_mode = AsyncMock(return_value=[])
@@ -1979,12 +1935,8 @@ class TestHistoryHandler:
     ) -> None:
         """Test history handler with no trades."""
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(return_value=[])
@@ -2018,12 +1970,8 @@ class TestHistoryHandler:
     ) -> None:
         """Test history handler with no chat ID restriction."""
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(return_value=[])
@@ -2062,12 +2010,8 @@ class TestHistoryHandler:
         mock_context.args = ["100"]  # Over 50
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(return_value=[])
@@ -2093,12 +2037,8 @@ class TestHistoryHandler:
         mock_context.args = ["0"]  # Below 1
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(return_value=[])
@@ -2124,12 +2064,8 @@ class TestHistoryHandler:
         mock_context.args = ["invalid"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(return_value=[])
@@ -2155,12 +2091,8 @@ class TestHistoryHandler:
         mock_context.args = ["5", "paper"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_by_mode = AsyncMock(return_value=[])
@@ -2181,12 +2113,8 @@ class TestHistoryHandler:
     ) -> None:
         """Test history handler when market is not found."""
         with (
-            patch(
-                "src.telegram_commands.handlers.TradeRepository"
-            ) as MockTradeRepo,
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.TradeRepository") as MockTradeRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
         ):
             mock_trade_repo = MagicMock()
             mock_trade_repo.get_recent = AsyncMock(
@@ -2470,9 +2398,7 @@ class TestPredictHandler:
         self, mock_update: MagicMock, mock_context: MagicMock
     ) -> None:
         """Test predict handler without args shows market list."""
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(
                 return_value=[
@@ -2503,9 +2429,7 @@ class TestPredictHandler:
         mock_context.args = ["2"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
             patch("src.telegram_commands.handlers.LLMAnalyzer") as MockAnalyzer,
             patch("src.telegram_commands.handlers.settings") as mock_settings,
         ):
@@ -2554,9 +2478,7 @@ class TestPredictHandler:
         mock_context.args = ["market-abc123"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
             patch("src.telegram_commands.handlers.LLMAnalyzer") as MockAnalyzer,
             patch("src.telegram_commands.handlers.settings") as mock_settings,
         ):
@@ -2603,9 +2525,7 @@ class TestPredictHandler:
         mock_context = MagicMock()
         mock_context.args = ["nonexistent"]
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_market = AsyncMock(return_value=None)
             MockMarketRepo.return_value = mock_market_repo
@@ -2638,9 +2558,7 @@ class TestPredictHandler:
         mock_context = MagicMock()
         mock_context.args = ["100"]
 
-        with patch(
-            "src.telegram_commands.handlers.MarketRepository"
-        ) as MockMarketRepo:
+        with patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo:
             mock_market_repo = MagicMock()
             mock_market_repo.get_active_markets = AsyncMock(
                 return_value=[
@@ -2669,9 +2587,7 @@ class TestPredictHandler:
         assert "*未授权访问*" in call_args
 
     @pytest.mark.asyncio
-    async def test_predict_handler_analysis_error(
-        self, mock_update: MagicMock
-    ) -> None:
+    async def test_predict_handler_analysis_error(self, mock_update: MagicMock) -> None:
         """Test predict handler when analysis fails."""
         from src.analysis import AnalysisError
 
@@ -2679,9 +2595,7 @@ class TestPredictHandler:
         mock_context.args = ["market-1"]
 
         with (
-            patch(
-                "src.telegram_commands.handlers.MarketRepository"
-            ) as MockMarketRepo,
+            patch("src.telegram_commands.handlers.MarketRepository") as MockMarketRepo,
             patch("src.telegram_commands.handlers.LLMAnalyzer") as MockAnalyzer,
         ):
             # Setup mock market repo
@@ -3022,9 +2936,11 @@ class TestEnableDisableHandlers:
         """Create a mock state manager."""
         manager = MagicMock()
         manager.set_trading_enabled = AsyncMock()
-        manager.get_state = AsyncMock(return_value=MagicMock(
-            trading_enabled=True,
-        ))
+        manager.get_state = AsyncMock(
+            return_value=MagicMock(
+                trading_enabled=True,
+            )
+        )
         return manager
 
     @pytest.fixture
@@ -3106,9 +3022,11 @@ class TestModeHandler:
         """Create a mock state manager."""
         manager = MagicMock()
         manager.set_mode = AsyncMock()
-        manager.get_state = AsyncMock(return_value=MagicMock(
-            trading_enabled=True,
-        ))
+        manager.get_state = AsyncMock(
+            return_value=MagicMock(
+                trading_enabled=True,
+            )
+        )
         return manager
 
     @pytest.fixture
@@ -3585,9 +3503,11 @@ class TestModeHandlerEdgeCases:
         """Create a mock state manager."""
         manager = MagicMock()
         manager.set_mode = AsyncMock()
-        manager.get_state = AsyncMock(return_value=MagicMock(
-            trading_enabled=True,
-        ))
+        manager.get_state = AsyncMock(
+            return_value=MagicMock(
+                trading_enabled=True,
+            )
+        )
         return manager
 
     @pytest.mark.asyncio

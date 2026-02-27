@@ -40,7 +40,9 @@ class TestExitReasonMapping:
 
     def test_unknown_reason_falls_back_to_original(self) -> None:
         """Test unknown reason returns original value."""
-        assert EXIT_REASON_MAP.get("unknown_reason", "unknown_reason") == "unknown_reason"
+        assert (
+            EXIT_REASON_MAP.get("unknown_reason", "unknown_reason") == "unknown_reason"
+        )
 
 
 class TestExitNotification:

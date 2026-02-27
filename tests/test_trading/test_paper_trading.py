@@ -388,7 +388,9 @@ class TestPaperTradingExecutor:
 
         mock_position_manager = AsyncMock()
         # Tech-Spec: First check for existing position via API
-        mock_position_manager.get_position_by_market_from_api = AsyncMock(return_value=None)
+        mock_position_manager.get_position_by_market_from_api = AsyncMock(
+            return_value=None
+        )
         # Then open_position throws
         mock_position_manager.open_position.side_effect = TradingError(
             "Position already exists"

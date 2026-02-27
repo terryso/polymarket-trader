@@ -41,9 +41,7 @@ def client(mock_settings: MagicMock) -> Generator[TestClient, None, None]:
     """Create test client with mocked dependencies."""
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
-            with patch(
-                "src.dashboard.routes.settings.settings", mock_settings
-            ):
+            with patch("src.dashboard.routes.settings.settings", mock_settings):
                 from src.dashboard.app import app
 
                 with TestClient(app, raise_server_exceptions=False) as c:
@@ -95,14 +93,27 @@ class TestGetExitStrategyConfig:
         assert "exit_check_interval_minutes" in config
 
         # Verify values match mock
-        assert config["take_profit_enabled"] == mock_exit_strategy_settings.take_profit_enabled
+        assert (
+            config["take_profit_enabled"]
+            == mock_exit_strategy_settings.take_profit_enabled
+        )
         assert config["take_profit_pct"] == mock_exit_strategy_settings.take_profit_pct
-        assert config["stop_loss_enabled"] == mock_exit_strategy_settings.stop_loss_enabled
+        assert (
+            config["stop_loss_enabled"] == mock_exit_strategy_settings.stop_loss_enabled
+        )
         assert config["stop_loss_pct"] == mock_exit_strategy_settings.stop_loss_pct
-        assert config["time_exit_enabled"] == mock_exit_strategy_settings.time_exit_enabled
+        assert (
+            config["time_exit_enabled"] == mock_exit_strategy_settings.time_exit_enabled
+        )
         assert config["time_exit_hours"] == mock_exit_strategy_settings.time_exit_hours
-        assert config["signal_exit_enabled"] == mock_exit_strategy_settings.signal_exit_enabled
-        assert config["exit_check_interval_minutes"] == mock_exit_strategy_settings.exit_check_interval_minutes
+        assert (
+            config["signal_exit_enabled"]
+            == mock_exit_strategy_settings.signal_exit_enabled
+        )
+        assert (
+            config["exit_check_interval_minutes"]
+            == mock_exit_strategy_settings.exit_check_interval_minutes
+        )
 
     def test_get_exit_strategy_config_no_error(
         self,

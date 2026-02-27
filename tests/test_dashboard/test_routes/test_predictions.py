@@ -26,6 +26,7 @@ from src.storage.repositories.prediction_repo import (
 @pytest.fixture
 def sample_market():
     """Create a sample market for testing."""
+
     @dataclass
     class MockMarket:
         id: str
@@ -33,7 +34,9 @@ def sample_market():
         slug: str
         yes_price: float | None = None
 
-    return MockMarket(id="market-001", title="Test Market?", slug="test-market", yes_price=0.65)
+    return MockMarket(
+        id="market-001", title="Test Market?", slug="test-market", yes_price=0.65
+    )
 
 
 @pytest.fixture
@@ -46,7 +49,10 @@ def sample_predictions(sample_market) -> list[Prediction]:
             predicted_probability=0.72,
             confidence=0.85,
             reasoning="Strong technical indicators suggest upward momentum",
-            key_assumptions=["Market sentiment remains positive", "No major regulatory changes"],
+            key_assumptions=[
+                "Market sentiment remains positive",
+                "No major regulatory changes",
+            ],
             model_used="glm-4",
             recommendation=Recommendation.BUY_YES,
             actual_outcome=None,
@@ -106,7 +112,9 @@ def mock_prediction_repo(sample_predictions, sample_market) -> MagicMock:
     repo.get_predictions_with_outcome = AsyncMock(return_value=mock_result)
     repo.get_validated_with_market = AsyncMock(return_value=prediction_market_tuples)
     repo.get_all = AsyncMock(return_value=sample_predictions)
-    repo.get_by_id = AsyncMock(return_value=sample_predictions[0] if sample_predictions else None)
+    repo.get_by_id = AsyncMock(
+        return_value=sample_predictions[0] if sample_predictions else None
+    )
     return repo
 
 
@@ -115,13 +123,16 @@ def client(mock_prediction_repo: MagicMock) -> Generator[TestClient, None, None]
     """Create test client with mocked dependencies."""
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
+
             def mock_get_prediction_repository() -> MagicMock:
                 return mock_prediction_repo
 
             from src.dashboard.app import app
             from src.dashboard.routes.predictions import get_prediction_repository
 
-            app.dependency_overrides[get_prediction_repository] = mock_get_prediction_repository
+            app.dependency_overrides[get_prediction_repository] = (
+                mock_get_prediction_repository
+            )
 
             with TestClient(app, raise_server_exceptions=False) as c:
                 yield c
@@ -133,14 +144,20 @@ class TestListPredictions:
     """Tests for GET /api/predictions endpoint."""
 
     def test_list_predictions_returns_200(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test list endpoint returns 200."""
         response = client.get("/api/predictions")
         assert response.status_code == 200
 
     def test_list_predictions_format(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test response format."""
         response = client.get("/api/predictions")
@@ -152,7 +169,10 @@ class TestListPredictions:
         assert isinstance(data["data"], list)
 
     def test_list_predictions_pagination(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test pagination functionality."""
         response = client.get("/api/predictions?page=1&per_page=10")
@@ -161,11 +181,19 @@ class TestListPredictions:
         assert data["meta"]["per_page"] == 10
 
     def test_list_predictions_validated_filter(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction], sample_market
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
+        sample_market,
     ) -> None:
         """Test validated filter."""
-        validated_predictions = [(p, sample_market) for p in sample_predictions if p.is_correct is not None]
-        mock_prediction_repo.get_validated_with_market.return_value = validated_predictions
+        validated_predictions = [
+            (p, sample_market) for p in sample_predictions if p.is_correct is not None
+        ]
+        mock_prediction_repo.get_validated_with_market.return_value = (
+            validated_predictions
+        )
 
         response = client.get("/api/predictions?validated=true")
         assert response.status_code == 200
@@ -173,10 +201,16 @@ class TestListPredictions:
         assert data["success"] is True
 
     def test_list_predictions_unvalidated_filter(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction], sample_market
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
+        sample_market,
     ) -> None:
         """Test unvalidated filter."""
-        unvalidated_tuples = [(p, sample_market) for p in sample_predictions if p.is_correct is None]
+        unvalidated_tuples = [
+            (p, sample_market) for p in sample_predictions if p.is_correct is None
+        ]
         mock_result = PredictionQueryResult(
             predictions=unvalidated_tuples,
             total=len(unvalidated_tuples),
@@ -216,7 +250,9 @@ class TestListPredictions:
 class TestGetPrediction:
     """Tests for GET /api/predictions/{prediction_id} endpoint."""
 
-    def test_get_prediction_404(self, client: TestClient, mock_prediction_repo: MagicMock) -> None:
+    def test_get_prediction_404(
+        self, client: TestClient, mock_prediction_repo: MagicMock
+    ) -> None:
         """Test prediction not found returns 404."""
         mock_prediction_repo.get_by_id.return_value = None
         response = client.get("/api/predictions/99999")
@@ -225,7 +261,10 @@ class TestGetPrediction:
         assert data["detail"]["error"]["code"] == "NOT_FOUND"
 
     def test_get_prediction_success(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test successful prediction retrieval."""
         prediction = sample_predictions[0]
@@ -240,7 +279,10 @@ class TestGetPrediction:
         assert data["data"]["confidence"] == 0.85
 
     def test_get_prediction_includes_all_fields(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test that detail endpoint includes all fields."""
         prediction = sample_predictions[0]
@@ -256,7 +298,10 @@ class TestGetAccuracy:
     """Tests for GET /api/predictions/accuracy endpoint."""
 
     def test_get_accuracy_returns_200(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test accuracy endpoint returns 200."""
         mock_prediction_repo.get_all.return_value = sample_predictions
@@ -264,7 +309,10 @@ class TestGetAccuracy:
         assert response.status_code == 200
 
     def test_get_accuracy_format(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test response format."""
         mock_prediction_repo.get_all.return_value = sample_predictions
@@ -276,7 +324,10 @@ class TestGetAccuracy:
         assert "accuracy" in data["data"]
 
     def test_get_accuracy_calculation(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test accuracy calculation."""
         mock_prediction_repo.get_all.return_value = sample_predictions
@@ -301,7 +352,10 @@ class TestGetAccuracy:
         assert data["data"]["avg_confidence"] == 0.0
 
     def test_get_accuracy_avg_confidence(
-        self, client: TestClient, mock_prediction_repo: MagicMock, sample_predictions: list[Prediction]
+        self,
+        client: TestClient,
+        mock_prediction_repo: MagicMock,
+        sample_predictions: list[Prediction],
     ) -> None:
         """Test average confidence calculation."""
         mock_prediction_repo.get_all.return_value = sample_predictions

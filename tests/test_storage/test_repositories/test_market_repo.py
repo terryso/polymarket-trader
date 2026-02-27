@@ -98,9 +98,7 @@ class TestMarketRepository:
         import aiosqlite
 
         mock_conn = AsyncMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -206,9 +204,7 @@ class TestMarketRepository:
     # ==================== update_last_fetch_time tests ====================
 
     @pytest.mark.asyncio
-    async def test_update_last_fetch_time_success(
-        self, repo: MarketRepository
-    ) -> None:
+    async def test_update_last_fetch_time_success(self, repo: MarketRepository) -> None:
         """Test successful update of last fetch time."""
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock()
@@ -232,9 +228,7 @@ class TestMarketRepository:
         import aiosqlite
 
         mock_conn = AsyncMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -258,9 +252,9 @@ class TestMarketRepository:
             "id": sample_market.id,
             "title": sample_market.title,
             "description": sample_market.description,
-            "category": sample_market.category.value
-            if sample_market.category
-            else None,
+            "category": (
+                sample_market.category.value if sample_market.category else None
+            ),
             "yes_price": sample_market.yes_price,
             "no_price": sample_market.no_price,
             "liquidity": sample_market.liquidity,
@@ -330,9 +324,7 @@ class TestMarketRepository:
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_all_markets_with_limit(
-        self, repo: MarketRepository
-    ) -> None:
+    async def test_get_all_markets_with_limit(self, repo: MarketRepository) -> None:
         """Test retrieving markets with limit using parameterized query."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchall = AsyncMock(return_value=[])
@@ -380,9 +372,7 @@ class TestMarketRepository:
             assert isinstance(result, datetime)
 
     @pytest.mark.asyncio
-    async def test_get_last_fetch_time_not_found(
-        self, repo: MarketRepository
-    ) -> None:
+    async def test_get_last_fetch_time_not_found(self, repo: MarketRepository) -> None:
         """Test retrieving last fetch time when not set."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchone = AsyncMock(return_value=None)
@@ -409,9 +399,7 @@ class TestMarketRepository:
 
         mock_conn = AsyncMock()
         mock_conn.row_factory = MagicMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -424,17 +412,13 @@ class TestMarketRepository:
             assert exc_info.value.operation == "get_market"
 
     @pytest.mark.asyncio
-    async def test_get_all_markets_database_error(
-        self, repo: MarketRepository
-    ) -> None:
+    async def test_get_all_markets_database_error(self, repo: MarketRepository) -> None:
         """Test that database errors in get_all_markets are properly wrapped."""
         import aiosqlite
 
         mock_conn = AsyncMock()
         mock_conn.row_factory = MagicMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -455,9 +439,7 @@ class TestMarketRepository:
 
         mock_conn = AsyncMock()
         mock_conn.row_factory = MagicMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -480,9 +462,7 @@ class TestMarketRepository:
 
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock()
-        mock_conn.commit = AsyncMock(
-            side_effect=aiosqlite.Error("Commit failed")
-        )
+        mock_conn.commit = AsyncMock(side_effect=aiosqlite.Error("Commit failed"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -529,9 +509,7 @@ class TestMarketRepository:
 
         mock_conn = AsyncMock()
         mock_conn.row_factory = MagicMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -601,9 +579,7 @@ class TestMarketRepository:
 
         mock_conn = AsyncMock()
         mock_conn.row_factory = MagicMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -669,9 +645,7 @@ class TestMarketRepository:
         import aiosqlite
 
         mock_conn = AsyncMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"
@@ -838,6 +812,7 @@ class TestMarketRepository:
         mock_rows = []
         for i in range(3):
             mock_row = MagicMock()
+
             # Use closure to capture the value of i
             def make_getitem(idx: int) -> callable:
                 def getitem(self, key: str) -> any:
@@ -855,7 +830,9 @@ class TestMarketRepository:
                         "created_at": None,
                         "updated_at": None,
                     }[key]
+
                 return getitem
+
             mock_row.__getitem__ = make_getitem(i)
             mock_rows.append(mock_row)
 
@@ -1012,9 +989,7 @@ class TestMarketRepository:
     # ==================== get_resolved_markets tests ====================
 
     @pytest.mark.asyncio
-    async def test_get_resolved_markets_success(
-        self, repo: MarketRepository
-    ) -> None:
+    async def test_get_resolved_markets_success(self, repo: MarketRepository) -> None:
         """Test retrieving resolved markets."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchall = AsyncMock(return_value=[])
@@ -1083,9 +1058,7 @@ class TestMarketRepository:
 
         mock_conn = AsyncMock()
         mock_conn.row_factory = MagicMock()
-        mock_conn.execute = AsyncMock(
-            side_effect=aiosqlite.Error("Database error")
-        )
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
 
         with patch(
             "src.storage.repositories.market_repo.get_connection"

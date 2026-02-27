@@ -14,7 +14,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.models.position import CacheFreshness, Position, PositionOutcome, PositionStatus
+from src.models.position import (
+    CacheFreshness,
+    Position,
+    PositionOutcome,
+    PositionStatus,
+)
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 
 
@@ -89,6 +94,7 @@ def client(mock_position_repo: MagicMock) -> Generator[TestClient, None, None]:
 
     # Reset PositionCacheService singleton to ensure clean state
     from src.trading.position_sync import PositionCacheService
+
     PositionCacheService._reset_instance()
 
     # Patch init_db and close_db to avoid database operations
@@ -103,7 +109,9 @@ def client(mock_position_repo: MagicMock) -> Generator[TestClient, None, None]:
             from src.dashboard.routes.positions import get_position_repository
 
             # Override the dependency
-            app.dependency_overrides[get_position_repository] = mock_get_position_repository
+            app.dependency_overrides[get_position_repository] = (
+                mock_get_position_repository
+            )
 
             # Mock PositionCacheService.get_positions to return empty list by default
             mock_cache_status = MagicMock()
@@ -193,7 +201,9 @@ class TestListPositions:
         from src.models.position import CacheFreshness
 
         # Mock the PositionCacheService - patch at module level where it's imported
-        with patch("src.trading.position_sync.PositionCacheService") as mock_cache_service:
+        with patch(
+            "src.trading.position_sync.PositionCacheService"
+        ) as mock_cache_service:
             mock_instance = MagicMock()
             mock_instance.get_positions = AsyncMock(
                 return_value=(sample_positions, CacheFreshness.FRESH)
@@ -387,6 +397,7 @@ def client_with_both_repos(
     """Create test client with mocked position and trade repositories."""
     with patch("src.dashboard.app.init_db", new_callable=AsyncMock):
         with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
+
             def mock_get_position_repository() -> MagicMock:
                 return mock_position_repo
 
@@ -399,7 +410,9 @@ def client_with_both_repos(
                 get_trade_repository,
             )
 
-            app.dependency_overrides[get_position_repository] = mock_get_position_repository
+            app.dependency_overrides[get_position_repository] = (
+                mock_get_position_repository
+            )
             app.dependency_overrides[get_trade_repository] = mock_get_trade_repository
 
             with TestClient(app, raise_server_exceptions=False) as c:

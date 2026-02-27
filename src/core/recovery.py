@@ -151,7 +151,9 @@ class RecoveryManager:
 
             # 3. Validate positions if repository available
             if self.position_repo:
-                position_warnings = await self._validate_positions(result.recovered_state)
+                position_warnings = await self._validate_positions(
+                    result.recovered_state
+                )
                 result.warnings.extend(position_warnings)
 
             # 4. Check consistency
@@ -224,10 +226,14 @@ class RecoveryManager:
                 balance_result = await asyncio.to_thread(client.get_wallet_balance)
                 if balance_result.is_success:
                     balance = balance_result.usdc_balance
-                    logger.info(f"Fetched Polymarket wallet balance: ${balance:.2f} USDC")
+                    logger.info(
+                        f"Fetched Polymarket wallet balance: ${balance:.2f} USDC"
+                    )
                     return balance
                 else:
-                    logger.warning(f"Failed to get wallet balance: {balance_result.error}")
+                    logger.warning(
+                        f"Failed to get wallet balance: {balance_result.error}"
+                    )
                     return None
             finally:
                 client.close()

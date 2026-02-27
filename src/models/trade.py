@@ -134,7 +134,8 @@ class Trade(BaseModel):
         default=None, description="Polymarket order ID (for synced trades)"
     )
     exit_type: str | None = Field(
-        default=None, description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)"
+        default=None,
+        description="Exit type (take_profit, stop_loss, time_exit, signal_exit, manual)",
     )
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
 

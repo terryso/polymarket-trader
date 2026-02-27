@@ -70,6 +70,7 @@ def _create_trade_with_today_timestamp(
         created_at=datetime.now(timezone.utc),
     )
 
+
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
 

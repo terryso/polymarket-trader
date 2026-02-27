@@ -249,7 +249,9 @@ class DatabaseManager:
 
                 # Migration: Add cur_price column if it doesn't exist
                 try:
-                    await conn.execute("ALTER TABLE positions ADD COLUMN cur_price REAL")
+                    await conn.execute(
+                        "ALTER TABLE positions ADD COLUMN cur_price REAL"
+                    )
                 except Exception:
                     pass  # Column already exists, ignore error
 
@@ -343,9 +345,7 @@ class DatabaseManager:
 
                 # Migration: Add exit_type column (Story 10.6)
                 try:
-                    await conn.execute(
-                        "ALTER TABLE trades ADD COLUMN exit_type TEXT"
-                    )
+                    await conn.execute("ALTER TABLE trades ADD COLUMN exit_type TEXT")
                     logger.info("📊 Added exit_type column to trades table")
                 except aiosqlite.OperationalError:
                     # Column already exists, ignore

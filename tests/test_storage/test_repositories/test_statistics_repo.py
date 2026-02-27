@@ -139,9 +139,7 @@ class TestStatisticsRepository:
         assert result.mode == TradeMode.PAPER
 
     @pytest.mark.asyncio
-    async def test_get_by_date_not_found(
-        self, repo: StatisticsRepository
-    ) -> None:
+    async def test_get_by_date_not_found(self, repo: StatisticsRepository) -> None:
         """Test get_by_date when record does not exist."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchone = AsyncMock(return_value=None)
@@ -163,9 +161,7 @@ class TestStatisticsRepository:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_by_date_range(
-        self, repo: StatisticsRepository
-    ) -> None:
+    async def test_get_by_date_range(self, repo: StatisticsRepository) -> None:
         """Test get_by_date_range returns statistics in order."""
         today = date.today()
         yesterday = today - timedelta(days=1)
@@ -202,9 +198,7 @@ class TestStatisticsRepository:
             "src.storage.repositories.statistics_repo.get_connection",
             return_value=mock_conn,
         ):
-            result = await repo.get_by_date_range(
-                yesterday, today, TradeMode.PAPER
-            )
+            result = await repo.get_by_date_range(yesterday, today, TradeMode.PAPER)
 
         assert len(result) == 2
         # Results should be ordered by date ascending
@@ -212,9 +206,7 @@ class TestStatisticsRepository:
         assert result[1].date == today
 
     @pytest.mark.asyncio
-    async def test_get_by_date_range_empty(
-        self, repo: StatisticsRepository
-    ) -> None:
+    async def test_get_by_date_range_empty(self, repo: StatisticsRepository) -> None:
         """Test get_by_date_range when no records found."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchall = AsyncMock(return_value=[])
@@ -280,9 +272,7 @@ class TestStatisticsRepository:
         assert result[1].date == yesterday
 
     @pytest.mark.asyncio
-    async def test_get_latest_with_limit(
-        self, repo: StatisticsRepository
-    ) -> None:
+    async def test_get_latest_with_limit(self, repo: StatisticsRepository) -> None:
         """Test get_latest respects the limit parameter."""
         mock_cursor = AsyncMock()
         mock_cursor.fetchall = AsyncMock(return_value=[])

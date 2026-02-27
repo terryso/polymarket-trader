@@ -458,9 +458,7 @@ class TestDailyStatisticsTask:
     async def test_daily_statistics_task_failure(self) -> None:
         """Test daily statistics task handles errors gracefully."""
         mock_state = Mock()
-        mock_state.get_state = AsyncMock(
-            side_effect=Exception("State Error")
-        )
+        mock_state.get_state = AsyncMock(side_effect=Exception("State Error"))
 
         # Should not raise exception
         await _daily_statistics_task(
@@ -487,16 +485,15 @@ class TestValidatePredictionsTask:
     @pytest.mark.asyncio
     async def test_validate_predictions_task_creates_tracker_if_none(self) -> None:
         """Test prediction validation task creates tracker if not provided."""
-        with patch(
-            "src.analysis.prediction_tracker.PredictionTracker"
-        ) as MockTracker:
+        with patch("src.analysis.prediction_tracker.PredictionTracker") as MockTracker:
             mock_tracker = Mock()
             mock_tracker.check_resolved_markets = AsyncMock(return_value=[])
             MockTracker.return_value = mock_tracker
 
-            with patch(
-                "src.storage.repositories.market_repo.MarketRepository"
-            ), patch("src.storage.repositories.prediction_repo.PredictionRepository"):
+            with (
+                patch("src.storage.repositories.market_repo.MarketRepository"),
+                patch("src.storage.repositories.prediction_repo.PredictionRepository"),
+            ):
                 await _validate_predictions_task(prediction_tracker=None)
 
                 MockTracker.assert_called_once()

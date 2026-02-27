@@ -8,10 +8,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exceptions import BotError, DatabaseError, NetworkError, RateLimitError, RequestTimeoutError
+from src.exceptions import (
+    BotError,
+    DatabaseError,
+    NetworkError,
+    RateLimitError,
+    RequestTimeoutError,
+)
 from src.models import Market, MarketCategory
 from src.storage.market_fetcher import MarketFetcher
-
 
 # Category mapping matching src.api.polymarket.PolymarketClient._map_category()
 _CATEGORY_MAP: dict[str, MarketCategory] = {
@@ -80,9 +85,7 @@ class TestMarketFetcher:
         return repo
 
     @pytest.fixture
-    def fetcher(
-        self, mock_client: MagicMock, mock_repo: AsyncMock
-    ) -> MarketFetcher:
+    def fetcher(self, mock_client: MagicMock, mock_repo: AsyncMock) -> MarketFetcher:
         """Create a MarketFetcher with mocked dependencies."""
         return MarketFetcher(client=mock_client, repo=mock_repo)
 
@@ -151,9 +154,7 @@ class TestMarketFetcher:
         mock_client.get_active_markets.return_value = sample_gamma_markets
         mock_repo.save_markets.return_value = 2
 
-        count = await fetcher.fetch_and_store_markets(
-            limit=50, min_liquidity=10000.0
-        )
+        count = await fetcher.fetch_and_store_markets(limit=50, min_liquidity=10000.0)
 
         assert count == 2
         mock_client.get_active_markets.assert_called_once_with(
@@ -268,9 +269,7 @@ class TestMarketFetcher:
         mock_repo: AsyncMock,
     ) -> None:
         """Test handling of unexpected errors."""
-        mock_client.get_active_markets.side_effect = RuntimeError(
-            "Unexpected error"
-        )
+        mock_client.get_active_markets.side_effect = RuntimeError("Unexpected error")
 
         with pytest.raises(BotError) as exc_info:
             await fetcher.fetch_and_store_markets()
@@ -281,9 +280,7 @@ class TestMarketFetcher:
 
     def test_init_with_defaults(self) -> None:
         """Test initialization with default dependencies."""
-        with patch(
-            "src.storage.market_fetcher.PolymarketClient"
-        ) as mock_client_class:
+        with patch("src.storage.market_fetcher.PolymarketClient") as mock_client_class:
             with patch(
                 "src.storage.market_fetcher.MarketRepository"
             ) as mock_repo_class:

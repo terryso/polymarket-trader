@@ -105,10 +105,15 @@ class TestApplicationInitialize:
             recovered_state={"current_capital": 200.0, "trading_enabled": True},
         )
 
-        with patch("src.main.setup_logging") as mock_setup_logging, \
-             patch("src.main.init_db", new_callable=AsyncMock) as mock_init_db, \
-             patch("src.core.state.ThreadSafeState.load_from_storage", new_callable=AsyncMock) as mock_load, \
-             patch("src.core.scheduler.Scheduler") as mock_scheduler_class:
+        with (
+            patch("src.main.setup_logging") as mock_setup_logging,
+            patch("src.main.init_db", new_callable=AsyncMock) as mock_init_db,
+            patch(
+                "src.core.state.ThreadSafeState.load_from_storage",
+                new_callable=AsyncMock,
+            ) as mock_load,
+            patch("src.core.scheduler.Scheduler") as mock_scheduler_class,
+        ):
             mock_load.return_value = mock_recovery_result
             mock_scheduler_class.return_value = MagicMock()
 
@@ -145,8 +150,10 @@ class TestApplicationStartDashboard:
         """Test dashboard startup."""
         app = Application(mode="paper")
 
-        with patch("uvicorn.Server") as mock_server_class, \
-             patch("uvicorn.Config") as mock_config_class:
+        with (
+            patch("uvicorn.Server") as mock_server_class,
+            patch("uvicorn.Config") as mock_config_class,
+        ):
             mock_server = MagicMock()
             mock_server.serve = AsyncMock()
             mock_server_class.return_value = mock_server
@@ -178,8 +185,10 @@ class TestApplicationRegisterScheduledTasks:
         app.scheduler = mock_scheduler
         app.state = MagicMock()
 
-        with patch("apscheduler.triggers.interval.IntervalTrigger") as mock_interval, \
-             patch("apscheduler.triggers.cron.CronTrigger") as mock_cron:
+        with (
+            patch("apscheduler.triggers.interval.IntervalTrigger") as mock_interval,
+            patch("apscheduler.triggers.cron.CronTrigger") as mock_cron,
+        ):
             mock_interval.return_value = MagicMock()
             mock_cron.return_value = MagicMock()
 
@@ -420,14 +429,20 @@ class TestApplicationStart:
             if app._shutdown_event:
                 app._shutdown_event.set()
 
-        with patch.object(app, "_check_existing_instance") as mock_check, \
-             patch.object(app, "initialize", new_callable=AsyncMock) as mock_init, \
-             patch.object(app, "_write_pid_file") as mock_write_pid, \
-             patch.object(app, "start_dashboard", new_callable=AsyncMock) as mock_dash, \
-             patch.object(app, "register_scheduled_tasks", new_callable=AsyncMock) as mock_reg, \
-             patch.object(app, "run_initial_analysis", new_callable=AsyncMock) as mock_analysis, \
-             patch.object(app, "_setup_signal_handlers") as mock_signals, \
-             patch.object(app, "shutdown", new_callable=AsyncMock):
+        with (
+            patch.object(app, "_check_existing_instance") as mock_check,
+            patch.object(app, "initialize", new_callable=AsyncMock) as mock_init,
+            patch.object(app, "_write_pid_file") as mock_write_pid,
+            patch.object(app, "start_dashboard", new_callable=AsyncMock) as mock_dash,
+            patch.object(
+                app, "register_scheduled_tasks", new_callable=AsyncMock
+            ) as mock_reg,
+            patch.object(
+                app, "run_initial_analysis", new_callable=AsyncMock
+            ) as mock_analysis,
+            patch.object(app, "_setup_signal_handlers") as mock_signals,
+            patch.object(app, "shutdown", new_callable=AsyncMock),
+        ):
             app.scheduler = MagicMock()
             app.scheduler.is_running = False
             app.scheduler.start = MagicMock()
@@ -577,13 +592,17 @@ class TestIntegration:
         mock_server = MagicMock()
         mock_server.serve = AsyncMock()
 
-        with patch.object(app, "_check_existing_instance"), \
-             patch("src.main.init_db", new_callable=AsyncMock), \
-             patch("src.core.state.ThreadSafeState.restore", new_callable=AsyncMock) as mock_restore, \
-             patch("src.core.scheduler.Scheduler") as mock_scheduler_class, \
-             patch("uvicorn.Server", return_value=mock_server), \
-             patch("uvicorn.Config"), \
-             patch("src.main.close_db", new_callable=AsyncMock):
+        with (
+            patch.object(app, "_check_existing_instance"),
+            patch("src.main.init_db", new_callable=AsyncMock),
+            patch(
+                "src.core.state.ThreadSafeState.restore", new_callable=AsyncMock
+            ) as mock_restore,
+            patch("src.core.scheduler.Scheduler") as mock_scheduler_class,
+            patch("uvicorn.Server", return_value=mock_server),
+            patch("uvicorn.Config"),
+            patch("src.main.close_db", new_callable=AsyncMock),
+        ):
             # Setup mocks
             mock_restore.return_value = MagicMock()
             mock_restore.return_value.persist = AsyncMock()

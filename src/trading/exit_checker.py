@@ -177,7 +177,9 @@ class ExitChecker:
         # No exit condition triggered
         self.logger.debug(
             f"🔍 No exit conditions triggered for position {position.id}, "
-            f"pnl_pct={pnl_pct:.2%}" if pnl_pct is not None else "pnl_pct=None"
+            f"pnl_pct={pnl_pct:.2%}"
+            if pnl_pct is not None
+            else "pnl_pct=None"
         )
         return self._no_exit(position, pnl_pct)
 
@@ -197,7 +199,9 @@ class ExitChecker:
             return None
         if position.current_value is None:
             return None
-        return (position.current_value - position.initial_value) / position.initial_value
+        return (
+            position.current_value - position.initial_value
+        ) / position.initial_value
 
     def _check_take_profit(
         self, position: Position, pnl_pct: float | None
@@ -418,8 +422,7 @@ class ExitChecker:
                 exit_count += 1
 
         self.logger.info(
-            f"🔍 批量检查完成: 检查 {checked_count} 个持仓, "
-            f"{exit_count} 个触发退出"
+            f"🔍 批量检查完成: 检查 {checked_count} 个持仓, " f"{exit_count} 个触发退出"
         )
 
         return results

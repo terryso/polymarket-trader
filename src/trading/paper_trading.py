@@ -149,7 +149,9 @@ class PaperTradingExecutor:
         """
         try:
             # 0. Check for existing position using API method (returns local in Paper mode)
-            existing_position = await self._position_manager.get_position_by_market_from_api(market.id)
+            existing_position = (
+                await self._position_manager.get_position_by_market_from_api(market.id)
+            )
             if existing_position:
                 self._logger.warning(
                     f"{OPERATION_EMOJIS['warning']} Skipping trade: open position already exists "
@@ -216,7 +218,9 @@ class PaperTradingExecutor:
             # 8. Mark cache as stale (Tech-Spec: Single Source of Truth)
             if self._cache_service:
                 await self._cache_service.mark_stale()
-                self._logger.debug(f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade")
+                self._logger.debug(
+                    f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade"
+                )
 
             self._logger.info(
                 f"{OPERATION_EMOJIS['success']} Paper trade completed: trade_id={saved_trade.id}, "
@@ -238,7 +242,9 @@ class PaperTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"{OPERATION_EMOJIS['error']} Unexpected error in paper trade: {e}")
+            self._logger.error(
+                f"{OPERATION_EMOJIS['error']} Unexpected error in paper trade: {e}"
+            )
             return PaperTradeResult(
                 trade=None,
                 position=None,

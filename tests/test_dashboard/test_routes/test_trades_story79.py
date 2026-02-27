@@ -17,7 +17,6 @@ from fastapi.testclient import TestClient
 
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 
-
 # ==============================================================================
 # FIXTURES
 # ==============================================================================

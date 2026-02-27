@@ -89,7 +89,9 @@ class TestPolymarketClientInit:
     ) -> None:
         """Test client initialization with credentials."""
         mock_settings.polymarket.pk = "test_key"
-        mock_settings.polymarket.proxy_wallet = "0x1234567890abcdef1234567890abcdef12345678"
+        mock_settings.polymarket.proxy_wallet = (
+            "0x1234567890abcdef1234567890abcdef12345678"
+        )
 
         with patch("src.api.polymarket.settings", mock_settings):
             with patch("src.api.polymarket.ClobClient", return_value=mock_clob_client):
@@ -426,9 +428,7 @@ class TestExceptionMapping:
         result = client._map_exception(e, "test_endpoint")
         assert isinstance(result, RateLimitError)
 
-    def test_map_exception_rate_limit_message(
-        self, client: PolymarketClient
-    ) -> None:
+    def test_map_exception_rate_limit_message(self, client: PolymarketClient) -> None:
         """Test rate limit detection from message."""
         e = Exception("Rate limit exceeded, please retry later")
         result = client._map_exception(e, "test_endpoint")
