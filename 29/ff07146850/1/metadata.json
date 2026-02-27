@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "29ff07146850",
+  "session_id": "d2ca6573-b70c-41c3-b768-0a825cc6bfa1",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T01:44:12.042678Z",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "dashboard/tailwind.config.ts",
+    "dashboard/src/lib/utils.test.ts",
+    "dashboard/src/components/ui/textarea.tsx",
+    "dashboard/src/components/ui/command.tsx"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "d2b52e9750df",
+  "checkpoint_transcript_start": 377,
+  "transcript_lines_at_start": 377,
+  "token_usage": {
+    "input_tokens": 12229,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1849984,
+    "output_tokens": 2242,
+    "api_call_count": 20
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T01:44:11.726034Z",
+    "agent_lines": 6,
+    "human_added": 53,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 59,
+    "agent_percentage": 10.16949152542373
+  }
+}
