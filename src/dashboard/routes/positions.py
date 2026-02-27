@@ -772,7 +772,7 @@ async def manual_exit_position(
             from src.storage.repositories.market_repo import MarketRepository
 
             market_repo = MarketRepository()
-            market = await market_repo.get_by_id(position.market_id)
+            market = await market_repo.get_market(position.market_id)
 
             if market is None:
                 raise HTTPException(

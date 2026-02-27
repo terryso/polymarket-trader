@@ -421,6 +421,7 @@ def client_with_both_repos(
             app.dependency_overrides.clear()
 
 
+@pytest.mark.integration
 class TestManualExitPosition:
     """Tests for the POST /api/positions/{position_id}/exit endpoint."""
 

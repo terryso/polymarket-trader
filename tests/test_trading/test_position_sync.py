@@ -257,6 +257,7 @@ class TestPositionCacheService:
         assert status.cache_updated_at is None
 
 
+@pytest.mark.integration
 class TestPositionCacheServiceIntegration:
     """集成测试 (使用 mock API)."""
 

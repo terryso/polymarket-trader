@@ -247,6 +247,7 @@ class TestListPredictions:
         assert data["meta"]["total"] == 0
 
 
+@pytest.mark.integration
 class TestGetPrediction:
     """Tests for GET /api/predictions/{prediction_id} endpoint."""
 
