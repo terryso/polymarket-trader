@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "b1f02a6a2fbd",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/trading/live_trading.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b1/f02a6a2fbd/0/metadata.json",
+      "transcript": "/b1/f02a6a2fbd/0/full.jsonl",
+      "context": "/b1/f02a6a2fbd/0/context.md",
+      "content_hash": "/b1/f02a6a2fbd/0/content_hash.txt",
+      "prompt": "/b1/f02a6a2fbd/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 11491,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1480896,
+    "output_tokens": 4128,
+    "api_call_count": 17
+  }
+}
