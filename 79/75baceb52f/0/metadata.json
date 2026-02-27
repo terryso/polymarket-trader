@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "7975baceb52f",
+  "session_id": "cb108540-0e9e-4148-8315-cacc95ae115f",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T01:31:43.838775Z",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    ".github/workflows/test.yml",
+    "src/trading/live_trading.py",
+    "src/trading/position_sync.py",
+    "tests/test_trading/test_live_trading_sell.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "18bd6db6742c",
+  "checkpoint_transcript_start": 261,
+  "transcript_lines_at_start": 261,
+  "token_usage": {
+    "input_tokens": 100429,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2869056,
+    "output_tokens": 6799,
+    "api_call_count": 35
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T01:31:43.401194Z",
+    "agent_lines": 459,
+    "human_added": 259,
+    "human_modified": 20,
+    "human_removed": 0,
+    "total_committed": 738,
+    "agent_percentage": 62.19512195121951
+  }
+}

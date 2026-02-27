@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "7975baceb52f",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    ".github/workflows/test.yml",
+    "src/trading/live_trading.py",
+    "src/trading/position_sync.py",
+    "tests/test_trading/test_live_trading_sell.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/79/75baceb52f/0/metadata.json",
+      "transcript": "/79/75baceb52f/0/full.jsonl",
+      "context": "/79/75baceb52f/0/context.md",
+      "content_hash": "/79/75baceb52f/0/content_hash.txt",
+      "prompt": "/79/75baceb52f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 100429,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2869056,
+    "output_tokens": 6799,
+    "api_call_count": 35
+  }
+}
