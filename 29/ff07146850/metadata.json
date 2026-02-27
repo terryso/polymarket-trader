@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "29ff07146850",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "dashboard/src/components/ui/command.tsx",
+    "dashboard/src/components/ui/textarea.tsx",
+    "dashboard/src/lib/utils.test.ts",
+    "dashboard/tailwind.config.ts",
+    "src/api/polymarket.py",
+    "src/core/__init__.py",
+    "src/models/__init__.py",
+    "src/utils/logger.py",
+    "tests/integration/test_llm_analyzer_integration.py",
+    "tests/test_api/test_llm.py",
+    "tests/test_api/test_telegram.py",
+    "tests/test_core/test_error_handler.py",
+    "tests/test_core/test_recovery.py",
+    "tests/test_core/test_scheduler.py",
+    "tests/test_core/test_tasks.py",
+    "tests/test_dashboard/test_routes/test_activities.py",
+    "tests/test_dashboard/test_routes/test_predictions.py",
+    "tests/test_logger.py",
+    "tests/test_notifications/test_message_queue.py",
+    "tests/test_retry_extended.py",
+    "tests/test_storage/test_repositories/test_state_repo.py",
+    "tests/test_storage/test_repositories/test_statistics_repo.py",
+    "tests/test_trading/test_exit_checker.py",
+    "tests/test_trading/test_position_sync.py",
+    "tests/test_trading/test_risk_control.py",
+    "tests/test_trading/test_statistics_recorder.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/29/ff07146850/0/metadata.json",
+      "transcript": "/29/ff07146850/0/full.jsonl",
+      "context": "/29/ff07146850/0/context.md",
+      "content_hash": "/29/ff07146850/0/content_hash.txt",
+      "prompt": "/29/ff07146850/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 22883,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1643008,
+    "output_tokens": 2579,
+    "api_call_count": 15
+  }
+}
