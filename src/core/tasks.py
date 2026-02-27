@@ -46,7 +46,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
 
 from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
-from apscheduler.triggers.interval import IntervalTrigger  # type: ignore[import-untyped]
+from apscheduler.triggers.interval import (
+    IntervalTrigger,  # type: ignore[import-untyped]
+)
 
 from src.config import settings
 from src.core.scheduler import Scheduler

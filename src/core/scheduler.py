@@ -11,9 +11,13 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
-from apscheduler.executors.pool import ThreadPoolExecutor  # type: ignore[import-untyped]
+from apscheduler.executors.pool import (
+    ThreadPoolExecutor,  # type: ignore[import-untyped]
+)
 from apscheduler.jobstores.memory import MemoryJobStore  # type: ignore[import-untyped]
-from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
+from apscheduler.schedulers.asyncio import (
+    AsyncIOScheduler,  # type: ignore[import-untyped]
+)
 
 from src.config import settings
 from src.utils.logger import get_logger

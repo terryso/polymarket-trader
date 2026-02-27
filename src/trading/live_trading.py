@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from src.models.market import Market
     from src.models.position import Position
     from src.models.prediction import PredictionResult
-    from src.trading.position_sync import PositionCacheService
     from src.trading.position_manager import PositionManager
+    from src.trading.position_sync import PositionCacheService
 
 
 logger = get_logger(__name__)
@@ -385,7 +385,9 @@ class LiveTradingExecutor:
             )
 
             # 3. Place order on Polymarket using create_and_post_order
-            from py_clob_client.clob_types import OrderArgs  # type: ignore[import-untyped]
+            from py_clob_client.clob_types import (
+                OrderArgs,  # type: ignore[import-untyped]
+            )
 
             order_args = OrderArgs(
                 token_id=token_id,
