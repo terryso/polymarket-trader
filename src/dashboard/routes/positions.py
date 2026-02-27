@@ -41,7 +41,7 @@ from src.storage.repositories.trade_repo import TradeRepository
 from src.api.polymarket import PolymarketClient
 from src.trading.live_trading import LiveTradingExecutor
 from src.trading.position_manager import PositionManager
-from src.core.state import state
+from src.core.state import ThreadSafeState
 
 logger = logging.getLogger(__name__)
 
@@ -695,7 +695,7 @@ def get_trade_repository() -> TradeRepository:
     "/{position_id}/exit",
     response_model=ApiResponse[ManualExitResponse],
     summary="Manually exit a position",
-    description="Sell all shares of a position at current market price. This is a simplified paper trading exit - for live trading, use the trading bot directly.",
+    description="Sell all shares of a position at current market price. In LIVE mode, executes real trade on Polymarket. In PAPER mode, simulates the exit.",
 )
 async def manual_exit_position(
     position_id: int,
@@ -707,11 +707,9 @@ async def manual_exit_position(
     Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
         - Marks cache as stale after exit
 
-    This endpoint provides a simplified manual exit for paper trading mode.
-    It marks the position as closed and creates a sell trade record.
-
-    For live trading, the actual order execution should be handled by
-    the trading bot using LiveTradingExecutor.
+    Story 10.6: Dashboard 退出支持 Live Trading
+        - In LIVE mode: executes real sell order on Polymarket
+        - In PAPER mode: simulates exit in local database
 
     Args:
         position_id: Position ID to exit
@@ -761,51 +759,156 @@ async def manual_exit_position(
             },
         )
 
+    # Check trading mode
+    is_live_mode = settings.trading_mode == "live"
+    logger.info(f"💰 Trading mode: {'LIVE' if is_live_mode else 'PAPER'}")
+
     try:
-        # Calculate exit values
-        # Use current_value if available, otherwise use avg_price * shares
-        exit_price = position.avg_price  # Simplified: use avg_price as exit price
-        if position.current_value is not None and position.shares > 0:
-            exit_price = position.current_value / position.shares
+        if is_live_mode:
+            # ========== LIVE TRADING: Execute real sell on Polymarket ==========
+            logger.info(f"💰 Executing LIVE sell for position {position_id}")
 
-        total_value = position.shares * exit_price
+            # Get market data
+            from src.storage.repositories.market_repo import MarketRepository
 
-        # Calculate realized PnL
-        realized_pnl = None
-        if position.initial_value is not None:
-            realized_pnl = total_value - position.initial_value
+            market_repo = MarketRepository()
+            market = await market_repo.get_by_id(position.market_id)
 
-        # Determine trade type based on position outcome
-        from src.models.position import PositionOutcome
+            if market is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "success": False,
+                        "error": {
+                            "code": ErrorCode.NOT_FOUND,
+                            "message": f"Market not found: {position.market_id}",
+                        },
+                    },
+                )
 
-        if position.outcome == PositionOutcome.YES:
-            trade_type = TradeType.SELL_YES
+            # Initialize live trading executor
+            from src.api.polymarket import PolymarketClient
+            from src.trading.live_trading import LiveTradingExecutor
+            from src.trading.position_manager import PositionManager
+            from src.core.state import ThreadSafeState
+
+            client = PolymarketClient()
+            state = ThreadSafeState.get_instance()
+            position_manager = PositionManager()
+
+            executor = LiveTradingExecutor(
+                client=client,
+                trade_repo=trade_repo,
+                position_manager=position_manager,
+                state=state,
+            )
+
+            # Execute sell
+            result = await executor.sell_position(
+                position=position,
+                market=market,
+                reason="manual",
+            )
+
+            client.close()
+
+            if not result.success:
+                logger.error(f"💰 Live sell failed: {result.error_message}")
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "success": False,
+                        "error": {
+                            "code": ErrorCode.TRADING_ERROR,
+                            "message": result.error_message or "Live sell failed",
+                        },
+                    },
+                )
+
+            # Build response from live result
+            response = ManualExitResponse(
+                success=True,
+                position_id=position_id,
+                market_id=position.market_id,
+                shares_sold=position.shares,
+                avg_price=result.trade.price if result.trade else position.avg_price,
+                total_value=result.trade.amount if result.trade else 0,
+                realized_pnl=result.realized_pnl,
+                exit_type="manual",  # Live sell
+            )
+
+            logger.info(
+                f"💰 Live sell successful for position {position_id}: "
+                f"shares={position.shares:.2f}, pnl=${result.realized_pnl:.2f}"
+            )
+
         else:
-            trade_type = TradeType.SELL_NO
+            # ========== PAPER TRADING: Simulate exit in database ==========
+            logger.info(f"💰 Executing PAPER sell for position {position_id}")
 
-        # Create sell trade record
-        trade = Trade(
-            id=0,
-            market_id=position.market_id,
-            trade_type=trade_type,
-            mode=TradeMode.PAPER,  # Manual exit via dashboard is always paper mode
-            amount=total_value,
-            price=exit_price,
-            shares=position.shares,
-            status=TradeStatus.FILLED,
-            position_id=position.id,
-            exit_type="manual",  # Story 10.6: Mark as manual exit
-        )
-        saved_trade = await trade_repo.save(trade)
-        logger.info(f"💰 Created sell trade: id={saved_trade.id}")
+            # Calculate exit values
+            exit_price = position.avg_price
+            if position.current_value is not None and position.shares > 0:
+                exit_price = position.current_value / position.shares
 
-        # Update position status to closed
-        position.status = PositionStatus.CLOSED
-        position.closed_at = datetime.now(timezone.utc)
-        position.current_value = total_value
-        position.pnl = realized_pnl if realized_pnl is not None else position.pnl
-        updated_position = await position_repo.update(position)
-        logger.info(f"💰 Position {position_id} marked as closed")
+            total_value = position.shares * exit_price
+
+            # Calculate realized PnL
+            realized_pnl = None
+            if position.initial_value is not None:
+                realized_pnl = total_value - position.initial_value
+
+            # Determine trade type based on position outcome
+            from src.models.position import PositionOutcome
+
+            if position.outcome == PositionOutcome.YES:
+                trade_type = TradeType.SELL_YES
+            else:
+                trade_type = TradeType.SELL_NO
+
+            # Create sell trade record
+            trade = Trade(
+                id=0,
+                market_id=position.market_id,
+                trade_type=trade_type,
+                mode=TradeMode.PAPER,
+                amount=total_value,
+                price=exit_price,
+                shares=position.shares,
+                status=TradeStatus.FILLED,
+                position_id=position.id,
+                exit_type="manual",
+            )
+            saved_trade = await trade_repo.save(trade)
+            logger.info(f"💰 Created paper sell trade: id={saved_trade.id}")
+
+            # Update position status to closed
+            position.status = PositionStatus.CLOSED
+            position.closed_at = datetime.now(timezone.utc)
+            position.current_value = total_value
+            position.pnl = realized_pnl if realized_pnl is not None else position.pnl
+            await position_repo.update(position)
+            logger.info(f"💰 Position {position_id} marked as closed (paper)")
+
+            # Build response
+            response = ManualExitResponse(
+                success=True,
+                position_id=position_id,
+                market_id=position.market_id,
+                shares_sold=position.shares,
+                avg_price=exit_price,
+                total_value=total_value,
+                realized_pnl=realized_pnl,
+                exit_type="manual",  # Paper sell
+            )
+
+            logger.info(
+                f"💰 Paper sell successful for position {position_id}: "
+                f"shares={position.shares:.2f}, value=${total_value:.2f}, "
+                f"pnl=${realized_pnl:.2f}"
+                if realized_pnl is not None
+                else ""
+            )
 
         # Mark cache as stale (Tech-Spec: Single Source of Truth)
         from src.trading.position_sync import PositionCacheService
@@ -814,28 +917,11 @@ async def manual_exit_position(
         await cache_service.mark_stale()
         logger.debug(f"📊 Cache marked as stale after manual exit")
 
-        # Build response
-        response = ManualExitResponse(
-            success=True,
-            position_id=position_id,
-            market_id=position.market_id,
-            shares_sold=position.shares,
-            avg_price=exit_price,
-            total_value=total_value,
-            realized_pnl=realized_pnl,
-            exit_type="manual",
-        )
-
-        logger.info(
-            f"💰 Manual exit successful for position {position_id}: "
-            f"shares={position.shares:.2f}, value=${total_value:.2f}, "
-            f"pnl=${realized_pnl:.2f}"
-            if realized_pnl is not None
-            else ""
-        )
-
         return ApiResponse(success=True, data=response, error=None)
 
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"💰 Manual exit error for position {position_id}: {e}")
         raise HTTPException(
