@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from src.config import settings
 from src.core.state import ThreadSafeState, get_state_manager
@@ -482,6 +483,72 @@ async def get_settings_sanitized() -> ApiResponse[SanitizedSettings]:
     )
 
     return ApiResponse(success=True, data=sanitized, error=None)
+
+
+# ==================== Trading Control Endpoints ====================
+
+
+class TradingControlResponse(BaseModel):
+    """Response model for trading control operations."""
+
+    trading_enabled: bool
+    message: str
+
+
+@router.post(
+    "/trading/enable",
+    response_model=ApiResponse[TradingControlResponse],
+    summary="Enable trading",
+    description="Enable automated trading in the system.",
+)
+async def enable_trading(
+    state: ThreadSafeState = Depends(get_state),
+) -> ApiResponse[TradingControlResponse]:
+    """Enable automated trading.
+
+    Returns:
+        Response with trading status
+    """
+    logger.info("📊 Enabling trading via Dashboard API")
+
+    await state.set_trading_enabled(True)
+    snapshot = await state.get_state()
+
+    response = TradingControlResponse(
+        trading_enabled=snapshot.trading_enabled,
+        message="Trading enabled successfully",
+    )
+
+    logger.info(f"📊 Trading enabled: {snapshot.trading_enabled}")
+    return ApiResponse(success=True, data=response, error=None)
+
+
+@router.post(
+    "/trading/disable",
+    response_model=ApiResponse[TradingControlResponse],
+    summary="Disable trading",
+    description="Disable automated trading in the system.",
+)
+async def disable_trading(
+    state: ThreadSafeState = Depends(get_state),
+) -> ApiResponse[TradingControlResponse]:
+    """Disable automated trading.
+
+    Returns:
+        Response with trading status
+    """
+    logger.info("📊 Disabling trading via Dashboard API")
+
+    await state.set_trading_enabled(False)
+    snapshot = await state.get_state()
+
+    response = TradingControlResponse(
+        trading_enabled=snapshot.trading_enabled,
+        message="Trading disabled successfully",
+    )
+
+    logger.info(f"📊 Trading disabled: {snapshot.trading_enabled}")
+    return ApiResponse(success=True, data=response, error=None)
 
 
 __all__ = ["router"]

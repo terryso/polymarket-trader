@@ -7,7 +7,7 @@
  * Story 7.6: 前端 API 集成
  */
 
-import { get, getPaginated } from './client';
+import { get, getPaginated, post } from './client';
 import type {
   OverviewStats,
   DailyStatsItem,
@@ -15,6 +15,14 @@ import type {
   SystemStatus,
   SanitizedSettings,
 } from './types';
+
+/**
+ * Trading control response from enable/disable endpoints.
+ */
+export interface TradingControlResponse {
+  trading_enabled: boolean;
+  message: string;
+}
 
 /**
  * Get system overview statistics.
@@ -71,6 +79,22 @@ export async function fetchPerformance(days: number = 30): Promise<PerformanceDa
 }
 
 /**
+ * Enable automated trading.
+ * Sends POST request to enable trading in the system.
+ */
+export async function enableTrading(): Promise<TradingControlResponse> {
+  return post<TradingControlResponse>('/api/statistics/trading/enable');
+}
+
+/**
+ * Disable automated trading.
+ * Sends POST request to disable trading in the system.
+ */
+export async function disableTrading(): Promise<TradingControlResponse> {
+  return post<TradingControlResponse>('/api/statistics/trading/disable');
+}
+
+/**
  * Statistics API object with all methods.
  */
 export const statisticsApi = {
@@ -79,4 +103,6 @@ export const statisticsApi = {
   getSettings: fetchSettings,
   getDaily: fetchDailyStats,
   getPerformance: fetchPerformance,
+  enableTrading,
+  disableTrading,
 };

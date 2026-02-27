@@ -1,10 +1,14 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useSettings } from "@/hooks/useStatistics";
+import { useSettings, useSystemStatus, statisticsKeys } from "@/hooks/useStatistics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, Key, BarChart3, Download, FileText, ToggleLeft, AlertCircle } from "lucide-react";
+import { Shield, Key, BarChart3, Download, FileText, ToggleLeft, AlertCircle, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ExitStrategySettings } from "@/components/settings/ExitStrategySettings";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { enableTrading, disableTrading } from "@/api/statistics";
+import { toast } from "sonner";
+import type { SystemStatus } from "@/api/types";
 
 const SettingSection = ({
   icon,
@@ -33,6 +37,54 @@ const SettingRow = ({ label, value }: { label: string; value: string }) => (
 
 const Settings = () => {
   const { data: settings, isLoading, error } = useSettings();
+  const { data: systemStatus } = useSystemStatus();
+  const queryClient = useQueryClient();
+
+  // Trading control mutation with optimistic update
+  const tradingMutation = useMutation({
+    mutationFn: async (enable: boolean) => {
+      if (enable) {
+        return await enableTrading();
+      } else {
+        return await disableTrading();
+      }
+    },
+    onMutate: async (enable: boolean) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: statisticsKeys.status() });
+
+      // Snapshot the previous value
+      const previousStatus = queryClient.getQueryData<SystemStatus>(statisticsKeys.status());
+
+      // Optimistically update to the new value
+      if (previousStatus) {
+        queryClient.setQueryData<SystemStatus>(statisticsKeys.status(), {
+          ...previousStatus,
+          trading_enabled: enable,
+        });
+      }
+
+      return { previousStatus };
+    },
+    onError: (error: Error, _variables, context) => {
+      // Roll back on error
+      if (context?.previousStatus) {
+        queryClient.setQueryData(statisticsKeys.status(), context.previousStatus);
+      }
+      toast.error(`操作失败: ${error.message}`);
+    },
+    onSuccess: (data) => {
+      toast.success(data.message);
+    },
+    onSettled: () => {
+      // Refetch after mutation settles to ensure sync with server
+      queryClient.invalidateQueries({ queryKey: statisticsKeys.status() });
+    },
+  });
+
+  const handleTradingToggle = (enabled: boolean) => {
+    tradingMutation.mutate(enabled);
+  };
 
   // Loading state
   if (isLoading) {
@@ -110,6 +162,44 @@ const Settings = () => {
           <div className="stat-card">
             <h3 className="text-sm font-semibold text-foreground mb-4">操作</h3>
             <div className="space-y-3">
+              {/* Trading Control Toggle */}
+              <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  {systemStatus?.trading_enabled ? (
+                    <Play className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Pause className="h-4 w-4 text-yellow-500" />
+                  )}
+                  <div>
+                    <span className="text-sm font-medium text-foreground">自动交易</span>
+                    <p className="text-xs text-muted-foreground">
+                      {systemStatus?.trading_enabled ? "交易已启用" : "交易已暂停"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={systemStatus?.trading_enabled ? "destructive" : "default"}
+                  onClick={() => handleTradingToggle(!systemStatus?.trading_enabled)}
+                  disabled={tradingMutation.isPending}
+                  className="min-w-[80px]"
+                >
+                  {tradingMutation.isPending ? (
+                    "处理中..."
+                  ) : systemStatus?.trading_enabled ? (
+                    <>
+                      <Pause className="h-3 w-3 mr-1" />
+                      暂停
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-3 w-3 mr-1" />
+                      启用
+                    </>
+                  )}
+                </Button>
+              </div>
+
               <Button variant="outline" className="w-full justify-start gap-2 border-border text-foreground hover:bg-accent">
                 <ToggleLeft className="h-4 w-4" />
                 切换 Paper/Live 模式

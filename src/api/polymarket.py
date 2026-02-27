@@ -976,6 +976,9 @@ class PolymarketClient:
             else:
                 trades_data = []
 
+            # Get user's proxy wallet address for filtering
+            user_wallet = settings.polymarket.proxy_wallet.lower()
+
             for trade_data in trades_data:
                 try:
                     # Skip if market filter doesn't match
@@ -983,6 +986,33 @@ class PolymarketClient:
                         continue
                     if asset_id and trade_data.get("asset_id") != asset_id:
                         continue
+
+                    # Filter: Only include trades that belong to the user
+                    # A trade belongs to user if:
+                    # 1. User is MAKER: maker_address matches proxy_wallet
+                    # 2. User is TAKER: owner matches user's owner ID (derived from proxy_wallet)
+                    trader_side = trade_data.get("trader_side", "")
+                    maker_address = trade_data.get("maker_address", "").lower()
+
+                    if trader_side == "MAKER":
+                        # User is maker, check if maker_address is user's wallet
+                        if maker_address != user_wallet:
+                            continue
+                    elif trader_side == "TAKER":
+                        # User is taker, check if owner matches
+                        # Note: TAKER trades have maker_address of counterparty
+                        # The owner field should correspond to user's wallet
+                        owner = trade_data.get("owner", "")
+                        # For TAKER trades, we need to verify this is user's trade
+                        # The owner ID is derived from the user's wallet, so we check maker_address
+                        # from the maker_orders list which should contain user's info
+                        maker_orders = trade_data.get("maker_orders", [])
+                        is_user_trade = any(
+                            order.get("maker_address", "").lower() == user_wallet
+                            for order in maker_orders
+                        )
+                        if not is_user_trade:
+                            continue
 
                     # Parse trade data - note the different field names from orders
                     # Trade has: id, market, asset_id, side, size, price, status, match_time, outcome
