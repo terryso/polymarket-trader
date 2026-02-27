@@ -32,3 +32,12 @@ Trading is disabled in system state 这个是什么意思
 
 一起提交
 
+### Prompt 8
+
+Run black --check src/ tests/
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/risk_control.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 156 files would be left unchanged.
+Error: Process completed with exit code 1.
+

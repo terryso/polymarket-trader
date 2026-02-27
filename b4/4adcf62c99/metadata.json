@@ -5,7 +5,8 @@
   "branch": "develop",
   "checkpoints_count": 0,
   "files_touched": [
-    "src/trading/live_trading.py"
+    "src/trading/live_trading.py",
+    "src/trading/risk_control.py"
   ],
   "sessions": [
     {
@@ -17,10 +18,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 368,
+    "input_tokens": 782,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 140736,
-    "output_tokens": 220,
-    "api_call_count": 2
+    "cache_read_tokens": 283328,
+    "output_tokens": 219,
+    "api_call_count": 5
   }
 }
