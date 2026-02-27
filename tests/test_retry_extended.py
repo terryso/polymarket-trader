@@ -22,6 +22,7 @@ class TestGetLoggerFallback:
         """Test _get_logger fallback when project logger not available."""
         # Import the function directly and test with ImportError
         import importlib
+
         import src.utils.retry as retry_module
 
         # Store original get_logger

@@ -11,9 +11,9 @@ from src.core.alerting import AlertManager
 from src.core.error_handler import (
     ErrorHandler,
     get_error_handler,
+    setup_async_exception_handler,
     setup_error_handler,
     setup_global_exception_handler,
-    setup_async_exception_handler,
 )
 from src.exceptions import NetworkError, TradingError, ValidationError
 
@@ -268,9 +268,10 @@ class TestErrorHandlerIntegration:
     @pytest.mark.asyncio
     async def test_full_error_flow(self) -> None:
         """Test complete error handling flow."""
-        from src.core.alerting import AlertManager, LogAlertChannel
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
+        from src.core.alerting import AlertManager, LogAlertChannel
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             log_file = str(Path(tmp_dir) / "errors.log")

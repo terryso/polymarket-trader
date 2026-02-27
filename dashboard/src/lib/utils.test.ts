@@ -8,7 +8,8 @@ describe("cn utility", () => {
   });
 
   it("handles conditional classes", () => {
-    const result = cn("base", false && "hidden", "visible");
+    const isVisible = false;
+    const result = cn("base", isVisible && "hidden", "visible");
     expect(result).toBe("base visible");
   });
 

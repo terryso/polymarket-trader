@@ -97,8 +97,8 @@ def client(
             # Import app after patches
             from src.dashboard.app import app
             from src.dashboard.routes.activities import (
-                trade_repo_dependency,
                 prediction_repo_dependency,
+                trade_repo_dependency,
             )
 
             # Create mock factory functions
@@ -239,8 +239,8 @@ class TestGetActivities:
             with patch("src.dashboard.app.close_db", new_callable=AsyncMock):
                 from src.dashboard.app import app
                 from src.dashboard.routes.activities import (
-                    trade_repo_dependency,
                     prediction_repo_dependency,
+                    trade_repo_dependency,
                 )
 
                 def mock_empty_trade_repo() -> MagicMock:

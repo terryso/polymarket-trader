@@ -44,7 +44,9 @@ from py_clob_client.clob_types import (  # type: ignore[import-untyped]  # noqa:
     ApiCreds,
     RequestArgs,
 )
-from py_clob_client.headers.headers import create_level_2_headers  # type: ignore[import-untyped]
+from py_clob_client.headers.headers import (
+    create_level_2_headers,  # type: ignore[import-untyped]
+)
 
 from src.config import settings
 from src.exceptions import NetworkError, RateLimitError, RequestTimeoutError
@@ -1266,8 +1268,9 @@ class PolymarketClient:
             # This ensures we don't miss any positions from orders placed through the bot
             # that might not appear in the API's get_trades() response
             try:
-                import aiosqlite
                 import asyncio
+
+                import aiosqlite
 
                 async def get_local_market_ids() -> set[str]:
                     market_ids = set()

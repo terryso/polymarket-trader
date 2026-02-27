@@ -5,12 +5,19 @@ Story 8.2: 定时任务配置
 This module tests the TaskManager and task registration functions.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 
 from src.core.scheduler import Scheduler
 from src.core.tasks import (
     TaskManager,
+    _check_positions_task,
+    _daily_statistics_task,
+    _fetch_markets_task,
+    _persist_state_task,
+    _reset_daily_state_task,
+    _validate_predictions_task,
     register_all_tasks,
     register_check_positions_job,
     register_daily_statistics_job,
@@ -19,12 +26,6 @@ from src.core.tasks import (
     register_reset_daily_state_job,
     register_validate_predictions_job,
     task_manager,
-    _check_positions_task,
-    _daily_statistics_task,
-    _fetch_markets_task,
-    _persist_state_task,
-    _reset_daily_state_task,
-    _validate_predictions_task,
 )
 
 

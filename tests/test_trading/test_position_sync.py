@@ -16,11 +16,10 @@ from src.models.position import (
     PositionOutcome,
     PositionStatus,
 )
-from src.trading.position_sync import (
+from src.trading.position_sync import (  # Backward compatibility aliases
     CacheRefreshResult,
-    PositionCacheService,
     CacheStatus,
-    # Backward compatibility aliases
+    PositionCacheService,
     PositionSyncResult,
     PositionSyncService,
     PositionSyncStatus,

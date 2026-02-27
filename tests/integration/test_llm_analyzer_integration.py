@@ -12,9 +12,9 @@ Note: These tests require a valid LLM_API_KEY environment variable.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 
 import pytest
-from datetime import datetime, timezone
 
 from src.analysis import LLMAnalyzer
 from src.analysis.llm_analyzer import AnalysisError

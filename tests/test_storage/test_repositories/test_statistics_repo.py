@@ -3,9 +3,10 @@
 Story 5.5: 统计数据记录
 """
 
-import pytest
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.models.statistics import Statistics
 from src.models.trade import TradeMode

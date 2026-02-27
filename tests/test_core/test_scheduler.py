@@ -11,7 +11,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.core.scheduler import Scheduler, scheduler as global_scheduler
+from src.core.scheduler import Scheduler
+from src.core.scheduler import scheduler as global_scheduler
 
 
 class TestScheduler:

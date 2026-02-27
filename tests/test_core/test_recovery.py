@@ -3,13 +3,14 @@
 Story 8.4: Auto Recovery Mechanism
 """
 
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from src.core.recovery import RecoveryManager, RecoveryResult
-from src.storage.repositories.state_repo import StateRepository
 from src.storage.repositories.position_repo import PositionRepository
+from src.storage.repositories.state_repo import StateRepository
 
 
 class TestRecoveryResult:

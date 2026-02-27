@@ -23,7 +23,9 @@ from openai import (
 from src.api.llm import LLMClient
 from src.exceptions import (
     NetworkError,
-    RateLimitError as BotRateLimitError,
+)
+from src.exceptions import RateLimitError as BotRateLimitError
+from src.exceptions import (
     RequestTimeoutError,
 )
 

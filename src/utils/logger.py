@@ -25,6 +25,7 @@ import os
 import re
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
 import colorlog
 
 # Emoji mappings for log levels

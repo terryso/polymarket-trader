@@ -13,7 +13,7 @@ from src.config import ExitStrategySettings
 from src.models.market import Market
 from src.models.position import Position, PositionOutcome, PositionStatus
 from src.models.prediction import Prediction, Recommendation
-from src.trading.exit_checker import ExitCheckResult, ExitChecker, ExitReason
+from src.trading.exit_checker import ExitChecker, ExitCheckResult, ExitReason
 
 
 def create_exit_config(

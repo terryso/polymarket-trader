@@ -18,7 +18,9 @@ import pytest
 from telegram import User
 from telegram.error import (
     InvalidToken,
-    NetworkError as TelegramNetworkError,
+)
+from telegram.error import NetworkError as TelegramNetworkError
+from telegram.error import (
     TelegramError,
 )
 

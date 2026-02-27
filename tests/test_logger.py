@@ -13,8 +13,8 @@ from src.utils.logger import (
     LOG_EMOJIS,
     OPERATION_EMOJIS,
     SENSITIVE_PATTERNS,
-    SanitizingFilter,
     FileEmojiFormatter,
+    SanitizingFilter,
     get_logger,
     setup_logging,
 )

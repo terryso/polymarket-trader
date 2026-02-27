@@ -12,10 +12,11 @@ Usage:
 
 from __future__ import annotations
 
+from src.models.activity import ActivityItem, ActivityListResponse, ActivityType
 from src.models.api_response import (
     ApiResponse,
-    ErrorDetail,
     ErrorCode,
+    ErrorDetail,
     PaginatedResponse,
     PaginationMeta,
 )
@@ -50,7 +51,6 @@ from src.models.trade_response import (
     TradeListQueryParams,
     TradeResponse,
 )
-from src.models.activity import ActivityItem, ActivityType, ActivityListResponse
 
 __all__ = [
     # API Response

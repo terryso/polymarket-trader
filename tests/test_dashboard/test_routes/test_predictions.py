@@ -17,8 +17,8 @@ from fastapi.testclient import TestClient
 from src.models.prediction import Prediction, Recommendation
 from src.storage.repositories.prediction_repo import (
     PaginationParams,
-    PredictionQueryResult,
     PredictionOutcomeStatus,
+    PredictionQueryResult,
     SortParams,
 )
 

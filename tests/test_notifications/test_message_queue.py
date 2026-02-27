@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.notifications.message_queue import (
+    CRITICAL_CATEGORIES,
     MAX_MESSAGE_LENGTH,
     MAX_MESSAGES_PER_SECOND,
     MAX_QUEUE_SIZE,
-    CRITICAL_CATEGORIES,
     MERGEABLE_CATEGORIES,
     MessageCategory,
     MessagePriority,

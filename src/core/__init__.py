@@ -17,9 +17,9 @@ from src.core.circuit_breaker import (
 from src.core.error_handler import (
     ErrorHandler,
     get_error_handler,
+    setup_async_exception_handler,
     setup_error_handler,
     setup_global_exception_handler,
-    setup_async_exception_handler,
 )
 from src.core.recovery import RecoveryManager, RecoveryResult
 from src.core.scheduler import Scheduler, scheduler

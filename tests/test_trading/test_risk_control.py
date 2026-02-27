@@ -13,16 +13,17 @@ Test Categories:
     7. Circuit breaker integration
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from src.models.market import Market, MarketCategory
+from src.models.prediction import PredictionResult, Recommendation
 from src.trading.risk_control import (
     RiskCheckFailure,
     RiskCheckResult,
     RiskController,
 )
-from src.models.prediction import PredictionResult, Recommendation
-from src.models.market import Market, MarketCategory
 
 
 # Helper function to create test fixtures
