@@ -413,6 +413,12 @@ class PolymarketClient:
 
     # ==================== Gamma API Methods ====================
 
+    @retry(
+        max_attempts=3,
+        base_delay=2.0,
+        max_delay=30.0,
+        exceptions=(NetworkError,),
+    )
     def get_active_markets(
         self,
         limit: int = 100,
@@ -517,9 +523,10 @@ class PolymarketClient:
                 status_code=e.response.status_code,
                 original_exception=e,
             )
-        except httpx.RequestError as e:
+        except (httpx.RequestError, httpx.RemoteProtocolError) as e:
+            # Handle transient network errors like "Server disconnected"
             raise NetworkError(
-                message="Gamma API request failed",
+                message=f"Gamma API request failed: {type(e).__name__}",
                 endpoint="get_active_markets",
                 original_exception=e,
             )

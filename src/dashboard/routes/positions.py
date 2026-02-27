@@ -38,6 +38,10 @@ from src.models.position_response import PositionListItem, PositionResponse
 from src.models.trade import Trade, TradeMode, TradeStatus, TradeType
 from src.storage.repositories.position_repo import PositionRepository
 from src.storage.repositories.trade_repo import TradeRepository
+from src.api.polymarket import PolymarketClient
+from src.trading.live_trading import LiveTradingExecutor
+from src.trading.position_manager import PositionManager
+from src.core.state import state
 
 logger = logging.getLogger(__name__)
 
