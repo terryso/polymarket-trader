@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "a0490304aa2d",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "dashboard/src/api/activities.test.ts",
+    "dashboard/src/api/settings.test.ts",
+    "dashboard/src/components/positions/ConfirmExitDialog.test.tsx",
+    "dashboard/src/components/settings/ExitStrategySettings.test.tsx",
+    "dashboard/src/hooks/useActivities.test.tsx",
+    "dashboard/src/pages/Predictions.test.tsx",
+    "dashboard/src/pages/Settings.test.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a0/490304aa2d/0/metadata.json",
+      "transcript": "/a0/490304aa2d/0/full.jsonl",
+      "context": "/a0/490304aa2d/0/context.md",
+      "content_hash": "/a0/490304aa2d/0/content_hash.txt",
+      "prompt": "/a0/490304aa2d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 346817,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4702848,
+    "output_tokens": 33559,
+    "api_call_count": 56
+  }
+}

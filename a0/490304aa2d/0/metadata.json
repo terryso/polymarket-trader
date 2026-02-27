@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "a0490304aa2d",
+  "session_id": "5e7c667b-338d-4f8c-bca6-021cdee525c0",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T06:06:51.760655Z",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "dashboard/src/api/activities.test.ts",
+    "dashboard/src/api/settings.test.ts",
+    "dashboard/src/components/positions/ConfirmExitDialog.test.tsx",
+    "dashboard/src/components/settings/ExitStrategySettings.test.tsx",
+    "dashboard/src/hooks/useActivities.test.tsx",
+    "dashboard/src/pages/Predictions.test.tsx",
+    "dashboard/src/pages/Settings.test.tsx"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "ed196298bc56",
+  "token_usage": {
+    "input_tokens": 346817,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4702848,
+    "output_tokens": 33559,
+    "api_call_count": 56
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T06:06:51.268214Z",
+    "agent_lines": 1352,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1352,
+    "agent_percentage": 100
+  }
+}
