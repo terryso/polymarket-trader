@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "194802f5e423",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/dashboard/routes/positions.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/19/4802f5e423/0/metadata.json",
+      "transcript": "/19/4802f5e423/0/full.jsonl",
+      "context": "/19/4802f5e423/0/context.md",
+      "content_hash": "/19/4802f5e423/0/content_hash.txt",
+      "prompt": "/19/4802f5e423/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 7634,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1969536,
+    "output_tokens": 4270,
+    "api_call_count": 20
+  }
+}
