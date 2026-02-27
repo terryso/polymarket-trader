@@ -8,6 +8,7 @@ Tech-Spec: 持仓数据源重构 - Polymarket 作为单一数据源
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -268,15 +269,15 @@ class LiveTradingExecutor:
         try:
             market_data = self._client._client.get_market(market.id)
             if market_data:
-                # tick_size is in the market response
-                tick_size = market_data.get("tick_size", "0.01")
+                # API returns 'minimum_tick_size', not 'tick_size'
+                tick_size = market_data.get("minimum_tick_size", "0.001")
                 return str(tick_size)
         except Exception as e:
             self._logger.warning(
                 f"Failed to get tick_size for market {market.id[:10]}...: {e}"
             )
-        # Default to 0.01 (most common)
-        return "0.01"
+        # Default to 0.001 (0.1c - most common on Polymarket)
+        return "0.001"
 
     def _get_neg_risk(self, market: "Market") -> bool:
         """Get negative risk flag for a market from CLOB API.
@@ -671,23 +672,29 @@ class LiveTradingExecutor:
             )
 
             # 4. Place sell order on Polymarket
-            order_args = OrderArgs(
-                token_id=token_id,
-                price=price,
-                size=shares_to_sell,
-                side="SELL",
-            )
-
-            # Use FAK (Fill and Kill) for stop loss to ensure quick execution
-            # FAK: Fill as much as possible immediately, cancel the rest
-            from py_clob_client.clob_types import OrderType
+            # For stop loss, use MarketOrderArgs with FAK order type
+            from py_clob_client.clob_types import MarketOrderArgs, OrderType
 
             if reason == "stop_loss":
-                result = self._client._client.create_and_post_order(
-                    order_args, OrderType.FAK
+                # Use create_market_order with FAK for stop loss
+                # FAK: Fill as much as possible immediately, cancel the rest
+                market_order_args = MarketOrderArgs(
+                    token_id=token_id,
+                    amount=shares_to_sell,  # SELL: amount is shares, not dollars
+                    side="SELL",
+                    price=price,
+                    order_type=OrderType.FAK,  # FAK order type in args, not as separate param
                 )
+                result = self._client._client.create_market_order(market_order_args)
                 self._logger.info(f"Stop loss order (FAK) result: {result}")
             else:
+                # Regular GTC order for manual sells
+                order_args = OrderArgs(
+                    token_id=token_id,
+                    price=price,
+                    size=shares_to_sell,
+                    side="SELL",
+                )
                 result = self._client._client.create_and_post_order(order_args)
                 self._logger.info(f"Sell order result: {result}")
 
@@ -889,6 +896,10 @@ class LiveTradingExecutor:
             return None
 
         try:
+            # Get tick_size first to validate price constraints
+            tick_size = self._get_tick_size(market)
+            tick_size_float = float(tick_size)
+
             # Calculate take profit price
             # TP price = buy_price * (1 + take_profit_pct)
             # Example: buy @ $0.50, TP 30% → sell @ $0.65
@@ -897,6 +908,23 @@ class LiveTradingExecutor:
 
             # Cap at 0.99 (max possible price in prediction market)
             take_profit_price = min(take_profit_price, 0.99)
+
+            # Round up to nearest tick_size multiple FIRST
+            # e.g., tick_size=0.01, price=0.013 → 0.02
+            # This ensures TP price is valid for trading
+            take_profit_price = math.ceil(take_profit_price / tick_size_float) * tick_size_float
+
+            # Cap again at 0.99 after rounding
+            take_profit_price = min(take_profit_price, 0.99)
+
+            # After rounding up, check if TP price is still above buy price
+            # If buy price is already >= 0.99, we can't place a profitable TP order
+            if take_profit_price <= buy_price:
+                self._logger.warning(
+                    f"⚠️ Rounded TP price ${take_profit_price:.4f} is not above buy_price ${buy_price:.4f}. "
+                    f"Cannot place profitable TP order. Skipping."
+                )
+                return None
 
             # Get token ID for selling (same token we bought)
             token_id = self._get_sell_token_id(position, market)
@@ -919,8 +947,7 @@ class LiveTradingExecutor:
                 side="SELL",
             )
 
-            # Get tick_size and neg_risk from market
-            tick_size = self._get_tick_size(market)
+            # Get neg_risk from market
             neg_risk = self._get_neg_risk(market)
             options = CreateOrderOptions(tick_size=tick_size, neg_risk=neg_risk)
 
