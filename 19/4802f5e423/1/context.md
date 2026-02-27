@@ -1,0 +1,45 @@
+# Session Context
+
+## User Prompts
+
+### Prompt 1
+
+IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
+
+<steps CRITICAL="TRUE">
+1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
+2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/tea/workflows/testarch/ci/workflow.yaml
+3. Pass the yaml path @{project-root}/_bmad/tea/workflows/testarch/ci/workflow.yaml as 'workflow-config' parameter to the wor...
+
+### Prompt 2
+
+提交全部代码
+
+### Prompt 3
+
+11s
+Run black --check src/ tests/
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/analysis/market_filter.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/api/telegram.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/alerting.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/error_handler.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/recovery.py
+...
+
+### Prompt 4
+
+https://github.com/terryso/polymarket-trader/actions/runs/22469014117
+
+你可以看看这个action的运行结果, 还是很多错误
+
+### Prompt 5
+
+https://github.com/terryso/polymarket-trader/actions/runs/22469192608
+
+还是很多错误
+
+### Prompt 6
+
+https://github.com/terryso/polymarket-trader/actions/runs/22469461990
+还有错误
+
