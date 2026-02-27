@@ -256,6 +256,49 @@ class LiveTradingExecutor:
             )
             return None
 
+    def _get_tick_size(self, market: "Market") -> str:
+        """Get tick size for a market from CLOB API.
+
+        Args:
+            market: Market to get tick size for
+
+        Returns:
+            Tick size string ("0.1", "0.01", "0.001", or "0.0001")
+        """
+        try:
+            market_data = self._client._client.get_market(market.id)
+            if market_data:
+                # tick_size is in the market response
+                tick_size = market_data.get("tick_size", "0.01")
+                return str(tick_size)
+        except Exception as e:
+            self._logger.warning(
+                f"Failed to get tick_size for market {market.id[:10]}...: {e}"
+            )
+        # Default to 0.01 (most common)
+        return "0.01"
+
+    def _get_neg_risk(self, market: "Market") -> bool:
+        """Get negative risk flag for a market from CLOB API.
+
+        Args:
+            market: Market to get neg_risk for
+
+        Returns:
+            Boolean indicating if market uses negative risk CTF exchange
+        """
+        try:
+            market_data = self._client._client.get_market(market.id)
+            if market_data:
+                # neg_risk is in the market response
+                return bool(market_data.get("neg_risk", False))
+        except Exception as e:
+            self._logger.warning(
+                f"Failed to get neg_risk for market {market.id[:10]}...: {e}"
+            )
+        # Default to False
+        return False
+
     def _get_sell_trade_type(self, position: "Position") -> TradeType:
         """Determine trade type based on position outcome.
 
@@ -867,7 +910,7 @@ class LiveTradingExecutor:
             )
 
             # Place GTC sell order
-            from py_clob_client.clob_types import OrderArgs
+            from py_clob_client.clob_types import OrderArgs, CreateOrderOptions
 
             order_args = OrderArgs(
                 token_id=token_id,
@@ -876,12 +919,12 @@ class LiveTradingExecutor:
                 side="SELL",
             )
 
-            # Use GTC (Good Till Cancelled) order type for take profit
-            from py_clob_client.clob_types import OrderType
+            # Get tick_size and neg_risk from market
+            tick_size = self._get_tick_size(market)
+            neg_risk = self._get_neg_risk(market)
+            options = CreateOrderOptions(tick_size=tick_size, neg_risk=neg_risk)
 
-            result = self._client._client.create_and_post_order(
-                order_args, OrderType.GTC
-            )
+            result = self._client._client.create_and_post_order(order_args, options)
             self._logger.debug(f"Take profit order result: {result}")
 
             # Extract order ID from result
