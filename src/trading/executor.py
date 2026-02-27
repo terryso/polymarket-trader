@@ -50,6 +50,8 @@ if TYPE_CHECKING:
     from src.models.position import Position
     from src.models.prediction import PredictionResult
     from src.notifications.telegram_notifier import TelegramNotifier
+    from src.storage.repositories.prediction_repo import PredictionRepository
+    from src.trading.live_trading import LiveTradingExecutor
     from src.trading.paper_trading import PaperTradeResult, PaperTradingExecutor
     from src.trading.risk_control import RiskCheckResult, RiskController
 

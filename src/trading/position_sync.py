@@ -127,6 +127,9 @@ class PositionCacheService:
 
     _instance: PositionCacheService | None = None
     _lock: asyncio.Lock = asyncio.Lock()
+    _position_repo: PositionRepository
+    _refreshing: bool
+    _refresh_lock: asyncio.Lock
 
     def __new__(cls) -> PositionCacheService:
         """Singleton pattern to prevent multiple repository instances."""

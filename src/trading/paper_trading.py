@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from src.models.position import Position
     from src.models.prediction import PredictionResult
     from src.storage.repositories.trade_repo import TradeRepository
-    from src.trading.position_cache import PositionCacheService
+    from src.trading.position_sync import PositionCacheService
     from src.trading.position_manager import PositionManager
 
 

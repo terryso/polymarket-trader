@@ -288,7 +288,7 @@ class ThreadSafeState:
         """
         async with self._get_lock():
             # Update settings (runtime)
-            settings.trading_mode = "paper" if paper_trading else "live"
+            settings.trading_mode = "paper" if paper_trading else "live"  # type: ignore[attr-defined]
             mode = "PAPER" if paper_trading else "LIVE"
             logger.info(f"Trading mode set to {mode}")
 

@@ -48,7 +48,7 @@ class BaseEnvSettings(BaseSettings):
     """Base settings class that dynamically disables .env file during tests."""
 
     @classmethod
-    def settings_customise_sources(
+    def settings_customise_sources(  # type: ignore[override]
         cls,
         settings_cls: type[BaseSettings],
         init_settings: InitSettingsSource,
@@ -59,9 +59,9 @@ class BaseEnvSettings(BaseSettings):
         """Customize settings sources to disable .env during tests."""
         if _is_running_tests():
             # During tests, only use init and env settings, skip dotenv
-            return init_settings, env_settings
+            return (init_settings, env_settings)
         # Normal operation: use all sources including dotenv
-        return init_settings, env_settings, dotenv_settings
+        return (init_settings, env_settings, dotenv_settings)
 
 
 class LLMSettings(BaseEnvSettings):
@@ -824,4 +824,4 @@ class _SettingsProxy:
         return getattr(self._get_settings(), name)
 
 
-settings = _SettingsProxy()  # type: ignore[assignment]
+settings = _SettingsProxy()

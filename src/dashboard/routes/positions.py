@@ -793,8 +793,11 @@ async def manual_exit_position(
             from src.core.state import ThreadSafeState
 
             client = PolymarketClient()
-            state = ThreadSafeState.get_instance()
-            position_manager = PositionManager()
+            state = ThreadSafeState()  # Create new state instance for Dashboard
+            position_manager = PositionManager(
+                repository=position_repo,
+                state=state,
+            )
 
             executor = LiveTradingExecutor(
                 client=client,

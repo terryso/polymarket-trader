@@ -11,15 +11,15 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
-from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.jobstores.memory import MemoryJobStore
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.executors.pool import ThreadPoolExecutor  # type: ignore[import-untyped]
+from apscheduler.jobstores.memory import MemoryJobStore  # type: ignore[import-untyped]
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
 
 from src.config import settings
 from src.utils.logger import get_logger
 
 if TYPE_CHECKING:
-    from apscheduler.job import Job
+    from apscheduler.job import Job  # type: ignore[import-untyped]
 
 logger = get_logger(__name__)
 

@@ -44,8 +44,8 @@ from py_clob_client.clob_types import (  # type: ignore[import-untyped]  # noqa:
     ApiCreds,
     RequestArgs,
 )
-from py_clob_client.headers.headers import (
-    create_level_2_headers,  # type: ignore[import-untyped]
+from py_clob_client.headers.headers import (  # type: ignore[import-untyped]
+    create_level_2_headers,
 )
 
 from src.config import settings
@@ -1073,8 +1073,8 @@ class PolymarketClient:
             request_path="/positions",
         )
         headers = create_level_2_headers(
-            self._client.signer,  # type: ignore[attr-defined]
-            self._client.creds,  # type: ignore[attr-defined]
+            self._client.signer,
+            self._client.creds,
             request_args,
         )
 
@@ -1454,7 +1454,7 @@ class PolymarketClient:
                 ).call()
 
                 # Convert from wei to shares (6 decimals for Polymarket CTF, same as USDC)
-                return balance_wei / 10**6
+                return float(balance_wei) / 10**6
 
             except Exception as e:
                 last_error = e
@@ -1693,7 +1693,9 @@ class PolymarketClient:
         except ValueError:
             pass
 
-        # Try other common formats
+        # Try other common formats (only for string dates)
+        if not isinstance(date_str, str):
+            return None
         formats = [
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S",

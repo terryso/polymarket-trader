@@ -327,8 +327,8 @@ class TradeSyncService:
         return (
             local.market_id == remote.market_id
             and local.trade_type == remote.trade_type
-            and abs(local.price - remote.price) < 0.001
-            and abs(local.shares - remote.shares) < 0.001
+            and abs((local.price or 0) - (remote.price or 0)) < 0.001
+            and abs((local.shares or 0) - (remote.shares or 0)) < 0.001
             and local.status == remote.status
         )
 

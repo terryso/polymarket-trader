@@ -81,7 +81,7 @@ class TelegramClient:
 
         # Load configuration
         self._token = settings.telegram.bot_token
-        self._chat_id = settings.telegram.chat_id
+        self._chat_id: str | None = settings.telegram.chat_id
         self._enabled = settings.telegram.enabled
 
         # Log initialization (with masked token)
