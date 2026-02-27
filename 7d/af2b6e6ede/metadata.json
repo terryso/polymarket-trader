@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "7daf2b6e6ede",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/core/scheduler.py",
+    "src/core/tasks.py",
+    "src/trading/live_trading.py",
+    "src/trading/paper_trading.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7d/af2b6e6ede/0/metadata.json",
+      "transcript": "/7d/af2b6e6ede/0/full.jsonl",
+      "context": "/7d/af2b6e6ede/0/context.md",
+      "content_hash": "/7d/af2b6e6ede/0/content_hash.txt",
+      "prompt": "/7d/af2b6e6ede/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 898,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 366144,
+    "output_tokens": 359,
+    "api_call_count": 6
+  }
+}
