@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "b3ec06de269a",
+  "session_id": "cb108540-0e9e-4148-8315-cacc95ae115f",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T02:33:12.409394Z",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/dashboard/routes/positions.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "a4c66a79fdbe",
+  "checkpoint_transcript_start": 755,
+  "transcript_lines_at_start": 755,
+  "token_usage": {
+    "input_tokens": 89554,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1694080,
+    "output_tokens": 1344,
+    "api_call_count": 25
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T02:33:11.469989Z",
+    "agent_lines": 0,
+    "human_added": 23,
+    "human_modified": 7,
+    "human_removed": 0,
+    "total_committed": 28,
+    "agent_percentage": 0
+  }
+}
