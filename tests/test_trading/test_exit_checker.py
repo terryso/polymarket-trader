@@ -245,13 +245,22 @@ class TestExitChecker:
             shares=100.0,
             avg_price=0.45,
             initial_value=45.0,
-            current_value=67.5,  # 50% profit
+            current_value=67.5,  # 50% profit (cached)
             pnl=22.5,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc),
         )
 
-        result = await checker.check_exit_conditions(position, sample_market)
+        # Create market with yes_price that gives 50% PnL: 100 * 0.675 / 45 - 1 = 50%
+        market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.675,  # Real-time price gives exactly 50% profit
+            no_price=0.325,
+            liquidity=10000.0,
+        )
+
+        result = await checker.check_exit_conditions(position, market)
 
         assert result.should_exit is True
         assert result.reason == ExitReason.TAKE_PROFIT.value
@@ -369,13 +378,22 @@ class TestExitChecker:
             shares=100.0,
             avg_price=0.45,
             initial_value=45.0,
-            current_value=31.5,  # -30% loss
+            current_value=31.5,  # -30% loss (cached)
             pnl=-13.5,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc),
         )
 
-        result = await checker.check_exit_conditions(position, sample_market)
+        # Create market with yes_price that gives -30% PnL: 100 * 0.315 / 45 - 1 = -30%
+        market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.315,  # Real-time price gives exactly -30% loss
+            no_price=0.685,
+            liquidity=10000.0,
+        )
+
+        result = await checker.check_exit_conditions(position, market)
 
         assert result.should_exit is True
         assert result.reason == ExitReason.STOP_LOSS.value
@@ -460,13 +478,22 @@ class TestExitChecker:
             shares=100.0,
             avg_price=0.50,
             initial_value=50.0,
-            current_value=35.0,  # Exactly -30% loss
+            current_value=35.0,  # Exactly -30% loss (cached)
             pnl=-15.0,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc),
         )
 
-        result = await checker.check_exit_conditions(position, sample_market)
+        # Create market with yes_price that gives -30% PnL: 100 * 0.35 / 50 - 1 = -30%
+        market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.35,  # Real-time price gives exactly -30% loss
+            no_price=0.65,
+            liquidity=10000.0,
+        )
+
+        result = await checker.check_exit_conditions(position, market)
 
         assert result.should_exit is True
         assert result.reason == ExitReason.STOP_LOSS.value
@@ -902,13 +929,22 @@ class TestExitChecker:
             shares=100.0,
             avg_price=0.50,
             initial_value=50.0,
-            current_value=40.0,  # -20% loss, triggers stop loss
+            current_value=40.0,  # -20% loss (cached), triggers stop loss
             pnl=-10.0,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc),
         )
 
-        result = await checker.check_exit_conditions(position, sample_market)
+        # Create market with yes_price that gives -20% loss: 100 * 0.40 / 50 - 1 = -20%
+        market = Market(
+            id="test-market-1",
+            title="Test Market",
+            yes_price=0.40,  # Real-time price gives -20% loss
+            no_price=0.60,
+            liquidity=10000.0,
+        )
+
+        result = await checker.check_exit_conditions(position, market)
 
         # Stop loss should trigger first (priority 1)
         assert result.should_exit is True
@@ -931,50 +967,75 @@ class TestExitChecker:
         )
         checker = ExitChecker(config=config)
 
-        # Position 1: triggers take profit
+        # Position 1: triggers take profit (50% profit at yes_price=0.675)
         position1 = Position(
             id=1,
-            market_id="test-market-1",
+            market_id="market-1",
             outcome=PositionOutcome.YES,
             shares=100.0,
             avg_price=0.45,
             initial_value=45.0,
-            current_value=67.5,  # 50% profit
+            current_value=67.5,  # 50% profit (cached)
             pnl=22.5,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc) - timedelta(hours=10),
         )
+        market1 = Market(
+            id="market-1",
+            title="Market 1",
+            yes_price=0.675,  # 50% profit: 100 * 0.675 / 45 - 1 = 50%
+            no_price=0.325,
+            liquidity=10000.0,
+        )
 
-        # Position 2: triggers stop loss
+        # Position 2: triggers stop loss (-30% loss at yes_price=0.315)
         position2 = Position(
             id=2,
-            market_id="test-market-1",
+            market_id="market-2",
             outcome=PositionOutcome.YES,
             shares=100.0,
             avg_price=0.45,
             initial_value=45.0,
-            current_value=31.5,  # -30% loss
+            current_value=31.5,  # -30% loss (cached)
             pnl=-13.5,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc) - timedelta(hours=10),
         )
+        market2 = Market(
+            id="market-2",
+            title="Market 2",
+            yes_price=0.315,  # -30% loss: 100 * 0.315 / 45 - 1 = -30%
+            no_price=0.685,
+            liquidity=10000.0,
+        )
 
-        # Position 3: triggers time exit
+        # Position 3: triggers time exit (held for 73 hours)
         position3 = Position(
             id=3,
-            market_id="test-market-1",
+            market_id="market-3",
             outcome=PositionOutcome.YES,
             shares=100.0,
             avg_price=0.45,
             initial_value=45.0,
-            current_value=50.0,  # Small profit
+            current_value=50.0,  # Small profit (doesn't matter for time exit)
             pnl=5.0,
             status=PositionStatus.OPEN,
             opened_at=datetime.now(timezone.utc) - timedelta(hours=73),
         )
+        market3 = Market(
+            id="market-3",
+            title="Market 3",
+            yes_price=0.50,  # Small profit, not triggering take profit or stop loss
+            no_price=0.50,
+            liquidity=10000.0,
+        )
 
         positions = [position1, position2, position3]
-        markets = {"test-market-1": sample_market}
+        markets = {
+            "market-1": market1,
+            "market-2": market2,
+            "market-3": market3,
+        }
 
         results = await checker.check_all_positions(positions, markets)
 

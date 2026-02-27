@@ -146,8 +146,9 @@ class ExitChecker:
             f"(market: {position.market_id})"
         )
 
-        # Calculate current PnL percentage for all checks
-        pnl_pct = self._calculate_pnl_pct(position)
+        # Calculate current PnL percentage using REAL-TIME market price
+        # This ensures exit decisions are based on current prices, not stale cached values
+        pnl_pct = self._calculate_pnl_pct_with_market(position, market)
 
         # Check in priority order - return immediately if any condition triggers
         # Priority 1: Stop Loss (highest priority - limit losses first)
@@ -184,10 +185,13 @@ class ExitChecker:
         return self._no_exit(position, pnl_pct)
 
     def _calculate_pnl_pct(self, position: Position) -> float | None:
-        """Calculate PnL percentage for a position.
+        """Calculate PnL percentage for a position using cached current_value.
 
         PnL percentage is calculated as:
         pnl_pct = (current_value - initial_value) / initial_value
+
+        WARNING: This uses position.current_value which may be stale.
+        Prefer _calculate_pnl_pct_with_market() for real-time PnL calculation.
 
         Args:
             position: Position to calculate PnL for
@@ -202,6 +206,58 @@ class ExitChecker:
         return (
             position.current_value - position.initial_value
         ) / position.initial_value
+
+    def _calculate_pnl_pct_with_market(
+        self, position: Position, market: Market
+    ) -> float | None:
+        """Calculate PnL percentage using REAL-TIME market price.
+
+        This is the preferred method for exit decisions because it uses
+        the current market price rather than stale position.current_value.
+
+        PnL percentage is calculated as:
+        current_value = shares * current_market_price
+        pnl_pct = (current_value - initial_value) / initial_value
+
+        Args:
+            position: Position to calculate PnL for
+            market: Market with current prices
+
+        Returns:
+            PnL percentage or None if values are not available
+        """
+        if position.initial_value is None or position.initial_value == 0:
+            self.logger.debug(
+                f"Cannot calculate PnL: initial_value is {position.initial_value}"
+            )
+            return None
+
+        # Get current market price based on position outcome
+        if position.outcome == PositionOutcome.YES:
+            current_price = market.yes_price
+        else:
+            current_price = market.no_price
+
+        if current_price is None:
+            self.logger.warning(
+                f"🔍 Cannot calculate real-time PnL for position {position.id}: "
+                f"market {market.id} has no {position.outcome.value} price"
+            )
+            # Fallback to cached current_value if available
+            return self._calculate_pnl_pct(position)
+
+        # Calculate real-time PnL
+        current_value = position.shares * current_price
+        pnl_pct = (current_value - position.initial_value) / position.initial_value
+
+        self.logger.debug(
+            f"🔍 Real-time PnL for position {position.id}: "
+            f"shares={position.shares:.2f}, current_price={current_price:.4f}, "
+            f"current_value=${current_value:.2f}, initial_value=${position.initial_value:.2f}, "
+            f"pnl_pct={pnl_pct:.2%}"
+        )
+
+        return pnl_pct
 
     def _check_take_profit(
         self, position: Position, pnl_pct: float | None

@@ -255,6 +255,17 @@ class DatabaseManager:
                 except Exception:
                     pass  # Column already exists, ignore error
 
+                # Migration: Add take_profit_order_id column if it doesn't exist
+                try:
+                    await conn.execute(
+                        "ALTER TABLE positions ADD COLUMN take_profit_order_id TEXT"
+                    )
+                    logger.info(
+                        "📊 Migrating database: adding take_profit_order_id column to positions table"
+                    )
+                except Exception:
+                    pass  # Column already exists, ignore error
+
                 # Create indexes for predictions table
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_predictions_market_id

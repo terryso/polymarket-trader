@@ -719,6 +719,56 @@ class Application:
                             )
                             continue
 
+                        # 检查是否需要补挂止盈单
+                        # 如果止盈开启但持仓没有止盈订单ID，需要补挂
+                        if (
+                            settings.exit_strategy.take_profit_enabled
+                            and not position.take_profit_order_id
+                            and app_settings.trading_mode.lower() == "live"
+                        ):
+                            logger.info(
+                                f"🎯 Position {position.id} has no take profit order, "
+                                f"placing one now..."
+                            )
+                            try:
+                                from src.models.trade import TradeType
+
+                                client = PolymarketClient()
+                                tp_executor = LiveTradingExecutor(
+                                    client=client,
+                                    trade_repo=trade_repo,
+                                    position_manager=position_manager,
+                                    state=self.state,
+                                )
+
+                                # 确定交易类型
+                                from src.models.position import PositionOutcome
+                                if position.outcome == PositionOutcome.YES:
+                                    trade_type = TradeType.BUY_YES
+                                else:
+                                    trade_type = TradeType.BUY_NO
+
+                                tp_order_id = await tp_executor._place_take_profit_order(
+                                    position=position,
+                                    market=market,
+                                    buy_price=position.avg_price,
+                                    shares=position.shares,
+                                    trade_type=trade_type,
+                                )
+
+                                if tp_order_id:
+                                    position.take_profit_order_id = tp_order_id
+                                    await position_manager._repo.update(position)
+                                    logger.info(
+                                        f"🎯 Take profit order placed for position {position.id}: "
+                                        f"order_id={tp_order_id}"
+                                    )
+                            except Exception as tp_error:
+                                logger.warning(
+                                    f"⚠️ Failed to place take profit order for position {position.id}: "
+                                    f"{tp_error}"
+                                )
+
                         # 检查退出条件
                         result = await exit_checker.check_exit_conditions(
                             position, market

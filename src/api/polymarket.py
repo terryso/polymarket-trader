@@ -352,7 +352,7 @@ class PolymarketClient:
             self._auth_level = 2
 
             # Set API credentials for posting orders
-            # Derive credentials from private key (most reliable method)
+            # Priority: 1) Derive from private key, 2) Use pre-configured credentials
             try:
                 creds = self._client.create_or_derive_api_creds()
                 self._client.set_api_creds(creds)
@@ -361,10 +361,34 @@ class PolymarketClient:
                     f"{OPERATION_EMOJIS['network']} Derived API credentials for order posting"
                 )
             except Exception as e:
-                self._api_creds_set = False
                 self._logger.warning(
-                    f"Failed to derive API credentials - order posting may fail: {e}"
+                    f"Failed to derive API credentials: {e}, trying pre-configured credentials"
                 )
+                # Try to use pre-configured API credentials
+                if api_key and api_secret and api_passphrase:
+                    try:
+                        from py_clob_client.clob_types import ApiCreds
+
+                        creds = ApiCreds(
+                            api_key=api_key,
+                            api_secret=api_secret,
+                            api_passphrase=api_passphrase,
+                        )
+                        self._client.set_api_creds(creds)
+                        self._api_creds_set = True
+                        self._logger.info(
+                            f"{OPERATION_EMOJIS['network']} Using pre-configured API credentials"
+                        )
+                    except Exception as e2:
+                        self._api_creds_set = False
+                        self._logger.error(
+                            f"Failed to set pre-configured API credentials: {e2}"
+                        )
+                else:
+                    self._api_creds_set = False
+                    self._logger.warning(
+                        "No pre-configured API credentials found - order posting may fail"
+                    )
 
             self._logger.info(
                 f"{OPERATION_EMOJIS['network']} Running with full authentication "

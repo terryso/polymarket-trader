@@ -38,7 +38,8 @@ class LiveTradeResult:
     Attributes:
         trade: The executed trade record
         position: The opened position (if any)
-        order_id: Polymarket order ID
+        order_id: Polymarket order ID (buy order)
+        take_profit_order_id: Take profit sell order ID (GTC)
         success: Whether the trade was successful
         error_message: Error message if trade failed
     """
@@ -46,6 +47,7 @@ class LiveTradeResult:
     trade: Trade | None = None
     position: "Position | None" = None
     order_id: str | None = None
+    take_profit_order_id: str | None = None
     success: bool = True
     error_message: str | None = None
 
@@ -463,6 +465,24 @@ class LiveTradingExecutor:
                     f"{OPERATION_EMOJIS['data']} Cache marked as stale after trade"
                 )
 
+            # 10. Place take profit order (GTC sell order at take profit price)
+            take_profit_order_id = await self._place_take_profit_order(
+                position=position,
+                market=market,
+                buy_price=price,
+                shares=shares,
+                trade_type=trade_type,
+            )
+
+            # 11. Update position with take profit order ID
+            if take_profit_order_id:
+                position.take_profit_order_id = take_profit_order_id
+                await self._position_manager._repo.update(position)
+                self._logger.info(
+                    f"🎯 Take profit order placed: order_id={take_profit_order_id}, "
+                    f"position_id={position.id}"
+                )
+
             self._logger.info(
                 f"{OPERATION_EMOJIS['success']} Live trade completed: trade_id={saved_trade.id}, "
                 f"position_id={position.id}, order_id={order_id}"
@@ -472,6 +492,7 @@ class LiveTradingExecutor:
                 trade=saved_trade,
                 position=position,
                 order_id=order_id,
+                take_profit_order_id=take_profit_order_id,
                 success=True,
             )
 
@@ -579,6 +600,21 @@ class LiveTradingExecutor:
             price = self._get_sell_price(position, market)
             trade_type = self._get_sell_trade_type(position)
 
+            # For stop loss, use more aggressive pricing for faster execution
+            order_type = None  # Default order type
+            if reason == "stop_loss":
+                # Use more aggressive discount for stop loss (5% instead of 2%)
+                # This ensures faster matching when trying to limit losses
+                STOP_LOSS_PRICE_DISCOUNT = 0.05
+                if position.outcome == PositionOutcome.YES:
+                    price = max(market.yes_price * (1 - STOP_LOSS_PRICE_DISCOUNT), 0.01)
+                else:
+                    price = max(market.no_price * (1 - STOP_LOSS_PRICE_DISCOUNT), 0.01)
+                self._logger.info(
+                    f"🛑 Stop loss: using aggressive price ${price:.4f} "
+                    f"(5% discount from market)"
+                )
+
             # Calculate proceeds
             sell_proceeds = shares_to_sell * price
 
@@ -599,8 +635,18 @@ class LiveTradingExecutor:
                 side="SELL",
             )
 
-            result = self._client._client.create_and_post_order(order_args)
-            self._logger.info(f"Sell order result: {result}")
+            # Use FAK (Fill and Kill) for stop loss to ensure quick execution
+            # FAK: Fill as much as possible immediately, cancel the rest
+            from py_clob_client.clob_types import OrderType
+
+            if reason == "stop_loss":
+                result = self._client._client.create_and_post_order(
+                    order_args, OrderType.FAK
+                )
+                self._logger.info(f"Stop loss order (FAK) result: {result}")
+            else:
+                result = self._client._client.create_and_post_order(order_args)
+                self._logger.info(f"Sell order result: {result}")
 
             # Extract order ID from result
             if isinstance(result, dict):
@@ -672,7 +718,11 @@ class LiveTradingExecutor:
             # 8. Update state capital (add proceeds from sale)
             await self._state.update_capital(sell_proceeds)
 
-            # 9. Mark cache as stale (Tech-Spec: Single Source of Truth)
+            # 9. Cancel take profit order if exists (position is being sold)
+            if position.take_profit_order_id:
+                await self.cancel_take_profit_order(updated_position)
+
+            # 10. Mark cache as stale (Tech-Spec: Single Source of Truth)
             if self._cache_service:
                 await self._cache_service.mark_stale()
                 self._logger.debug(
@@ -763,3 +813,148 @@ class LiveTradingExecutor:
                 success=False,
                 error_message=f"Unexpected error: {e}",
             )
+
+    async def _place_take_profit_order(
+        self,
+        position: "Position",
+        market: "Market",
+        buy_price: float,
+        shares: float,
+        trade_type: TradeType,
+    ) -> str | None:
+        """Place a take profit GTC sell order after a successful buy.
+
+        This method places a GTC (Good Till Cancelled) sell order at the take profit
+        price immediately after opening a position. This ensures the take profit order
+        is always in the orderbook, ready to execute when price reaches the target.
+
+        Args:
+            position: The newly opened position
+            market: Market for the position
+            buy_price: Price at which the position was bought
+            shares: Number of shares to sell
+            trade_type: Type of trade (BUY_YES or BUY_NO)
+
+        Returns:
+            Take profit order ID if successful, None otherwise
+        """
+        from src.config import settings
+
+        # Check if take profit is enabled
+        if not settings.exit_strategy.take_profit_enabled:
+            self._logger.debug("Take profit is disabled, skipping TP order placement")
+            return None
+
+        try:
+            # Calculate take profit price
+            # TP price = buy_price * (1 + take_profit_pct)
+            # Example: buy @ $0.50, TP 30% → sell @ $0.65
+            take_profit_pct = settings.exit_strategy.take_profit_pct
+            take_profit_price = buy_price * (1 + take_profit_pct)
+
+            # Cap at 0.99 (max possible price in prediction market)
+            take_profit_price = min(take_profit_price, 0.99)
+
+            # Get token ID for selling (same token we bought)
+            token_id = self._get_sell_token_id(position, market)
+
+            # Determine sell trade type
+            sell_trade_type = self._get_sell_trade_type(position)
+
+            self._logger.info(
+                f"🎯 Placing take profit order: {sell_trade_type.value} {shares:.4f} shares "
+                f"@ ${take_profit_price:.4f} (buy_price=${buy_price:.4f}, TP={take_profit_pct:.0%})"
+            )
+
+            # Place GTC sell order
+            from py_clob_client.clob_types import OrderArgs
+
+            order_args = OrderArgs(
+                token_id=token_id,
+                price=take_profit_price,
+                size=shares,
+                side="SELL",
+            )
+
+            # Use GTC (Good Till Cancelled) order type for take profit
+            from py_clob_client.clob_types import OrderType
+
+            result = self._client._client.create_and_post_order(
+                order_args, OrderType.GTC
+            )
+            self._logger.debug(f"Take profit order result: {result}")
+
+            # Extract order ID from result
+            if isinstance(result, dict):
+                order_id = (
+                    result.get("orderID")
+                    or result.get("order_id")
+                    or result.get("id")
+                )
+                success = result.get("success", False)
+                if not success:
+                    error_msg = result.get("errorMsg", "Unknown error")
+                    self._logger.warning(
+                        f"⚠️ Take profit order failed: {error_msg}"
+                    )
+                    return None
+            elif isinstance(result, str):
+                order_id = result
+            else:
+                order_id = str(result)
+
+            self._logger.info(
+                f"🎯 Take profit order placed successfully: order_id={order_id}, "
+                f"price=${take_profit_price:.4f}"
+            )
+            return order_id
+
+        except Exception as e:
+            # Log warning but don't fail the main trade
+            self._logger.warning(
+                f"⚠️ Failed to place take profit order: {e}. "
+                f"Position is still open, TP will be handled by scheduled check."
+            )
+            return None
+
+    async def cancel_take_profit_order(self, position: "Position") -> bool:
+        """Cancel an existing take profit order for a position.
+
+        This should be called when:
+        - Position is closed (manually or via stop loss)
+        - Position is partially sold
+
+        Args:
+            position: Position with a take profit order to cancel
+
+        Returns:
+            True if cancellation was successful, False otherwise
+        """
+        if not position.take_profit_order_id:
+            self._logger.debug(
+                f"No take profit order to cancel for position {position.id}"
+            )
+            return True
+
+        try:
+            self._logger.info(
+                f"🎯 Cancelling take profit order: {position.take_profit_order_id}"
+            )
+
+            result = self._client._client.cancel_order(position.take_profit_order_id)
+            self._logger.debug(f"Cancel order result: {result}")
+
+            # Clear the order ID from position
+            position.take_profit_order_id = None
+            await self._position_manager._repo.update(position)
+
+            self._logger.info(
+                f"🎯 Take profit order cancelled: position_id={position.id}"
+            )
+            return True
+
+        except Exception as e:
+            self._logger.warning(
+                f"⚠️ Failed to cancel take profit order {position.take_profit_order_id}: {e}"
+            )
+            return False

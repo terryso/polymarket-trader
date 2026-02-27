@@ -125,6 +125,9 @@ class Position(BaseModel):
     status: PositionStatus = Field(..., description="Position status")
     opened_at: datetime | None = Field(default=None, description="Opening timestamp")
     closed_at: datetime | None = Field(default=None, description="Closing timestamp")
+    take_profit_order_id: str | None = Field(
+        default=None, description="Take profit order ID on Polymarket (GTC sell order)"
+    )
 
     @field_serializer("opened_at", "closed_at")
     def serialize_datetime(self, dt: datetime | None, _info: Any) -> str | None:
