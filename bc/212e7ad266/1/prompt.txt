@@ -1,0 +1,102 @@
+IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
+
+<steps CRITICAL="TRUE">
+1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
+2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/tea/workflows/testarch/ci/workflow.yaml
+3. Pass the yaml path @{project-root}/_bmad/tea/workflows/testarch/ci/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
+4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
+5. Save outputs after EACH section when generating any documents from templates
+</steps>
+
+---
+
+提交全部代码
+
+---
+
+11s
+Run black --check src/ tests/
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/analysis/market_filter.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/api/telegram.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/alerting.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/error_handler.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/recovery.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/config.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/models/__init__.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/models/position.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/models/prediction_response.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/core/tasks.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/models/trade.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/models/trade_response.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/api/polymarket.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/storage/database.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/exit_checker.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/executor.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/paper_trading.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/live_trading.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/position_manager.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/trading/position_sync.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/src/utils/logger.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/integration/test_llm_integration.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/integration/test_llm_analyzer_integration.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/integration/test_statistics_recorder_integration.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/integration/test_trading_flow_integration.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_analysis/test_learning_log_generator.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_api/test_llm.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_api/test_polymarket_extended.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_analysis/test_prompts.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_api/test_polymarket.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_api/test_telegram.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_core/test_alerting.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_core/test_error_handler.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_core/test_scheduler.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_core/test_recovery.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_core/test_tasks.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_activities.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_middleware/test_error_middleware.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_config.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_settings_routes.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_predictions.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_positions.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_markets.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_system_status.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_statistics.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_trades_story79.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_main_extended.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_dashboard/test_routes/test_trades.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_logger.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_models/test_trade.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_main.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_models/test_prediction.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_retry_extended.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_storage/test_market_fetcher.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_notifications/test_exit_notification.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_storage/test_repositories/test_state_repo.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_storage/test_repositories/test_position_repo.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_storage/test_repositories/test_statistics_repo.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_storage/test_repositories/test_market_repo.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_storage/test_repositories/test_trade_repo.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_executor_notifications.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_live_trading_sell.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_paper_trading.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_exit_checker.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_position_sync.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_risk_control.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_trading/test_position_manager.py
+would reformat /home/runner/work/polymarket-trader/polymarket-trader/tests/test_telegram_commands/test_handlers.py
+
+Oh no! 💥 💔 💥
+68 files would be reformatted, 89 files would be left unchanged.
+Error: Process completed with exit code 1.
+
+---
+
+https://github.com/terryso/polymarket-trader/actions/runs/22469014117
+
+你可以看看这个action的运行结果, 还是很多错误
+
+---
+
+https://github.com/terryso/polymarket-trader/actions/runs/22469192608
+
+还是很多错误
