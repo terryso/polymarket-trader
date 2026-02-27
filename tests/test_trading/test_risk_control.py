@@ -83,6 +83,7 @@ def create_mock_circuit_breaker(
     allowed: bool = True,
     position_ratio: float = 1.0,
     reasons: list = None,
+    disable_circuit_breaker: bool = False,
 ) -> MagicMock:
     """Create a mock CircuitBreaker."""
     breaker = MagicMock()
@@ -93,6 +94,7 @@ def create_mock_circuit_breaker(
         reasons=reasons or [],
         triggers=[],
     )
+    breaker._disable_circuit_breaker = disable_circuit_breaker
     return breaker
 
 
@@ -526,9 +528,10 @@ class TestTradingDisabled:
 
     @pytest.mark.asyncio
     async def test_trading_disabled_in_state(self):
-        """Test that disabled trading fails the check."""
+        """Test that disabled trading fails the check when circuit breaker is enabled."""
         mock_state = create_mock_state(trading_enabled=False)
-        mock_breaker = create_mock_circuit_breaker()
+        # circuit breaker NOT disabled, so trading_enabled check should work
+        mock_breaker = create_mock_circuit_breaker(disable_circuit_breaker=False)
         controller = RiskController(mock_state, mock_breaker)
 
         prediction = create_prediction()
@@ -537,6 +540,23 @@ class TestTradingDisabled:
         result = await controller.check_trade_allowed(prediction, market)
 
         assert RiskCheckFailure.TRADING_DISABLED in result.failures
+
+    @pytest.mark.asyncio
+    async def test_trading_disabled_ignored_when_circuit_breaker_disabled(self):
+        """Test that disabled trading is ignored when circuit breaker is disabled."""
+        mock_state = create_mock_state(trading_enabled=False)
+        # circuit breaker IS disabled, so trading_enabled check should be skipped
+        mock_breaker = create_mock_circuit_breaker(disable_circuit_breaker=True)
+        controller = RiskController(mock_state, mock_breaker)
+
+        prediction = create_prediction()
+        market = create_market()
+
+        result = await controller.check_trade_allowed(prediction, market)
+
+        # Should pass because trading_enabled check is skipped when circuit breaker is disabled
+        assert result.allowed is True
+        assert RiskCheckFailure.TRADING_DISABLED not in result.failures
 
 
 class TestPositionTracking:
