@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -41,13 +41,21 @@ class TestDatabaseConfig:
 
     def test_from_settings_creates_path(self, tmp_path: Path) -> None:
         """Test DatabaseConfig.from_settings() creates correct path."""
+        from src.config import settings
         from src.storage.database import DatabaseConfig
 
-        with patch("src.storage.database.settings") as mock_settings:
-            mock_settings.data_dir = str(tmp_path)
+        # Save original settings
+        original_settings = settings._settings
+
+        try:
+            # Clear cache and set mock
+            settings._settings = MagicMock(data_dir=str(tmp_path))
             config = DatabaseConfig.from_settings()
 
             assert config.db_path == tmp_path / "polymarket.db"
+        finally:
+            # Restore original settings
+            settings._settings = original_settings
 
 
 class TestDatabaseManager:
@@ -505,16 +513,24 @@ class TestConvenienceFunctions:
     @pytest.mark.asyncio
     async def test_init_db_function(self, tmp_path: Path) -> None:
         """Test the init_db convenience function."""
+        from src.config import settings
         from src.storage import database as db_module
 
         # Reset the singleton
         db_module._db_manager = None
 
-        with patch("src.storage.database.settings") as mock_settings:
-            mock_settings.data_dir = str(tmp_path)
+        # Save original settings
+        original_settings = settings._settings
+
+        try:
+            # Clear cache and set mock
+            settings._settings = MagicMock(data_dir=str(tmp_path))
             await db_module.init_db()
 
             assert (tmp_path / "polymarket.db").exists()
+        finally:
+            # Restore original settings
+            settings._settings = original_settings
 
         # Reset for other tests
         db_module._db_manager = None
