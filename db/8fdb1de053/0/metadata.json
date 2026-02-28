@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "db8fdb1de053",
+  "session_id": "ecf34357-8dce-4fef-954c-f26c0343be1b",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-28T04:04:42.170896Z",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "_bmad-output/test-artifacts/atdd-checklist-epic5-p0.md",
+    "_bmad-output/test-artifacts/test-design-epic-5.md",
+    "_bmad-output/test-artifacts/test-design-progress.md",
+    "tests/integration/test_concurrent_p0.py",
+    "tests/test_trading/test_pnl_p0.py",
+    "tests/test_trading/test_share_precision_p0.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "93bf3e36213b",
+  "token_usage": {
+    "input_tokens": 173805,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3393152,
+    "output_tokens": 27141,
+    "api_call_count": 45
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-28T04:04:41.564877Z",
+    "agent_lines": 1753,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1753,
+    "agent_percentage": 100
+  }
+}

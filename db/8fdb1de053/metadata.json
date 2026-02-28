@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "db8fdb1de053",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "_bmad-output/test-artifacts/atdd-checklist-epic5-p0.md",
+    "_bmad-output/test-artifacts/test-design-epic-5.md",
+    "_bmad-output/test-artifacts/test-design-progress.md",
+    "tests/integration/test_concurrent_p0.py",
+    "tests/test_trading/test_pnl_p0.py",
+    "tests/test_trading/test_share_precision_p0.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/db/8fdb1de053/0/metadata.json",
+      "transcript": "/db/8fdb1de053/0/full.jsonl",
+      "context": "/db/8fdb1de053/0/context.md",
+      "content_hash": "/db/8fdb1de053/0/content_hash.txt",
+      "prompt": "/db/8fdb1de053/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 173805,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3393152,
+    "output_tokens": 27141,
+    "api_call_count": 45
+  }
+}
