@@ -67,6 +67,7 @@ def circuit_breaker(state: ThreadSafeState) -> CircuitBreaker:
         capital_threshold=100.0,
         reduce_ratio_low_capital=0.10,
         initial_capital=200.0,
+        disable_circuit_breaker=False,  # Explicitly enable for testing
     )
 
 
@@ -238,6 +239,7 @@ class TestRiskControllerCircuitBreakerIntegration:
             state,
             daily_loss_limit=0.30,
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
         risk_controller = RiskController(state, circuit_breaker)
 
@@ -341,6 +343,7 @@ class TestRiskControllerCircuitBreakerIntegration:
             consecutive_losses_limit=3,
             reduce_ratio_after_losses=0.10,  # 10% of normal position
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
         risk_controller = RiskController(
             state,
@@ -406,7 +409,9 @@ class TestRiskControllerEdgeCases:
         """Test trade blocked when capital is too low."""
         # Set very low capital
         low_capital_state = ThreadSafeState(initial_capital=3.0)
-        low_capital_breaker = CircuitBreaker(low_capital_state)
+        low_capital_breaker = CircuitBreaker(
+            low_capital_state, disable_circuit_breaker=False
+        )
 
         risk_controller = RiskController(
             low_capital_state,
@@ -461,6 +466,7 @@ class TestRiskControllerEdgeCases:
             capital_threshold=180.0,  # High threshold so it triggers
             daily_loss_limit=0.50,  # Higher limit to avoid daily loss trigger
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
         risk_controller = RiskController(state, circuit_breaker)
 
@@ -494,6 +500,7 @@ class TestRiskControllerEdgeCases:
             consecutive_losses_limit=2,
             reduce_ratio_after_losses=0.10,
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
         risk_controller = RiskController(state, circuit_breaker)
 
@@ -520,7 +527,7 @@ class TestRiskControllerStateIntegration:
         market: Market,
     ) -> None:
         """Test trade blocked when trading is disabled in state."""
-        circuit_breaker = CircuitBreaker(state)
+        circuit_breaker = CircuitBreaker(state, disable_circuit_breaker=False)
         risk_controller = RiskController(state, circuit_breaker)
 
         # Disable trading
@@ -633,6 +640,7 @@ class TestCircuitBreakerIntegration:
             capital_threshold=150.0,
             daily_loss_limit=0.50,  # Higher limit to avoid daily loss trigger
             initial_capital=200.0,
+            disable_circuit_breaker=False,
         )
 
         # Trigger capital threshold (small loss to stay under daily limit)

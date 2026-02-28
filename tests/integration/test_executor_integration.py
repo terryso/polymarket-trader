@@ -120,12 +120,14 @@ class _TestDatabaseManager:
                     outcome TEXT NOT NULL,
                     shares REAL NOT NULL,
                     avg_price REAL NOT NULL,
+                    cur_price REAL,
                     initial_value REAL,
                     current_value REAL,
                     pnl REAL,
                     status TEXT,
                     opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    closed_at DATETIME
+                    closed_at DATETIME,
+                    take_profit_order_id TEXT
                 )
             """)
 
@@ -143,7 +145,8 @@ class _TestDatabaseManager:
                     llm_prediction_id INTEGER,
                     position_id INTEGER,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    polymarket_order_id TEXT
+                    polymarket_order_id TEXT,
+                    exit_type TEXT
                 )
             """)
 

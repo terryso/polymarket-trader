@@ -94,7 +94,8 @@ class _TestDatabaseManager:
                     llm_prediction_id INTEGER,
                     position_id INTEGER,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    polymarket_order_id TEXT
+                    polymarket_order_id TEXT,
+                    exit_type TEXT
                 )
             """)
 

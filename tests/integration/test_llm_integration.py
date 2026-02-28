@@ -128,7 +128,7 @@ class TestLLMClientErrorHandling:
         # A real timeout would take too long for integration tests
         with LLMClient() as client:
             # Use actual config value instead of hardcoded
-            assert client._timeout == settings.llm_timeout
+            assert client._timeout == settings.llm.timeout
 
 
 class TestLLMClientMaskApiKey:

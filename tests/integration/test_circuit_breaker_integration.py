@@ -61,6 +61,7 @@ async def circuit_breaker(fresh_state: ThreadSafeState) -> CircuitBreaker:
         capital_threshold=100.0,
         reduce_ratio_low_capital=0.5,
         initial_capital=200.0,
+        disable_circuit_breaker=False,  # Explicitly enable for testing
     )
 
 
@@ -100,6 +101,7 @@ async def capital_threshold_breaker(
         capital_threshold=100.0,
         reduce_ratio_low_capital=0.5,
         initial_capital=1000.0,
+        disable_circuit_breaker=False,  # Explicitly enable for testing
     )
 
 
