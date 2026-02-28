@@ -1,0 +1,120 @@
+IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
+
+<steps CRITICAL="TRUE">
+1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
+2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/tea/workflows/testarch/test-design/workflow.yaml
+3. Pass the yaml path @{project-root}/_bmad/tea/workflows/testarch/test-design/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
+4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
+5. Save outputs after EACH section when generating any documents from templates
+</steps>
+
+---
+
+IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
+
+<steps CRITICAL="TRUE">
+1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
+2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/tea/workflows/testarch/test-design/workflow.yaml
+3. Pass the yaml path @{project-root}/_bmad/tea/workflows/testarch/test-design/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
+4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
+5. Save outputs after EACH section when generating any documents from templates
+</steps>
+
+---
+
+你推荐哪个模式
+
+---
+
+Epic 5 开始
+
+---
+
+IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
+
+<steps CRITICAL="TRUE">
+1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
+2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/tea/workflows/testarch/atdd/workflow.yaml
+3. Pass the yaml path @{project-root}/_bmad/tea/workflows/testarch/atdd/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
+4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
+5. Save outputs after EACH section when generating any documents from templates
+</steps>
+
+---
+
+IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
+
+<steps CRITICAL="TRUE">
+1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
+2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/tea/workflows/testarch/atdd/workflow.yaml
+3. Pass the yaml path @{project-root}/_bmad/tea/workflows/testarch/atdd/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
+4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
+5. Save outputs after EACH section when generating any documents from templates
+</steps>
+
+---
+
+4
+
+---
+
+commit the new P0 tests
+
+---
+
+下一步建议做什么
+
+---
+
+A) 完成 P1 测试
+
+---
+
+push
+
+---
+
+===================================== FAILURES ======================================
+________________ TestDatabaseConfig.test_from_settings_creates_path _________________
+tests/test_storage/test_database.py:50: in test_from_settings_creates_path
+    assert config.db_path == tmp_path / "polymarket.db"
+E   AssertionError: assert '/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db' == (PosixPath('/private/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/pytest-of-nick/pytest-68/test_from_settings_creates_pat0') / 'polymarket.db')
+E    +  where '/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db' = DatabaseConfig(db_path='/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db', max_connections=5).db_path
+__________________ TestConvenienceFunctions.test_init_db_function ___________________
+tests/test_storage/test_database.py:517: in test_init_db_function
+    assert (tmp_path / "polymarket.db").exists()
+E   AssertionError: assert False
+E    +  where False = exists()
+E    +    where exists = (PosixPath('/private/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/pytest-of-nick/pytest-68/test_init_db_function0') / 'polymarket.db').exists
+------------------------------- Captured stderr call --------------------------------
+2026-02-28 12:12:01 | INFO     | MainThread   | src.storage.database | ✅ 📊 Initializing database at /var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db...
+2026-02-28 12:12:01 | INFO     | MainThread   | src.storage.database | ✅ 📊 Migrating database: adding take_profit_order_id column to positions table
+2026-02-28 12:12:01 | INFO     | MainThread   | src.storage.database | ✅ 📊 Added exit_type column to trades table
+2026-02-28 12:12:01 | INFO     | MainThread   | src.storage.database | ✅ ✅ Database initialized at /var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db
+============================== short test summary info ==============================
+FAILED tests/test_storage/test_database.py::TestDatabaseConfig::test_from_settings_creates_path - AssertionError: assert '/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db' == (PosixPath('/private/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/pytest-of-nick/pytest-68/test_from_settings_creates_pat0') / 'polymarket.db')
+ +  where '/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db' = DatabaseConfig(db_path='/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/polymarket_test_8t761k49/test.db', max_connections=5).db_path
+FAILED tests/test_storage/test_database.py::TestConvenienceFunctions::test_init_db_function - AssertionError: assert False
+ +  where False = exists()
+ +    where exists = (PosixPath('/private/var/folders/zd/ygt_wt3x0wbdl1lwfddnstqh0000gn/T/pytest-of-nick/pytest-68/test_init_db_function0') / 'polymarket.db').exists
+============ 2 failed, 2001 passed, 8 skipped, 173 deselected in 11.72s ============
+
+---
+
+审查那 5 个未提交的修改
+
+---
+
+现在交易历史不是直接从Polymarket获取的吗
+
+---
+
+对 撤销那个文件 保留其他四个
+
+---
+
+下一步建议做什么
+
+---
+
+C 运行完整测试套件
