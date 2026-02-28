@@ -56,12 +56,14 @@ class PaperTradeResult:
         trade: The executed trade record
         position: The opened position (if any)
         success: Whether the trade was successful
+        skipped: Whether the trade was skipped (e.g., position already exists)
         error_message: Error message if trade failed
     """
 
     trade: Trade | None = None
     position: "Position | None" = None
     success: bool = True
+    skipped: bool = False
     error_message: str | None = None
 
 
@@ -153,14 +155,15 @@ class PaperTradingExecutor:
                 await self._position_manager.get_position_by_market_from_api(market.id)
             )
             if existing_position:
-                self._logger.warning(
-                    f"{OPERATION_EMOJIS['warning']} Skipping trade: open position already exists "
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['skip']} Skipping trade: open position already exists "
                     f"for market {market.id} (shares={existing_position.shares:.2f})"
                 )
                 return PaperTradeResult(
                     trade=None,
                     position=None,
-                    success=False,
+                    success=True,
+                    skipped=True,
                     error_message=f"Open position already exists for market {market.id}",
                 )
 

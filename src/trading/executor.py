@@ -350,6 +350,18 @@ class TradingExecutor:
                 prediction_id=prediction_id,
             )
 
+            if result.skipped:
+                # Trade was skipped (e.g., position already exists) - this is not an error
+                self._logger.info(
+                    f"Trade skipped for market {market.id}: {result.error_message}"
+                )
+                return TradingDecision(
+                    market_id=market.id,
+                    success=True,
+                    prediction=prediction,
+                    error_message=result.error_message,
+                )
+
             if not result.success:
                 self._logger.error(
                     f"Trade execution failed for market {market.id}: "

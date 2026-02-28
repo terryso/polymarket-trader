@@ -47,6 +47,7 @@ OPERATION_EMOJIS: dict[str, str] = {
     "warning": "⚠️",
     "success": "✅",
     "error": "❌",
+    "skip": "⏭️",
 }
 
 

@@ -42,6 +42,7 @@ class LiveTradeResult:
         order_id: Polymarket order ID (buy order)
         take_profit_order_id: Take profit sell order ID (GTC)
         success: Whether the trade was successful
+        skipped: Whether the trade was skipped (e.g., position already exists)
         error_message: Error message if trade failed
     """
 
@@ -50,6 +51,7 @@ class LiveTradeResult:
     order_id: str | None = None
     take_profit_order_id: str | None = None
     success: bool = True
+    skipped: bool = False
     error_message: str | None = None
 
 
@@ -400,13 +402,14 @@ class LiveTradingExecutor:
                 await self._position_manager.get_position_by_market_from_api(market.id)
             )
             if existing_position:
-                self._logger.warning(
-                    f"{OPERATION_EMOJIS['warning']} Skipping trade: open position already exists "
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['skip']} Skipping trade: open position already exists "
                     f"for market {market.id} (shares={existing_position.shares:.2f})"
                 )
                 return LiveTradeResult(
                     trade=None,
-                    success=False,
+                    success=True,
+                    skipped=True,
                     error_message=f"Open position already exists for market {market.id}",
                 )
 
@@ -666,12 +669,19 @@ class LiveTradingExecutor:
             # PnL = (sell_price - avg_price) * shares_sold
             realized_pnl = (price - position.avg_price) * shares_to_sell
 
+            # 4. Cancel ALL active SELL orders for this token FIRST
+            # This is critical because:
+            # - GTC SELL orders lock tokens, preventing new sells
+            # - The take_profit_order_id in DB may be out of sync with actual orders
+            # - We need ALL tokens available before placing a new sell order
+            await self.cancel_all_sell_orders_for_token(token_id)
+
             self._logger.info(
                 f"Placing sell order: {trade_type.value} {shares_to_sell:.4f} shares "
                 f"@ ${price:.4f} = ${sell_proceeds:.2f} (reason={reason})"
             )
 
-            # 4. Place sell order on Polymarket
+            # 5. Place sell order on Polymarket
             # For stop loss, use MarketOrderArgs with FAK order type
             from py_clob_client.clob_types import MarketOrderArgs, OrderType
 
@@ -768,11 +778,7 @@ class LiveTradingExecutor:
             # 8. Update state capital (add proceeds from sale)
             await self._state.update_capital(sell_proceeds)
 
-            # 9. Cancel take profit order if exists (position is being sold)
-            if position.take_profit_order_id:
-                await self.cancel_take_profit_order(updated_position)
-
-            # 10. Mark cache as stale (Tech-Spec: Single Source of Truth)
+            # 9. Mark cache as stale (Tech-Spec: Single Source of Truth)
             if self._cache_service:
                 await self._cache_service.mark_stale()
                 self._logger.debug(
@@ -929,6 +935,10 @@ class LiveTradingExecutor:
             # Get token ID for selling (same token we bought)
             token_id = self._get_sell_token_id(position, market)
 
+            # Cancel any existing SELL orders for this token FIRST
+            # This prevents "not enough balance" errors when placing new TP order
+            await self.cancel_all_sell_orders_for_token(token_id)
+
             # Determine sell trade type
             sell_trade_type = self._get_sell_trade_type(position)
 
@@ -1011,7 +1021,7 @@ class LiveTradingExecutor:
                 f"🎯 Cancelling take profit order: {position.take_profit_order_id}"
             )
 
-            result = self._client._client.cancel_order(position.take_profit_order_id)
+            result = self._client._client.cancel(position.take_profit_order_id)
             self._logger.debug(f"Cancel order result: {result}")
 
             # Clear the order ID from position
@@ -1028,3 +1038,56 @@ class LiveTradingExecutor:
                 f"⚠️ Failed to cancel take profit order {position.take_profit_order_id}: {e}"
             )
             return False
+
+    async def cancel_all_sell_orders_for_token(self, token_id: str) -> int:
+        """Cancel all active SELL orders for a specific token.
+
+        This is important because:
+        1. GTC SELL orders lock tokens, preventing new sells
+        2. The take_profit_order_id in DB may be out of sync with actual orders
+        3. We need to ensure all tokens are available before selling
+
+        Args:
+            token_id: Token ID to cancel orders for
+
+        Returns:
+            Number of orders successfully cancelled
+        """
+        try:
+            # Get all open orders
+            orders = self._client._client.get_orders()
+            if not orders:
+                self._logger.debug("No open orders found")
+                return 0
+
+            cancelled_count = 0
+            for order in orders:
+                # Only cancel SELL orders for this token
+                if (
+                    order.get("side", "").upper() == "SELL"
+                    and order.get("asset_id") == token_id
+                    and order.get("status") == "LIVE"
+                ):
+                    order_id = order.get("id")
+                    if order_id:
+                        try:
+                            self._logger.info(
+                                f"🎯 Cancelling active SELL order {order_id} "
+                                f"for token {token_id[:20]}... (releases locked tokens)"
+                            )
+                            self._client._client.cancel(order_id)
+                            cancelled_count += 1
+                        except Exception as cancel_error:
+                            self._logger.warning(
+                                f"⚠️ Failed to cancel order {order_id}: {cancel_error}"
+                            )
+
+            if cancelled_count > 0:
+                self._logger.info(
+                    f"🎯 Cancelled {cancelled_count} SELL orders for token {token_id[:20]}..."
+                )
+            return cancelled_count
+
+        except Exception as e:
+            self._logger.warning(f"⚠️ Failed to get/cancel orders: {e}")
+            return 0
