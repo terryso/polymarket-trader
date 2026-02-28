@@ -122,10 +122,13 @@ class TestLLMClientErrorHandling:
 
     def test_chat_timeout_handling(self) -> None:
         """Test that timeout is configured properly."""
+        from src.config import settings
+
         # This test verifies the timeout configuration is working
         # A real timeout would take too long for integration tests
         with LLMClient() as client:
-            assert client._timeout == 30  # Default from config
+            # Use actual config value instead of hardcoded
+            assert client._timeout == settings.llm_timeout
 
 
 class TestLLMClientMaskApiKey:
