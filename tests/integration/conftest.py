@@ -43,7 +43,7 @@ def test_db_path() -> str:
     return _test_db_path
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session")
 async def setup_test_database(test_db_path: str) -> AsyncIterator[None]:
     """Set up the test database for integration tests.
 
@@ -51,6 +51,9 @@ async def setup_test_database(test_db_path: str) -> AsyncIterator[None]:
     1. Creates the test database with the required schema
     2. Patches the database manager to use the test database
     3. Cleans up after all tests complete
+
+    Note: This fixture is NOT autouse to avoid affecting unit tests.
+    Integration tests should explicitly use this fixture.
 
     Args:
         test_db_path: Path to the test database file

@@ -39,23 +39,20 @@ class TestDatabaseConfig:
 
         assert config.max_connections == 10
 
-    def test_from_settings_creates_path(self, tmp_path: Path) -> None:
+    def test_from_settings_creates_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test DatabaseConfig.from_settings() creates correct path."""
         from src.config import settings
         from src.storage.database import DatabaseConfig
 
-        # Save original settings
-        original_settings = settings._settings
+        # Use monkeypatch for proper isolation
+        mock_settings = MagicMock(data_dir=str(tmp_path))
+        monkeypatch.setattr(settings, "_settings", mock_settings)
 
-        try:
-            # Clear cache and set mock
-            settings._settings = MagicMock(data_dir=str(tmp_path))
-            config = DatabaseConfig.from_settings()
+        config = DatabaseConfig.from_settings()
 
-            assert config.db_path == tmp_path / "polymarket.db"
-        finally:
-            # Restore original settings
-            settings._settings = original_settings
+        assert config.db_path == tmp_path / "polymarket.db"
 
 
 class TestDatabaseManager:
@@ -511,7 +508,9 @@ class TestConvenienceFunctions:
     """Test module-level convenience functions."""
 
     @pytest.mark.asyncio
-    async def test_init_db_function(self, tmp_path: Path) -> None:
+    async def test_init_db_function(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test the init_db convenience function."""
         from src.config import settings
         from src.storage import database as db_module
@@ -519,18 +518,13 @@ class TestConvenienceFunctions:
         # Reset the singleton
         db_module._db_manager = None
 
-        # Save original settings
-        original_settings = settings._settings
+        # Use monkeypatch for proper isolation
+        mock_settings = MagicMock(data_dir=str(tmp_path))
+        monkeypatch.setattr(settings, "_settings", mock_settings)
 
-        try:
-            # Clear cache and set mock
-            settings._settings = MagicMock(data_dir=str(tmp_path))
-            await db_module.init_db()
+        await db_module.init_db()
 
-            assert (tmp_path / "polymarket.db").exists()
-        finally:
-            # Restore original settings
-            settings._settings = original_settings
+        assert (tmp_path / "polymarket.db").exists()
 
         # Reset for other tests
         db_module._db_manager = None
