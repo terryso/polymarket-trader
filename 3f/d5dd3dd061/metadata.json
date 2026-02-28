@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "3fd5dd3dd061",
+  "strategy": "manual-commit",
+  "branch": "develop",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tests/test_trading/test_p1_supplementary.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/3f/d5dd3dd061/0/metadata.json",
+      "transcript": "/3f/d5dd3dd061/0/full.jsonl",
+      "context": "/3f/d5dd3dd061/0/context.md",
+      "content_hash": "/3f/d5dd3dd061/0/content_hash.txt",
+      "prompt": "/3f/d5dd3dd061/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 9062,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1378624,
+    "output_tokens": 6176,
+    "api_call_count": 12
+  }
+}
