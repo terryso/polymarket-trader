@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PnLChart } from "@/components/dashboard/PnLChart";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { TradingControl } from "@/components/dashboard/TradingControl";
 import { useOverview, useSystemStatus } from "@/hooks/useStatistics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -163,6 +164,9 @@ const Index = () => {
             testId="stat-trading-mode"
           />
         </div>
+
+        {/* Trading Control Panel */}
+        <TradingControl />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">

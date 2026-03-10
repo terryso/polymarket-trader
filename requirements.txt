@@ -4,6 +4,8 @@ web3>=5.31.0
 
 # LLM (OpenAI compatible protocol - GLM)
 openai>=1.0.0
+# BigModel (ZhipuAI) SDK for web search
+zai-sdk>=0.2.2
 
 # Web Framework
 fastapi>=0.109.0
@@ -30,5 +32,10 @@ apscheduler>=3.10.0
 # Telegram Bot (Story 9.1)
 python-telegram-bot>=20.0
 
+# Web Research (Chromium CDP)
+playwright>=1.40.0
+
 # Utilities
 halo>=0.0.31
+fake-useragent>=1.5.1
+playwright-stealth>=1.0.2

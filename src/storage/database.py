@@ -228,6 +228,24 @@ class DatabaseManager:
                     )
                     await conn.execute("ALTER TABLE predictions ADD COLUMN edge REAL")
 
+                # Migration: Add detailed analysis fields
+                new_columns = {
+                    "web_search_query": "TEXT",
+                    "web_search_summary": "TEXT",
+                    "llm_prompt": "TEXT",
+                    "llm_response": "TEXT",
+                    "trade_executed": "BOOLEAN",
+                    "trade_result": "TEXT",
+                    "trade_error": "TEXT",
+                }
+
+                for column_name, column_type in new_columns.items():
+                    if column_name not in column_names:
+                        logger.info(
+                            f"📊 Migrating database: adding {column_name} column to predictions table"
+                        )
+                        await conn.execute(f"ALTER TABLE predictions ADD COLUMN {column_name} {column_type}")
+
                 # Create positions table (Story 4.5)
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS positions (

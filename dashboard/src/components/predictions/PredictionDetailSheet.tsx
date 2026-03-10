@@ -6,6 +6,7 @@
  * Story 7.8: 预测详情抽屉组件
  */
 
+import React, { useState } from "react";
 import { usePrediction } from "@/hooks/usePredictions";
 import {
   Sheet,
@@ -15,8 +16,9 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, XCircle, Clock, Brain, Target, Lightbulb } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Brain, Target, Lightbulb, Globe, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 
 interface PredictionDetailSheetProps {
   /** Prediction ID to fetch and display */
@@ -26,6 +28,8 @@ interface PredictionDetailSheetProps {
   /** Callback when sheet open state changes */
   onOpenChange: (open: boolean) => void;
 }
+
+type TabType = "overview" | "web-research" | "llm";
 
 /**
  * Formats a probability value for display.
@@ -100,9 +104,45 @@ const LoadingSkeleton = () => (
 );
 
 /**
+ * Expandable text component for long content
+ */
+function ExpandableText({ content, maxLength = 300 }: { content: string; maxLength?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldTruncate = content.length > maxLength;
+
+  if (!shouldTruncate) {
+    return <div className="text-sm whitespace-pre-wrap">{content}</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="text-sm whitespace-pre-wrap">
+        {isExpanded ? content : `${content.substring(0, maxLength)}...`}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="h-8 text-xs"
+      >
+        {isExpanded ? (
+          <>
+            收起 <ChevronUp className="h-3 w-3 ml-1" />
+          </>
+        ) : (
+          <>
+            展开全部 <ChevronDown className="h-3 w-3 ml-1" />
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+/**
  * Prediction Detail Sheet Component.
  *
- * Displays complete LLM analysis details in a side drawer.
+ * Displays complete LLM analysis details in a side drawer with tabs.
  */
 export function PredictionDetailSheet({
   predictionId,
@@ -110,15 +150,17 @@ export function PredictionDetailSheet({
   onOpenChange,
 }: PredictionDetailSheetProps) {
   const { data: prediction, isLoading, error } = usePrediction(predictionId || 0);
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
 
-  // Reset query when sheet closes
+  // Reset tab when sheet closes
   const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen);
+    if (!newOpen) setActiveTab("overview");
   };
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className="w-[80%] sm:w-[80%] sm:max-w-[80%] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-left">
             {isLoading ? (
@@ -140,145 +182,303 @@ export function PredictionDetailSheet({
         )}
 
         {!isLoading && !error && prediction && (
-          <div className="mt-4 space-y-6">
-            {/* Basic Info Section */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Model Used */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Brain className="h-3 w-3" />
-                  <span>LLM 模型</span>
-                </div>
-                <div className="font-mono text-sm font-medium truncate" title={prediction.model_used || "-"}>
-                  {prediction.model_used || "-"}
-                </div>
-              </div>
-
-              {/* Created At */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>创建时间</span>
-                </div>
-                <div className="font-mono text-sm">
-                  {formatTimestamp(prediction.created_at)}
-                </div>
-              </div>
-            </div>
-
-            {/* Probability & Confidence */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Target className="h-3 w-3" />
-                  <span>预测概率</span>
-                </div>
-                <div className={cn("text-lg font-bold", formatProbability(prediction.predicted_probability).className)}>
-                  {formatProbability(prediction.predicted_probability).text}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  置信度
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", formatConfidence(prediction.confidence).color)} />
-                  <span className="text-lg font-bold">
-                    {(prediction.confidence * 100).toFixed(0)}%
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {formatConfidence(prediction.confidence).label}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* Reasoning Section - Main Content */}
-            {prediction.reasoning && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  分析过程
-                </h3>
-                <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
-                  {prediction.reasoning}
-                </div>
-              </div>
-            )}
-
-            {/* Key Assumptions Section */}
-            {prediction.key_assumptions && prediction.key_assumptions.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Lightbulb className="h-4 w-4" />
-                  关键假设
-                </h3>
-                <ul className="space-y-2">
-                  {prediction.key_assumptions.map((assumption, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start gap-2 text-sm"
-                    >
-                      <span className="text-primary mt-0.5">-</span>
-                      <span>{assumption}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Validation Result Section */}
-            {prediction.is_correct !== null && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">验证结果</h3>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                  {prediction.is_correct ? (
-                    <>
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      <div>
-                        <div className="font-medium text-green-600 dark:text-green-400">
-                          预测正确
-                        </div>
-                        {prediction.validated_at && (
-                          <div className="text-xs text-muted-foreground">
-                            验证时间: {formatTimestamp(prediction.validated_at)}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-5 w-5 text-red-500" />
-                      <div>
-                        <div className="font-medium text-red-600 dark:text-red-400">
-                          预测错误
-                        </div>
-                        {prediction.validated_at && (
-                          <div className="text-xs text-muted-foreground">
-                            验证时间: {formatTimestamp(prediction.validated_at)}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-                {prediction.actual_outcome && (
-                  <div className="text-sm text-muted-foreground">
-                    实际结果: <span className="font-medium text-foreground">{prediction.actual_outcome}</span>
-                  </div>
+          <div className="mt-4">
+            {/* Tab Navigation */}
+            <div className="flex gap-2 border-b border-border mb-4">
+              <button
+                onClick={() => setActiveTab("overview")}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "overview"
+                    ? "text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                概览
+              </button>
+              <button
+                onClick={() => setActiveTab("web-research")}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "web-research"
+                    ? "text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                disabled={!prediction.web_search_summary}
+              >
+                网络调研
+                {prediction.web_search_summary && (
+                  <span className="ml-1 w-2 h-2 bg-primary rounded-full inline-block" />
                 )}
-              </div>
-            )}
+              </button>
+              <button
+                onClick={() => setActiveTab("llm")}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "llm"
+                    ? "text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                disabled={!prediction.llm_response}
+              >
+                LLM 分析
+                {prediction.llm_response && (
+                  <span className="ml-1 w-2 h-2 bg-primary rounded-full inline-block" />
+                )}
+              </button>
+            </div>
 
-            {/* Recommendation Badge */}
-            {prediction.recommendation && (
-              <div className="pt-2 border-t border-border">
-                <div className="text-xs text-muted-foreground mb-1">交易建议</div>
-                <Badge variant={prediction.recommendation.includes("BUY") ? "default" : "secondary"}>
-                  {prediction.recommendation}
-                </Badge>
-              </div>
-            )}
+            {/* Tab Content */}
+            <div className="space-y-6">
+              {activeTab === "overview" && (
+                <>
+                  {/* Basic Info Section */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Model Used */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Brain className="h-3 w-3" />
+                        <span>LLM 模型</span>
+                      </div>
+                      <div className="font-mono text-sm font-medium truncate" title={prediction.model_used || "-"}>
+                        {prediction.model_used || "-"}
+                      </div>
+                    </div>
+
+                    {/* Created At */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>创建时间</span>
+                      </div>
+                      <div className="font-mono text-sm">
+                        {formatTimestamp(prediction.created_at)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Probability & Confidence */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Target className="h-3 w-3" />
+                        <span>预测概率</span>
+                      </div>
+                      <div className={cn("text-lg font-bold", formatProbability(prediction.predicted_probability).className)}>
+                        {formatProbability(prediction.predicted_probability).text}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        置信度
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", formatConfidence(prediction.confidence).color)} />
+                        <span className="text-lg font-bold">
+                          {(prediction.confidence * 100).toFixed(0)}%
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {formatConfidence(prediction.confidence).label}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reasoning Section - Main Content */}
+                  {prediction.reasoning && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        分析过程
+                      </h3>
+                      <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
+                        {prediction.reasoning}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Key Assumptions Section */}
+                  {prediction.key_assumptions && prediction.key_assumptions.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4" />
+                        关键假设
+                      </h3>
+                      <ul className="space-y-2">
+                        {prediction.key_assumptions.map((assumption, index) => (
+                          <li
+                            key={index}
+                            className="flex items-start gap-2 text-sm"
+                          >
+                            <span className="text-primary mt-0.5">-</span>
+                            <span>{assumption}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Trade Execution Info */}
+                  {prediction.trade_executed !== null && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">交易执行</h3>
+                      <div className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg",
+                        prediction.trade_executed ? "bg-green-500/10" : "bg-muted/30"
+                      )}>
+                        {prediction.trade_executed ? (
+                          <>
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            <div>
+                              <div className="font-medium text-green-600 dark:text-green-400">
+                                交易已执行
+                              </div>
+                              {prediction.trade_result && (
+                                <div className="text-xs text-muted-foreground">
+                                  {prediction.trade_result}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium text-muted-foreground">
+                                交易未执行
+                              </div>
+                              {prediction.trade_error && (
+                                <div className="text-xs text-destructive">
+                                  {prediction.trade_error}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validation Result Section */}
+                  {prediction.is_correct !== null && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">验证结果</h3>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                        {prediction.is_correct ? (
+                          <>
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            <div>
+                              <div className="font-medium text-green-600 dark:text-green-400">
+                                预测正确
+                              </div>
+                              {prediction.validated_at && (
+                                <div className="text-xs text-muted-foreground">
+                                  验证时间: {formatTimestamp(prediction.validated_at)}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-5 w-5 text-red-500" />
+                            <div>
+                              <div className="font-medium text-red-600 dark:text-red-400">
+                                预测错误
+                              </div>
+                              {prediction.validated_at && (
+                                <div className="text-xs text-muted-foreground">
+                                  验证时间: {formatTimestamp(prediction.validated_at)}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      {prediction.actual_outcome && (
+                        <div className="text-sm text-muted-foreground">
+                          实际结果: <span className="font-medium text-foreground">{prediction.actual_outcome}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Recommendation Badge */}
+                  {prediction.recommendation && (
+                    <div className="pt-2 border-t border-border">
+                      <div className="text-xs text-muted-foreground mb-1">交易建议</div>
+                      <Badge variant={prediction.recommendation.includes("BUY") ? "default" : "secondary"}>
+                        {prediction.recommendation}
+                      </Badge>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === "web-research" && (
+                <>
+                  {prediction.web_search_query && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        搜索查询
+                      </h3>
+                      <div className="bg-muted/50 rounded-lg p-3 text-sm font-mono">
+                        {prediction.web_search_query}
+                      </div>
+                    </div>
+                  )}
+
+                  {prediction.web_search_summary && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        搜索结果摘要
+                      </h3>
+                      <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed">
+                        <ExpandableText content={prediction.web_search_summary} />
+                      </div>
+                    </div>
+                  )}
+
+                  {!prediction.web_search_summary && (
+                    <div className="text-center text-muted-foreground py-8">
+                      暂无网络调研数据
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === "llm" && (
+                <>
+                  {prediction.llm_prompt && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        发送给 LLM 的完整 Prompt
+                      </h3>
+                      <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed max-h-96 overflow-y-auto">
+                        <ExpandableText content={prediction.llm_prompt} maxLength={500} />
+                      </div>
+                    </div>
+                  )}
+
+                  {prediction.llm_response && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        LLM 完整响应
+                      </h3>
+                      <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed max-h-96 overflow-y-auto">
+                        <ExpandableText content={prediction.llm_response} maxLength={500} />
+                      </div>
+                    </div>
+                  )}
+
+                  {!prediction.llm_response && (
+                    <div className="text-center text-muted-foreground py-8">
+                      暂无 LLM 分析数据
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
 

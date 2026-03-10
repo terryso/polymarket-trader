@@ -171,14 +171,35 @@ class LiveTradingExecutor:
         Raises:
             ValidationError: If price not available
         """
+        # Minimum price allowed by Polymarket CLOB (tick_size can be 0.001)
+        MIN_PRICE = 0.001
+        # Maximum price allowed by Polymarket CLOB
+        MAX_PRICE = 0.999
+
         if trade_type in (TradeType.BUY_YES, TradeType.SELL_YES):
             if market.yes_price is None:
                 raise ValidationError(f"Market {market.id} does not have YES price")
-            return market.yes_price
+            price = market.yes_price
         else:
             if market.no_price is None:
                 raise ValidationError(f"Market {market.id} does not have NO price")
-            return market.no_price
+            price = market.no_price
+
+        # Adjust price if outside valid range
+        if price < MIN_PRICE:
+            self._logger.warning(
+                f"Price {price} below minimum {MIN_PRICE}, adjusting to {MIN_PRICE} "
+                f"for market {market.id[:10]}..."
+            )
+            price = MIN_PRICE
+        elif price > MAX_PRICE:
+            self._logger.warning(
+                f"Price {price} above maximum {MAX_PRICE}, adjusting to {MAX_PRICE} "
+                f"for market {market.id[:10]}..."
+            )
+            price = MAX_PRICE
+
+        return price
 
     def _get_sell_token_id(self, position: "Position", market: "Market") -> str:
         """Get the token ID for selling a position.
@@ -227,19 +248,29 @@ class LiveTradingExecutor:
         """
         try:
             # Use the CLOB client to get market data
+            self._logger.debug(f"Fetching CLOB token IDs for market {market_id[:10]}...")
             market_data = self._client._client.get_market(market_id)
             if market_data:
                 tokens = market_data.get("tokens", [])
                 if len(tokens) >= 2:
                     # tokens[0] = YES, tokens[1] = NO
-                    return [tokens[0].get("token_id"), tokens[1].get("token_id")]
-            self._logger.warning(
-                f"Failed to fetch CLOB token IDs for market {market_id[:10]}..."
-            )
+                    token_ids = [tokens[0].get("token_id"), tokens[1].get("token_id")]
+                    self._logger.debug(f"Successfully fetched token IDs: {token_ids}")
+                    return token_ids
+                else:
+                    self._logger.warning(
+                        f"Market {market_id[:10]}... has {len(tokens)} tokens, expected 2"
+                    )
+            else:
+                self._logger.warning(
+                    f"get_market returned None for market {market_id[:10]}..."
+                )
             return None
         except Exception as e:
+            import traceback
             self._logger.warning(
-                f"Error fetching CLOB token IDs for market {market_id[:10]}...: {e}"
+                f"Error fetching CLOB token IDs for market {market_id[:10]}...: {e}\n"
+                f"Traceback: {traceback.format_exc()}"
             )
             return None
 
@@ -350,13 +381,31 @@ class LiveTradingExecutor:
             if amount <= 0:
                 raise ValidationError(f"Invalid trade amount: {amount}")
 
+            # 2. Determine trade type and price first (needed for minimum amount check)
+            # 1. Validate inputs
+            if amount <= 0:
+                raise ValidationError(f"Invalid trade amount: {amount}")
+
             if prediction.recommendation == Recommendation.NO_TRADE:
                 raise ValidationError("Cannot execute trade with NO_TRADE recommendation")
 
-            # 2. Determine trade type and token
+            # 2. Determine trade type and price
             trade_type = self._get_trade_type(prediction.recommendation)
-            token_id = self._get_token_id(market, trade_type)
             price = self._get_price(market, trade_type)
+
+            # 3. Calculate minimum amount based on Polymarket's 5 shares requirement
+            # Polymarket API requires minimum 5 shares per order
+            MIN_SHARES = 5.0
+            min_amount_from_shares = MIN_SHARES * price
+
+            if amount < min_amount_from_shares:
+                raise ValidationError(
+                    f"Trade amount ${amount:.4f} is below minimum ${min_amount_from_shares:.4f} "
+                    f"(required for {MIN_SHARES} shares at ${price:.4f} per share)"
+                )
+
+            # 4. Get token ID and calculate shares
+            token_id = self._get_token_id(market, trade_type)
             shares = self._calculate_shares(amount, price)
 
             self._logger.info(
@@ -364,7 +413,7 @@ class LiveTradingExecutor:
                 f"@ ${price:.4f} = ${amount:.2f} on market {market.id}"
             )
 
-            # 3. Place order on Polymarket using create_and_post_order
+            # 5. Place order on Polymarket using create_and_post_order
             from py_clob_client.clob_types import OrderArgs
 
             order_args = OrderArgs(
@@ -392,7 +441,7 @@ class LiveTradingExecutor:
 
             self._logger.info(f"Order placed successfully: {order_id}")
 
-            # 4. Create Trade record
+            # 6. Create Trade record
             trade = Trade(
                 id=0,
                 market_id=market.id,
@@ -407,11 +456,11 @@ class LiveTradingExecutor:
                 polymarket_order_id=order_id,
             )
 
-            # 5. Save trade
+            # 7. Save trade
             saved_trade = await self._trade_repo.save(trade)
             self._logger.info(f"Trade saved: id={saved_trade.id}, order_id={order_id}")
 
-            # 6. Create Position
+            # 8. Create Position
             outcome = (
                 PositionOutcome.YES
                 if trade_type == TradeType.BUY_YES
@@ -425,16 +474,23 @@ class LiveTradingExecutor:
                 price=price,
             )
 
-            # 7. Link trade to position
+            # 9. Link trade to position
             saved_trade.position_id = position.id
             await self._trade_repo.save(saved_trade)
 
-            # 8. Update state capital
+            # 10. Update state capital
             await self._state.update_capital(-amount)
 
             self._logger.info(
-                f"Live trade completed: trade_id={saved_trade.id}, "
-                f"position_id={position.id}, order_id={order_id}"
+                f"\n{'💰'*40}\n"
+                f"💰  [LIVE TRADE COMPLETED]\n"
+                f"    Trade ID: {saved_trade.id}\n"
+                f"    Position ID: {position.id}\n"
+                f"    Order ID: {order_id}\n"
+                f"    Type: {trade_type.value}\n"
+                f"    Shares: {shares:.2f} @ ${price:.4f}\n"
+                f"    Amount: ${amount:.2f}\n"
+                f"{'💰'*40}"
             )
 
             return LiveTradeResult(
@@ -445,14 +501,24 @@ class LiveTradingExecutor:
             )
 
         except (ValidationError, TradingError) as e:
-            self._logger.error(f"Live trade failed: {e}")
+            self._logger.error(
+                f"\n{'❌'*40}\n"
+                f"❌  [LIVE TRADE FAILED]\n"
+                f"    Error: {e}\n"
+                f"{'❌'*40}"
+            )
             return LiveTradeResult(
                 trade=None,
                 success=False,
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"Unexpected error in live trade: {e}")
+            self._logger.error(
+                f"\n{'❌'*40}\n"
+                f"❌  [LIVE TRADE UNEXPECTED ERROR]\n"
+                f"    Error: {e}\n"
+                f"{'❌'*40}"
+            )
             return LiveTradeResult(
                 trade=None,
                 success=False,
@@ -614,8 +680,16 @@ class LiveTradingExecutor:
             await self._state.update_capital(sell_proceeds)
 
             self._logger.info(
-                f"💰 Sell completed: trade_id={saved_trade.id}, "
-                f"proceeds=${sell_proceeds:.2f}, realized_pnl=${realized_pnl:.2f}"
+                f"\n{'💰'*40}\n"
+                f"💰  [SELL COMPLETED]\n"
+                f"    Trade ID: {saved_trade.id}\n"
+                f"    Position ID: {position.id}\n"
+                f"    Order ID: {order_id}\n"
+                f"    Type: {trade_type.value}\n"
+                f"    Shares: {shares_to_sell:.4f} @ ${price:.4f}\n"
+                f"    Proceeds: ${sell_proceeds:.2f}\n"
+                f"    Realized P&L: ${realized_pnl:.2f}\n"
+                f"{'💰'*40}"
             )
 
             return SellResult(
@@ -626,7 +700,13 @@ class LiveTradingExecutor:
             )
 
         except (ValidationError, TradingError) as e:
-            self._logger.error(f"Sell position failed: {e}")
+            self._logger.error(
+                f"\n{'❌'*40}\n"
+                f"❌  [SELL FAILED]\n"
+                f"    Position ID: {position.id}\n"
+                f"    Error: {e}\n"
+                f"{'❌'*40}"
+            )
             return SellResult(
                 trade=None,
                 position=position,
@@ -634,7 +714,13 @@ class LiveTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"Unexpected error in sell position: {e}")
+            self._logger.error(
+                f"\n{'❌'*40}\n"
+                f"❌  [SELL UNEXPECTED ERROR]\n"
+                f"    Position ID: {position.id}\n"
+                f"    Error: {e}\n"
+                f"{'❌'*40}"
+            )
             return SellResult(
                 trade=None,
                 position=position,

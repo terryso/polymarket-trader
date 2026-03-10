@@ -129,12 +129,12 @@ async def get_overview(
     wallet_balance: float | None = None
     wallet_balance_error: str | None = None
     try:
-        client = PolymarketClient()
-        balance_result = client.get_wallet_balance()
-        if balance_result.is_success:
-            wallet_balance = balance_result.usdc_balance
-        else:
-            wallet_balance_error = balance_result.error
+        with PolymarketClient() as client:
+            balance_result = client.get_wallet_balance()
+            if balance_result.is_success:
+                wallet_balance = balance_result.usdc_balance
+            else:
+                wallet_balance_error = balance_result.error
     except Exception as e:
         logger.warning(f"Failed to fetch wallet balance: {e}")
         wallet_balance_error = str(e)
@@ -377,12 +377,12 @@ async def get_system_status(
     wallet_balance: float | None = None
     wallet_balance_error: str | None = None
     try:
-        client = PolymarketClient()
-        balance_result = client.get_wallet_balance()
-        if balance_result.is_success:
-            wallet_balance = balance_result.usdc_balance
-        else:
-            wallet_balance_error = balance_result.error
+        with PolymarketClient() as client:
+            balance_result = client.get_wallet_balance()
+            if balance_result.is_success:
+                wallet_balance = balance_result.usdc_balance
+            else:
+                wallet_balance_error = balance_result.error
     except Exception as e:
         logger.warning(f"Failed to fetch wallet balance: {e}")
         wallet_balance_error = str(e)
@@ -482,6 +482,58 @@ async def get_settings_sanitized() -> ApiResponse[SanitizedSettings]:
     )
 
     return ApiResponse(success=True, data=sanitized, error=None)
+
+
+@router.post("/trading-state")
+async def update_trading_state(
+    trading_enabled: bool | None = None,
+    daily_pnl: float | None = None,
+    state: ThreadSafeState = Depends(get_state),
+) -> ApiResponse[dict]:
+    """Update trading state.
+
+    Allows manual control of trading state for debugging and recovery.
+
+    Args:
+        trading_enabled: Enable/disable trading (optional)
+        daily_pnl: Set daily PnL value (optional)
+        state: ThreadSafeState dependency
+
+    Returns:
+        Updated trading state
+
+    Example:
+        POST /api/statistics/trading-state?trading_enabled=true&daily_pnl=0
+    """
+    logger.info(f"📊 Updating trading state: trading_enabled={trading_enabled}, daily_pnl={daily_pnl}")
+
+    # Update trading enabled flag
+    if trading_enabled is not None:
+        await state.set_trading_enabled(trading_enabled)
+        logger.info(f"✅ Trading enabled set to: {trading_enabled}")
+
+    # Update daily PnL by adjusting capital
+    if daily_pnl is not None:
+        # Get current state
+        current_state = await state.get_state()
+        current_pnl = current_state.daily_pnl
+        pnl_difference = daily_pnl - current_pnl
+
+        # Update capital to adjust daily PnL
+        await state.update_capital(pnl_difference)
+        logger.info(f"✅ Daily PnL updated from {current_pnl:.2f} to {daily_pnl:.2f}")
+
+    # Get updated state
+    updated_state = await state.get_state()
+
+    result = {
+        "trading_enabled": updated_state.trading_enabled,
+        "daily_pnl": updated_state.daily_pnl,
+        "current_capital": updated_state.current_capital,
+        "message": "Trading state updated successfully",
+    }
+
+    return ApiResponse(success=True, data=result, error=None)
 
 
 __all__ = ["router"]

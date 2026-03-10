@@ -225,8 +225,10 @@ class PredictionRepository:
                     INSERT INTO predictions (
                         market_id, predicted_probability, confidence,
                         reasoning, key_assumptions, model_used, recommendation,
-                        edge
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        edge, web_search_query, web_search_summary,
+                        llm_prompt, llm_response, trade_executed,
+                        trade_result, trade_error
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         prediction.market_id,
@@ -237,6 +239,13 @@ class PredictionRepository:
                         prediction.model_used,
                         recommendation_str,
                         prediction.edge,
+                        prediction.web_search_query,
+                        prediction.web_search_summary,
+                        prediction.llm_prompt,
+                        prediction.llm_response,
+                        prediction.trade_executed,
+                        prediction.trade_result,
+                        prediction.trade_error,
                     ),
                 )
                 await conn.commit()
@@ -780,6 +789,79 @@ class PredictionRepository:
                 original_exception=e,
             ) from e
 
+    async def update_trade_info(
+        self,
+        prediction_id: int,
+        trade_executed: bool,
+        trade_result: str | None = None,
+        trade_error: str | None = None,
+    ) -> bool:
+        """Update prediction with trade execution information.
+
+        Used after trade execution or risk check failure to record
+        whether the trade was executed and the result.
+
+        Args:
+            prediction_id: The prediction ID to update
+            trade_executed: Whether the trade was executed successfully
+            trade_result: Trade execution result (e.g., "Bought 10 YES shares @ $0.65")
+            trade_error: Error message if trade was not executed
+
+        Returns:
+            True if update succeeded, False if prediction not found
+
+        Example:
+            >>> success = await repo.update_trade_info(
+            ...     1, False, None, "Edge too low: 6.75% < 10.00%"
+            ... )
+            >>> assert success is True
+        """
+        logger.info(
+            f"{OPERATION_EMOJIS['data']} Updating prediction {prediction_id}: "
+            f"trade_executed={trade_executed}, error={trade_error}"
+        )
+
+        try:
+            async with get_connection() as conn:
+                cursor = await conn.execute(
+                    """
+                    UPDATE predictions
+                    SET trade_executed = ?,
+                        trade_result = ?,
+                        trade_error = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        trade_executed,
+                        trade_result,
+                        trade_error,
+                        prediction_id,
+                    ),
+                )
+                await conn.commit()
+
+                if cursor.rowcount == 0:
+                    logger.warning(
+                        f"{OPERATION_EMOJIS['data']} Prediction not found: "
+                        f"{prediction_id}"
+                    )
+                    return False
+
+            logger.info(
+                f"{OPERATION_EMOJIS['data']} Updated prediction {prediction_id} trade info"
+            )
+            return True
+        except aiosqlite.Error as e:
+            logger.error(
+                f"{OPERATION_EMOJIS['data']} Failed to update prediction "
+                f"{prediction_id}: {e}"
+            )
+            raise DatabaseError(
+                message=f"Failed to update prediction: {prediction_id}",
+                operation="update_trade_info",
+                original_exception=e,
+            ) from e
+
     def _row_to_prediction(self, row: aiosqlite.Row) -> Prediction:
         """Convert a database row to a Prediction model.
 
@@ -833,6 +915,35 @@ class PredictionRepository:
         if "actual_outcome" in row.keys():
             actual_outcome = row["actual_outcome"]
 
+        # Parse detailed analysis fields (may not exist in older data)
+        web_search_query: str | None = None
+        if "web_search_query" in row.keys():
+            web_search_query = row["web_search_query"]
+
+        web_search_summary: str | None = None
+        if "web_search_summary" in row.keys():
+            web_search_summary = row["web_search_summary"]
+
+        llm_prompt: str | None = None
+        if "llm_prompt" in row.keys():
+            llm_prompt = row["llm_prompt"]
+
+        llm_response: str | None = None
+        if "llm_response" in row.keys():
+            llm_response = row["llm_response"]
+
+        trade_executed: bool | None = None
+        if "trade_executed" in row.keys():
+            trade_executed = bool(row["trade_executed"]) if row["trade_executed"] is not None else None
+
+        trade_result: str | None = None
+        if "trade_result" in row.keys():
+            trade_result = row["trade_result"]
+
+        trade_error: str | None = None
+        if "trade_error" in row.keys():
+            trade_error = row["trade_error"]
+
         return Prediction(
             id=row["id"],
             market_id=row["market_id"],
@@ -847,6 +958,13 @@ class PredictionRepository:
             is_correct=is_correct,
             validated_at=validated_at,
             created_at=created_at,
+            web_search_query=web_search_query,
+            web_search_summary=web_search_summary,
+            llm_prompt=llm_prompt,
+            llm_response=llm_response,
+            trade_executed=trade_executed,
+            trade_result=trade_result,
+            trade_error=trade_error,
         )
 
     # ==================== Story 6.4: 预测历史查询 API ====================

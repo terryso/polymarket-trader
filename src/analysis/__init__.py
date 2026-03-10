@@ -26,6 +26,14 @@ Example:
     >>> from src.analysis import PerformanceAnalyzer
     >>> analyzer = PerformanceAnalyzer(prediction_repo, trade_repo, position_repo)
     >>> report = await analyzer.generate_insight_report()
+
+    >>> from src.analysis import WebResearcher, ResearchError
+    >>> researcher = WebResearcher()
+    >>> summary = await researcher.research_market("Will Bitcoin reach $100k?")
+
+    >>> from src.analysis import MultiSourceSearchEngine, SearchResult
+    >>> engine = MultiSourceSearchEngine()
+    >>> results = await engine.search("Bitcoin price prediction 2026")
 """
 
 from __future__ import annotations
@@ -62,6 +70,17 @@ from src.analysis.prompts import (
     parse_llm_analysis_response,
     validate_analysis_result,
 )
+from src.analysis.search_sources import (
+    BigModelSearchSource,
+    BingSearchSource,
+    DuckDuckGoSearchSource,
+    GoogleSearchSource,
+    MultiSourceSearchEngine,
+    SearchAggregationError,
+    SearchSource,
+    SearchResult,
+)
+from src.analysis.web_researcher import ResearchError, WebResearcher
 
 __all__ = [
     # Market filter
@@ -94,4 +113,16 @@ __all__ = [
     "PatternInsight",
     "ImprovementSuggestion",
     "PerformanceInsightReport",
+    # Web researcher
+    "WebResearcher",
+    "ResearchError",
+    # Multi-source search engine
+    "MultiSourceSearchEngine",
+    "SearchResult",
+    "SearchSource",
+    "SearchAggregationError",
+    "GoogleSearchSource",
+    "BingSearchSource",
+    "DuckDuckGoSearchSource",
+    "BigModelSearchSource",
 ]

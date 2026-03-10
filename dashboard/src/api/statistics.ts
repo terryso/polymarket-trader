@@ -7,7 +7,7 @@
  * Story 7.6: 前端 API 集成
  */
 
-import { get, getPaginated } from './client';
+import { get, getPaginated, post } from './client';
 import type {
   OverviewStats,
   DailyStatsItem,
@@ -71,6 +71,25 @@ export async function fetchPerformance(days: number = 30): Promise<PerformanceDa
 }
 
 /**
+ * Update trading state.
+ *
+ * @param tradingEnabled - Enable/disable trading (optional)
+ * @param dailyPnl - Set daily PnL value (optional)
+ */
+export async function updateTradingState(
+  tradingEnabled?: boolean,
+  dailyPnl?: number
+): Promise<{ trading_enabled: boolean; daily_pnl: number; current_capital: number; message: string }> {
+  const params = new URLSearchParams();
+  if (tradingEnabled !== undefined) params.append('trading_enabled', String(tradingEnabled));
+  if (dailyPnl !== undefined) params.append('daily_pnl', String(dailyPnl));
+
+  return post<{ trading_enabled: boolean; daily_pnl: number; current_capital: number; message: string }>(
+    `/api/statistics/trading-state?${params.toString()}`
+  );
+}
+
+/**
  * Statistics API object with all methods.
  */
 export const statisticsApi = {
@@ -79,4 +98,5 @@ export const statisticsApi = {
   getSettings: fetchSettings,
   getDaily: fetchDailyStats,
   getPerformance: fetchPerformance,
+  updateTradingState,
 };

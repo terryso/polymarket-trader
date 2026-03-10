@@ -122,12 +122,29 @@ class LLMAnalyzer:
         self._min_edge = settings.risk.min_edge
         self._notifier = notifier
 
+        # Initialize web researcher if enabled
+        self._web_researcher = None
+        if settings.web_research.enabled:
+            try:
+                from src.analysis.web_researcher import WebResearcher
+
+                self._web_researcher = WebResearcher()
+                self._logger.info(
+                    f"{OPERATION_EMOJIS['analysis']} WebResearcher initialized"
+                )
+            except Exception as e:
+                self._logger.warning(
+                    f"{OPERATION_EMOJIS['analysis']} Failed to initialize WebResearcher: {e}"
+                )
+
         notification_status = "enabled" if self._notifier else "disabled"
+        web_research_status = "enabled" if self._web_researcher else "disabled"
         self._logger.info(
             f"{OPERATION_EMOJIS['analysis']} Initializing LLMAnalyzer "
             f"(min_confidence={self._min_confidence}, "
             f"min_edge={self._min_edge}, "
-            f"notifications={notification_status})"
+            f"notifications={notification_status}, "
+            f"web_research={web_research_status})"
         )
 
     async def analyze_market(self, market: Market) -> PredictionResult:
@@ -156,27 +173,92 @@ class LLMAnalyzer:
         )
 
         try:
-            # 构建提示词
-            user_prompt = build_market_analysis_prompt(market)
+            # 1. 网络调研（如果启用）
+            research_context = None
+            web_search_query = None
+            web_search_summary = None
 
-            # 调用 LLM API (使用 to_thread 避免阻塞事件循环)
+            if self._web_researcher:
+                try:
+                    self._logger.info(
+                        f"{OPERATION_EMOJIS['analysis']} Performing web research..."
+                    )
+                    # 构建搜索查询
+                    web_search_query = self._web_researcher._build_search_query(
+                        market.title, market.description
+                    )
+                    research_context = await self._web_researcher.research_market(
+                        market_title=market.title,
+                        description=market.description,
+                    )
+                    web_search_summary = research_context
+
+                    # 检查搜索结果是否有效
+                    if not research_context or "No search results found" in research_context:
+                        self._logger.error(
+                            f"{OPERATION_EMOJIS['analysis']} Web research returned no valid results. "
+                            f"Cannot proceed with prediction without market context."
+                        )
+                        raise AnalysisError(
+                            message="Web research failed to return valid results. "
+                                   "Cannot make accurate predictions without current market information.",
+                            market_id=market.id,
+                            original_exception=Exception("No search results found")
+                        )
+
+                    self._logger.info(
+                        f"{OPERATION_EMOJIS['analysis']} Web research completed successfully"
+                    )
+                except AnalysisError:
+                    # 重新抛出AnalysisError，让调用者知道不能继续
+                    raise
+                except Exception as e:
+                    self._logger.error(
+                        f"{OPERATION_EMOJIS['analysis']} Web research failed: {e}. "
+                        f"Cannot proceed with prediction without market context."
+                    )
+                    raise AnalysisError(
+                        message=f"Web research failed: {e}. Cannot make accurate predictions without current market information.",
+                        market_id=market.id,
+                        original_exception=e
+                    )
+            else:
+                # 如果网络搜索功能被禁用，发出警告
+                self._logger.warning(
+                    f"{OPERATION_EMOJIS['analysis']} Web research is disabled. "
+                    f"Prediction accuracy may be reduced without current market context."
+                )
+
+            # 2. 构建提示词（包含调研结果）
+            user_prompt = build_market_analysis_prompt(
+                market, research_context=research_context
+            )
+
+            # 3. 调用 LLM API (使用 to_thread 避免阻塞事件循环)
             def _call_llm() -> str:
                 language = settings.llm.analysis_language
                 self._logger.debug(
                     f"{OPERATION_EMOJIS['analysis']} Using analysis language: {language}"
                 )
                 with LLMClient() as client:
+                    # 将搜索结果添加到 system prompt
+                    system_prompt = get_market_analyst_system_prompt(
+                        language=language,
+                        research_summary=web_search_summary
+                    )
                     return client.chat_with_system(
-                        system_prompt=get_market_analyst_system_prompt(language),
+                        system_prompt=system_prompt,
                         user_prompt=user_prompt,
                     )
 
-            response = await asyncio.to_thread(_call_llm)
+            llm_response = await asyncio.to_thread(_call_llm)
+            # 记录完整的LLM响应用于后续保存
+            response = llm_response
 
-            # 解析响应
+            # 4. 解析响应
             llm_result = parse_llm_analysis_response(response)
 
-            # 转换为 PredictionResult
+            # 5. 转换为 PredictionResult
             # 使用 prompts.py 中的 Recommendation
             # 需要转换为 models/prediction.py 中的 Recommendation
             from src.models.prediction import Recommendation as PredRecommendation
@@ -187,15 +269,25 @@ class LLMAnalyzer:
                 Recommendation.NO_TRADE: PredRecommendation.NO_TRADE,
             }
 
+            # 获取完整的系统prompt用于保存
+            language = settings.llm.analysis_language
+            system_prompt = get_market_analyst_system_prompt(language)
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+
             result = PredictionResult(
                 predicted_probability=llm_result.predicted_probability,
                 confidence=llm_result.confidence,
                 reasoning=llm_result.reasoning,
                 key_assumptions=llm_result.key_assumptions,
                 recommendation=(recommendation_mapping[llm_result.recommendation]),
+                # 添加详细分析信息
+                web_search_query=web_search_query,
+                web_search_summary=web_search_summary,
+                llm_prompt=full_prompt,
+                llm_response=response,
             )
 
-            # 计算 Edge (如果有市场价格)
+            # 6. 计算 Edge (如果有市场价格)
             if market.yes_price is not None:
                 raw_edge = self.calculate_edge(result, market.yes_price)
                 result.edge = abs(raw_edge)  # 使用绝对值
@@ -205,7 +297,7 @@ class LLMAnalyzer:
                     f"min_edge={self._min_edge}"
                 )
 
-            # 验证是否可交易
+            # 7. 验证是否可交易
             is_tradeable = self._is_tradeable(result, market.yes_price)
 
             self._logger.info(
@@ -217,7 +309,7 @@ class LLMAnalyzer:
                 f"is_tradeable={is_tradeable}"
             )
 
-            # Story 9.4: Send analysis notification
+            # 8. Send analysis notification
             await self._notify_analysis_result(result, market)
 
             return result

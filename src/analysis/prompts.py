@@ -130,11 +130,15 @@ class LLMAnalysisResult(BaseModel):
         return [a.strip() for a in v if a.strip()]
 
 
-def get_market_analyst_system_prompt(language: LanguageType = "en") -> str:
+def get_market_analyst_system_prompt(
+    language: LanguageType = "en",
+    research_summary: str | None = None
+) -> str:
     """Get market analyst system prompt with language instruction.
 
     Args:
         language: Output language ("zh" for Chinese, "en" for English)
+        research_summary: Optional web research summary to include in system prompt
 
     Returns:
         System prompt string with language instruction appended
@@ -143,18 +147,33 @@ def get_market_analyst_system_prompt(language: LanguageType = "en") -> str:
         >>> prompt = get_market_analyst_system_prompt("zh")
         >>> "中文" in prompt
         True
+        >>> prompt = get_market_analyst_system_prompt("en", "Latest news: ...")
+        >>> "Latest news" in prompt
+        True
     """
     if language not in LANGUAGE_INSTRUCTIONS:
         _logger.warning(
             f"Unknown language '{language}', using default (English). "
             f"Supported languages: {list(LANGUAGE_INSTRUCTIONS.keys())}"
         )
-    base_prompt = """You are an expert prediction market analyst with deep knowledge of:
+
+    # Build research context section if provided
+    research_context = ""
+    if research_summary and research_summary.strip() and "No search results found" not in research_summary:
+        research_context = f"""
+
+**Latest Market Context from Web Research:**
+{research_summary}
+
+**IMPORTANT:** Use this latest market information to inform your analysis. The web research above contains the most recent news and developments related to this market. Incorporate this information into your probability estimate and reasoning.
+"""
+
+    base_prompt = f"""You are an expert prediction market analyst with deep knowledge of:
 - Political events and elections
 - Economic indicators and trends
 - Technology and crypto markets
 - Sports and entertainment outcomes
-
+{research_context}
 Your role is to analyze prediction markets and provide:
 1. A probability estimate (0.00 to 1.00) for the YES outcome
 2. A confidence level (0.00 to 1.00) in your analysis
@@ -165,13 +184,13 @@ Your role is to analyze prediction markets and provide:
 **IMPORTANT OUTPUT FORMAT:**
 You MUST respond with ONLY a valid JSON object in this exact format:
 ```json
-{
+{{
   "predicted_probability": 0.XX,
   "confidence": 0.XX,
   "reasoning": "Your detailed analysis...",
   "key_assumptions": ["Assumption 1", "Assumption 2", "Assumption 3"],
   "recommendation": "BUY_YES or BUY_NO or NO_TRADE"
-}
+}}
 ```
 
 **Analysis Guidelines:**
@@ -212,7 +231,9 @@ def _get_deprecated_constant() -> str:
 MARKET_ANALYST_SYSTEM_PROMPT = _get_deprecated_constant()
 
 
-def build_market_analysis_prompt(market: Market) -> str:
+def build_market_analysis_prompt(
+    market: Market, research_context: str | None = None
+) -> str:
     """Build market analysis User Prompt.
 
     Constructs a formatted prompt containing all relevant market information
@@ -220,6 +241,7 @@ def build_market_analysis_prompt(market: Market) -> str:
 
     Args:
         market: Market data model containing title, description, prices, etc.
+        research_context: Optional web research context to include in prompt
 
     Returns:
         Formatted User Prompt string for LLM analysis
@@ -248,6 +270,7 @@ def build_market_analysis_prompt(market: Market) -> str:
     # Format category
     category_str = market.category.value if market.category else "Uncategorized"
 
+    # Build base prompt
     prompt = f"""Analyze the following prediction market and provide your assessment:
 
 **Market Title:** {market.title}
@@ -263,9 +286,23 @@ def build_market_analysis_prompt(market: Market) -> str:
 **Market Deadline:** {deadline_str}
 
 **Liquidity:** {liquidity_str}
+"""
+
+    # Add research context if provided
+    if research_context:
+        prompt += f"""
+
+**Additional Research Context:**
+{research_context}
+
+Please consider this research context in your analysis, but also apply your own judgment and expertise.
+"""
+
+    prompt += """
 
 Based on your analysis, provide your probability estimate, confidence level, reasoning, key assumptions, and trading recommendation in the required JSON format.
 """
+
     return prompt
 
 

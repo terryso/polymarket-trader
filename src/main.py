@@ -230,147 +230,151 @@ class Application:
             from src.trading.position_manager import PositionManager
             from src.trading.risk_control import RiskController
 
-            client = PolymarketClient()
-            min_deadline_hours = settings.market_filter.min_deadline_hours
-            max_deadline_hours = settings.market_filter.max_deadline_hours
-            end_date_min = datetime.now(timezone.utc) + timedelta(
-                hours=min_deadline_hours
-            )
-
-            # Calculate max deadline for server-side filtering
-            # If max_deadline_hours is 0 or None, don't set end_date_max (no limit)
-            end_date_max = None
-            if max_deadline_hours and max_deadline_hours > 0:
-                end_date_max = datetime.now(timezone.utc) + timedelta(
-                    hours=max_deadline_hours
+            # Use context manager to ensure HTTP client is properly closed
+            with PolymarketClient() as client:
+                min_deadline_hours = settings.market_filter.min_deadline_hours
+                max_deadline_hours = settings.market_filter.max_deadline_hours
+                end_date_min = datetime.now(timezone.utc) + timedelta(
+                    hours=min_deadline_hours
                 )
 
-            gamma_markets = client.get_all_active_markets(
-                total_limit=200,
-                page_size=50,
-                order_by="volume24hr",  # Sort by volume (most liquid first)
-                ascending=False,
-                end_date_min=end_date_min,  # Server-side min deadline filter
-                end_date_max=end_date_max,  # Server-side max deadline filter
-            )
-            logger.info(
-                f"Fetched {len(gamma_markets)} active markets for initial analysis"
-            )
+                # Calculate max deadline for server-side filtering
+                # If max_deadline_hours is 0 or None, don't set end_date_max (no limit)
+                end_date_max = None
+                if max_deadline_hours and max_deadline_hours > 0:
+                    end_date_max = datetime.now(timezone.utc) + timedelta(
+                        hours=max_deadline_hours
+                    )
 
-            if not gamma_markets:
-                logger.info("No markets found, skipping initial analysis")
-                return
+                gamma_markets = client.get_all_active_markets(
+                    total_limit=200,
+                    page_size=50,
+                    order_by="volume24hr",  # Sort by volume (most liquid first)
+                    ascending=False,
+                    end_date_min=end_date_min,  # Server-side min deadline filter
+                    end_date_max=end_date_max,  # Server-side max deadline filter
+                )
+                logger.info(
+                    f"Fetched {len(gamma_markets)} active markets for initial analysis"
+                )
 
-            # Convert GammaMarket to Market model
-            markets = [gm.to_market() for gm in gamma_markets]
+                if not gamma_markets:
+                    logger.info("No markets found, skipping initial analysis")
+                    return
 
-            # Filter markets
-            market_filter = MarketFilter()
-            filter_result = market_filter.filter_markets(markets)
-            filtered_markets = filter_result.markets
+                # Convert GammaMarket to Market model
+                markets = [gm.to_market() for gm in gamma_markets]
 
-            logger.info(
-                f"Filtered markets: {len(filtered_markets)}/{len(markets)} "
-                f"(stats: {filter_result.statistics})"
-            )
+                # Filter markets
+                market_filter = MarketFilter()
+                filter_result = market_filter.filter_markets(markets)
+                filtered_markets = filter_result.markets
 
-            if not filtered_markets:
-                logger.info("No markets passed filter, skipping initial analysis")
-                return
+                logger.info(
+                    f"Filtered markets: {len(filtered_markets)}/{len(markets)} "
+                    f"(stats: {filter_result.statistics})"
+                )
 
-            # Initialize trading components
-            if not self.state:
-                logger.warning("State not initialized, skipping trading")
-                return
+                if not filtered_markets:
+                    logger.info("No markets passed filter, skipping initial analysis")
+                    return
 
-            market_repo = MarketRepository()
-            trade_repo = TradeRepository()
-            position_repo = PositionRepository()
-            circuit_breaker = CircuitBreaker(self.state)
-            risk_controller = RiskController(self.state, circuit_breaker)
+                # Initialize trading components
+                if not self.state:
+                    logger.warning("State not initialized, skipping trading")
+                    return
 
-            # Initialize LLM analyzer lazily to avoid import issues
-            from src.analysis.llm_analyzer import LLMAnalyzer
+                market_repo = MarketRepository()
+                trade_repo = TradeRepository()
+                position_repo = PositionRepository()
+                circuit_breaker = CircuitBreaker(self.state)
+                risk_controller = RiskController(self.state, circuit_breaker)
 
-            llm_analyzer = LLMAnalyzer()
+                # Initialize LLM analyzer lazily to avoid import issues
+                from src.analysis.llm_analyzer import LLMAnalyzer
 
-            # Create position manager first
-            position_manager = PositionManager(
-                repository=position_repo,
-                state=self.state,
-            )
+                llm_analyzer = LLMAnalyzer()
 
-            paper_executor = PaperTradingExecutor(
-                trade_repo=trade_repo,
-                position_manager=position_manager,
-                state=self.state,
-            )
+                # Create position manager first
+                position_manager = PositionManager(
+                    repository=position_repo,
+                    state=self.state,
+                )
 
-            # Create live executor if in live mode
-            live_executor = None
-            if settings.trading_mode.lower() == "live":
-                from src.trading.live_trading import LiveTradingExecutor
-
-                live_executor = LiveTradingExecutor(
-                    client=client,
+                paper_executor = PaperTradingExecutor(
                     trade_repo=trade_repo,
                     position_manager=position_manager,
                     state=self.state,
                 )
-                logger.info("Live trading executor initialized")
 
-            executor = TradingExecutor(
-                llm_analyzer=llm_analyzer,
-                risk_controller=risk_controller,
-                paper_executor=paper_executor,
-                state=self.state,
-                live_executor=live_executor,
-            )
+                # Create live executor if in live mode
+                live_executor = None
+                if settings.trading_mode.lower() == "live":
+                    from src.trading.live_trading import LiveTradingExecutor
 
-            # Process each market through the complete trading flow
-            analyzed_count = 0
-            traded_count = 0
-            skipped_count = 0
-            error_count = 0
+                    # Note: LiveTradingExecutor stores client reference, but since this is
+                    # in initial analysis and client will be closed after this block,
+                    # live_executor will only be used for this one-time execution.
+                    live_executor = LiveTradingExecutor(
+                        client=client,
+                        trade_repo=trade_repo,
+                        position_manager=position_manager,
+                        state=self.state,
+                    )
+                    logger.info("Live trading executor initialized")
 
-            for market in filtered_markets:
-                try:
-                    # Save market to database first (required for FK constraint)
-                    await market_repo.save_market(market)
+                executor = TradingExecutor(
+                    llm_analyzer=llm_analyzer,
+                    risk_controller=risk_controller,
+                    paper_executor=paper_executor,
+                    state=self.state,
+                    live_executor=live_executor,
+                )
 
-                    # Process market through complete trading flow
-                    decision = await executor.process_market(market)
-                    analyzed_count += 1
+                # Process each market through the complete trading flow
+                analyzed_count = 0
+                traded_count = 0
+                skipped_count = 0
+                error_count = 0
 
-                    if decision.success:
-                        if decision.skipped:
-                            skipped_count += 1
-                            logger.info(
-                                f"Market {market.id[:8]}... skipped: {decision.reason}"
+                for market in filtered_markets:
+                    try:
+                        # Save market to database first (required for FK constraint)
+                        await market_repo.save_market(market)
+
+                        # Process market through complete trading flow
+                        decision = await executor.process_market(market)
+                        analyzed_count += 1
+
+                        if decision.success:
+                            if decision.skipped:
+                                skipped_count += 1
+                                logger.info(
+                                    f"Market {market.id[:8]}... skipped: {decision.reason}"
+                                )
+                            elif decision.trade:
+                                traded_count += 1
+                                logger.info(
+                                    f"Market {market.id[:8]}... traded: "
+                                    f"{decision.trade.trade_type.value} "
+                                    f"${decision.trade.amount:.2f}"
+                                )
+                        else:
+                            error_count += 1
+                            logger.warning(
+                                f"Market {market.id[:8]}... error: {decision.error_message}"
                             )
-                        elif decision.trade:
-                            traded_count += 1
-                            logger.info(
-                                f"Market {market.id[:8]}... traded: "
-                                f"{decision.trade.trade_type.value} "
-                                f"${decision.trade.amount:.2f}"
-                            )
-                    else:
+
+                    except Exception as e:
                         error_count += 1
-                        logger.warning(
-                            f"Market {market.id[:8]}... error: {decision.error_message}"
-                        )
+                        logger.warning(f"Failed to process market {market.id}: {e}")
 
-                except Exception as e:
-                    error_count += 1
-                    logger.warning(f"Failed to process market {market.id}: {e}")
-
-            logger.info(
-                f"Initial analysis complete: {analyzed_count} analyzed, "
-                f"{traded_count} traded, {skipped_count} skipped, "
-                f"{error_count} errors"
-            )
-
+                logger.info(
+                    f"Initial analysis complete: {analyzed_count} analyzed, "
+                    f"{traded_count} traded, {skipped_count} skipped, "
+                    f"{error_count} errors"
+                )
+            # Context manager ensures PolymarketClient HTTP connections are closed
         except Exception as e:
             logger.error(f"Initial analysis failed: {e}", exc_info=True)
 
@@ -400,7 +404,7 @@ class Application:
         # Note: These imports are placed here to avoid circular imports
         # and to allow the tasks to be mocked in tests
         # Task 1: Analyze markets and execute trades periodically
-        async def _analyze_and_trade_async() -> None:
+        async def analyze_and_trade_task() -> None:
             """Fetch, filter, analyze markets and execute trades.
 
             Story 5.3: 交易决策流程
@@ -423,102 +427,100 @@ class Application:
                 from src.trading.position_manager import PositionManager
                 from src.trading.risk_control import RiskController
 
-                client = PolymarketClient()
-                min_deadline_hours = app_settings.market_filter.min_deadline_hours
-                max_deadline_hours = app_settings.market_filter.max_deadline_hours
-                end_date_min = datetime.now(timezone.utc) + timedelta(
-                    hours=min_deadline_hours
-                )
-
-                # Calculate max deadline for server-side filtering
-                # If max_deadline_hours is 0 or None, don't set end_date_max (no limit)
-                end_date_max = None
-                if max_deadline_hours and max_deadline_hours > 0:
-                    end_date_max = datetime.now(timezone.utc) + timedelta(
-                        hours=max_deadline_hours
+                # Use context manager to ensure HTTP client is properly closed
+                with PolymarketClient() as client:
+                    min_deadline_hours = app_settings.market_filter.min_deadline_hours
+                    max_deadline_hours = app_settings.market_filter.max_deadline_hours
+                    end_date_min = datetime.now(timezone.utc) + timedelta(
+                        hours=min_deadline_hours
                     )
 
-                gamma_markets = client.get_all_active_markets(
-                    total_limit=200,
-                    page_size=50,
-                    order_by="volume24hr",  # Sort by volume (most liquid first)
-                    ascending=False,
-                    end_date_min=end_date_min,  # Server-side min deadline filter
-                    end_date_max=end_date_max,  # Server-side max deadline filter
-                )
-                logger.info(f"Fetched {len(gamma_markets)} active markets")
+                    # Calculate max deadline for server-side filtering
+                    # If max_deadline_hours is 0 or None, don't set end_date_max (no limit)
+                    end_date_max = None
+                    if max_deadline_hours and max_deadline_hours > 0:
+                        end_date_max = datetime.now(timezone.utc) + timedelta(
+                            hours=max_deadline_hours
+                        )
 
-                if not gamma_markets or not self.state:
-                    return
+                    gamma_markets = client.get_all_active_markets(
+                        total_limit=200,
+                        page_size=50,
+                        order_by="volume24hr",  # Sort by volume (most liquid first)
+                        ascending=False,
+                        end_date_min=end_date_min,  # Server-side min deadline filter
+                        end_date_max=end_date_max,  # Server-side max deadline filter
+                    )
+                    logger.info(f"Fetched {len(gamma_markets)} active markets")
 
-                # Convert and filter
-                markets = [gm.to_market() for gm in gamma_markets]
-                market_filter = MarketFilter()
-                filter_result = market_filter.filter_markets(markets)
-                filtered_markets = filter_result.markets
+                    if not gamma_markets or not self.state:
+                        return
 
-                logger.info(f"Filtered: {len(filtered_markets)}/{len(markets)} markets")
+                    # Convert and filter
+                    markets = [gm.to_market() for gm in gamma_markets]
+                    market_filter = MarketFilter()
+                    filter_result = market_filter.filter_markets(markets)
+                    filtered_markets = filter_result.markets
 
-                if not filtered_markets:
-                    return
+                    logger.info(f"Filtered: {len(filtered_markets)}/{len(markets)} markets")
 
-                # Initialize trading components
-                market_repo = MarketRepository()
-                trade_repo = TradeRepository()
-                position_repo = PositionRepository()
-                circuit_breaker = CircuitBreaker(self.state)
-                risk_controller = RiskController(self.state, circuit_breaker)
-                llm_analyzer = LLMAnalyzer()
-                position_manager = PositionManager(
-                    repository=position_repo,
-                    state=self.state,
-                )
-                paper_executor = PaperTradingExecutor(
-                    trade_repo=trade_repo,
-                    position_manager=position_manager,
-                    state=self.state,
-                )
+                    if not filtered_markets:
+                        return
 
-                # Create live executor if in live mode
-                live_executor = None
-                if app_settings.trading_mode.lower() == "live":
-                    from src.trading.live_trading import LiveTradingExecutor
-
-                    live_executor = LiveTradingExecutor(
-                        client=client,
+                    # Initialize trading components
+                    market_repo = MarketRepository()
+                    trade_repo = TradeRepository()
+                    position_repo = PositionRepository()
+                    circuit_breaker = CircuitBreaker(self.state)
+                    risk_controller = RiskController(self.state, circuit_breaker)
+                    llm_analyzer = LLMAnalyzer()
+                    position_manager = PositionManager(
+                        repository=position_repo,
+                        state=self.state,
+                    )
+                    paper_executor = PaperTradingExecutor(
                         trade_repo=trade_repo,
                         position_manager=position_manager,
                         state=self.state,
                     )
 
-                executor = TradingExecutor(
-                    llm_analyzer=llm_analyzer,
-                    risk_controller=risk_controller,
-                    paper_executor=paper_executor,
-                    state=self.state,
-                    live_executor=live_executor,
-                )
+                    # Create live executor if in live mode
+                    live_executor = None
+                    if app_settings.trading_mode.lower() == "live":
+                        from src.trading.live_trading import LiveTradingExecutor
 
-                # Process each market
-                traded = 0
-                for market in filtered_markets:
-                    try:
-                        await market_repo.save_market(market)
-                        decision = await executor.process_market(market)
-                        if decision.success and decision.trade:
-                            traded += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to process {market.id}: {e}")
+                        live_executor = LiveTradingExecutor(
+                            client=client,
+                            trade_repo=trade_repo,
+                            position_manager=position_manager,
+                            state=self.state,
+                        )
 
-                logger.info(f"Analysis complete: {traded} trades executed")
+                    executor = TradingExecutor(
+                        llm_analyzer=llm_analyzer,
+                        risk_controller=risk_controller,
+                        paper_executor=paper_executor,
+                        state=self.state,
+                        live_executor=live_executor,
+                    )
 
+                    # Process each market
+                    traded = 0
+                    for market in filtered_markets:
+                        try:
+                            await market_repo.save_market(market)
+                            decision = await executor.process_market(market)
+                            if decision.success and decision.trade:
+                                traded += 1
+                        except Exception as e:
+                            logger.warning(f"Failed to process {market.id}: {e}")
+
+                    logger.info(f"Analysis complete: {traded} trades executed")
+                # Context manager ensures PolymarketClient HTTP connections are closed
             except Exception as e:
                 logger.error(f"Failed to analyze and trade: {e}")
 
-        def analyze_and_trade_task() -> None:
-            """Sync wrapper for the async analyze_and_trade function."""
-            asyncio.run(_analyze_and_trade_async())
-
+        # Pass async function directly to AsyncIOScheduler (no asyncio.run wrapper needed)
         self.scheduler.add_job(
             analyze_and_trade_task,
             IntervalTrigger(
@@ -529,17 +531,13 @@ class Application:
         )
 
         # Task 2: Check open positions periodically
-        async def _check_positions_task_async() -> None:
+        async def check_positions_task() -> None:
             """Check and update open positions."""
             try:
                 logger.debug("Checking open positions...")
                 # TODO: Implement position checking logic in Story 8.4
             except Exception as e:
                 logger.error(f"Failed to check positions: {e}")
-
-        def check_positions_task() -> None:
-            """Sync wrapper for the async check_positions function."""
-            asyncio.run(_check_positions_task_async())
 
         self.scheduler.add_job(
             check_positions_task,
@@ -551,17 +549,13 @@ class Application:
         )
 
         # Task 3: Generate daily statistics
-        async def _daily_statistics_task_async() -> None:
+        async def daily_statistics_task() -> None:
             """Generate daily trading statistics."""
             try:
                 logger.info("Generating daily statistics...")
                 # TODO: Implement daily statistics logic
             except Exception as e:
                 logger.error(f"Failed to generate daily statistics: {e}")
-
-        def daily_statistics_task() -> None:
-            """Sync wrapper for the async daily_statistics function."""
-            asyncio.run(_daily_statistics_task_async())
 
         self.scheduler.add_job(
             daily_statistics_task,
@@ -573,17 +567,13 @@ class Application:
         )
 
         # Task 4: Validate predictions
-        async def _validate_predictions_task_async() -> None:
+        async def validate_predictions_task() -> None:
             """Validate past predictions against actual outcomes."""
             try:
                 logger.info("Validating predictions...")
                 # TODO: Implement prediction validation logic
             except Exception as e:
                 logger.error(f"Failed to validate predictions: {e}")
-
-        def validate_predictions_task() -> None:
-            """Sync wrapper for the async validate_predictions function."""
-            asyncio.run(_validate_predictions_task_async())
 
         self.scheduler.add_job(
             validate_predictions_task,
@@ -595,7 +585,7 @@ class Application:
         )
 
         # Task 5: Reset daily state
-        async def _reset_daily_state_task_async() -> None:
+        async def reset_daily_state_task() -> None:
             """Reset daily state (PnL, consecutive losses)."""
             try:
                 if self.state:
@@ -603,10 +593,6 @@ class Application:
                     logger.info("Daily state reset complete")
             except Exception as e:
                 logger.error(f"Failed to reset daily state: {e}")
-
-        def reset_daily_state_task() -> None:
-            """Sync wrapper for the async reset_daily_state function."""
-            asyncio.run(_reset_daily_state_task_async())
 
         self.scheduler.add_job(
             reset_daily_state_task,
@@ -618,7 +604,7 @@ class Application:
         )
 
         # Task 6: Persist state periodically
-        async def _persist_state_task_async() -> None:
+        async def persist_state_task() -> None:
             """Persist state to database."""
             try:
                 if self.state:
@@ -626,10 +612,6 @@ class Application:
                     logger.debug("State persisted to database")
             except Exception as e:
                 logger.error(f"Failed to persist state: {e}")
-
-        def persist_state_task() -> None:
-            """Sync wrapper for the async persist_state function."""
-            asyncio.run(_persist_state_task_async())
 
         self.scheduler.add_job(
             persist_state_task,
@@ -643,7 +625,7 @@ class Application:
         # Task 7: Check exit strategies periodically
         # Story 10.4: 退出策略调度
         # Story 10.5: 退出通知集成
-        async def _check_exit_strategies_async() -> None:
+        async def check_exit_strategies_task() -> None:
             """定期检查并执行退出策略.
 
             Story 10.4: 退出策略调度
@@ -693,6 +675,8 @@ class Application:
 
                 if not open_positions:
                     logger.debug("🔍 No open positions to check for exit")
+                    if notifier:
+                        await notifier.stop()
                     return
 
                 logger.info(
@@ -737,19 +721,20 @@ class Application:
 
                             # 执行卖出 (仅 live 模式)
                             if app_settings.trading_mode.lower() == "live":
-                                client = PolymarketClient()
-                                live_executor = LiveTradingExecutor(
-                                    client=client,
-                                    trade_repo=trade_repo,
-                                    position_manager=position_manager,
-                                    state=self.state,
-                                )
+                                # Use context manager to ensure HTTP client is properly closed
+                                with PolymarketClient() as client:
+                                    live_executor = LiveTradingExecutor(
+                                        client=client,
+                                        trade_repo=trade_repo,
+                                        position_manager=position_manager,
+                                        state=self.state,
+                                    )
 
-                                sell_result = await live_executor.sell_position(
-                                    position=position,
-                                    market=market,
-                                    reason=result.reason,
-                                )
+                                    sell_result = await live_executor.sell_position(
+                                        position=position,
+                                        market=market,
+                                        reason=result.reason,
+                                    )
 
                                 if sell_result.success:
                                     exit_count += 1
@@ -845,10 +830,6 @@ class Application:
                 # 记录整体任务失败
                 if self.alert_manager:
                     self.alert_manager.record_failure("exit_strategy_task")
-
-        def check_exit_strategies_task() -> None:
-            """Sync wrapper for exit strategy check."""
-            asyncio.run(_check_exit_strategies_async())
 
         self.scheduler.add_job(
             check_exit_strategies_task,

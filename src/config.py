@@ -588,6 +588,64 @@ class SchedulerSettings(BaseEnvSettings):
     )
 
 
+class WebResearchSettings(BaseEnvSettings):
+    """Web research configuration settings.
+
+    网络调研配置，用于在 LLM 分析前进行网络搜索获取额外上下文。
+
+    Attributes:
+        enabled: 启用网络调研功能
+        proxy_url: 代理服务器地址
+        search_engine: 使用的搜索引擎 (google/bing/duckduckgo)
+        max_results: 最大搜索结果数量
+        timeout_seconds: 搜索超时时间 (秒)
+
+    Example:
+        >>> from src.config import settings
+        >>> settings.web_research.enabled
+        True
+        >>> settings.web_research.proxy_url
+        'http://127.0.0.1:1087'
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="WEB_RESEARCH_",
+        env_file=_get_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable web research for market analysis",
+    )
+    proxy_url: str = Field(
+        default="http://127.0.0.1:1087",
+        description="Proxy server URL for web requests",
+    )
+    search_engine: Literal["bigmodel"] = Field(
+        default="bigmodel",
+        description="Search engine to use (bigmodel)",
+    )
+    max_results: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum number of search results to return",
+    )
+    timeout_seconds: int = Field(
+        default=30,
+        ge=5,
+        le=60,
+        description="Search timeout in seconds",
+    )
+    bigmodel_api_key: str = Field(
+        default="",
+        alias="BIGMODEL_API_KEY",
+        description="BigModel (ZhipuAI) API key for web search",
+    )
+
+
 class TaskScheduleSettings(BaseEnvSettings):
     """Task schedule configuration settings.
 
@@ -690,6 +748,7 @@ class Settings(BaseEnvSettings):
     task_schedule: TaskScheduleSettings = Field(default_factory=TaskScheduleSettings)
     telegram: TelegramSettings = Field(default_factory=TelegramSettings)
     exit_strategy: ExitStrategySettings = Field(default_factory=ExitStrategySettings)
+    web_research: WebResearchSettings = Field(default_factory=WebResearchSettings)
 
     # Convenience properties for common settings
     @property
@@ -746,6 +805,11 @@ class _SettingsProxy:
         "MAX_DEADLINE_HOURS",
         "TRADING_MODE",
         "LOG_LEVEL",
+        "WEB_RESEARCH_ENABLED",
+        "WEB_RESEARCH_PROXY_URL",
+        "WEB_RESEARCH_SEARCH_ENGINE",
+        "WEB_RESEARCH_MAX_RESULTS",
+        "WEB_RESEARCH_TIMEOUT_SECONDS",
     ]
 
     def __init__(self) -> None:

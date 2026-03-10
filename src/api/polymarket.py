@@ -270,24 +270,118 @@ class PolymarketClient:
         api_secret = settings.polymarket.api_secret
         api_passphrase = settings.polymarket.api_passphrase
 
+        # Check if we have complete API credentials
+        has_api_creds = bool(api_key and api_secret and api_passphrase)
+
         # Initialize the underlying ClobClient with appropriate auth level
         # Level 2: Full auth with API credentials (can access order history)
         # Level 1: Private key only (can sign orders)
         # Level 0: Read-only mode
-        if pk and proxy_wallet:
+
+        # Priority 1: Use API credentials directly if available
+        if has_api_creds and proxy_wallet:
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Initializing Polymarket client "
+                f"with Level 2 auth (using API credentials)"
+            )
+            from py_clob_client.clob_types import ApiCreds
+
+            creds = ApiCreds(
+                api_key=api_key,
+                api_secret=api_secret,
+                api_passphrase=api_passphrase,
+            )
+
+            # For API credentials mode, still need PK for signing orders
+            # Use signature_type=1 (POLY_PROXY) for Magic Link wallets
+            # IMPORTANT: For proxy wallets, signer address (from PK) is different from funder address
+            if pk:
+                from eth_account import Account
+                signer_address = Account.from_key(pk).address
+
+                self._logger.info(
+                    f"Signer address (from PK): {signer_address[:10]}...{signer_address[-4:]}"
+                )
+                self._logger.info(
+                    f"Funder address (proxy wallet): {proxy_wallet[:10]}...{proxy_wallet[-4:]}"
+                )
+                self._logger.info(
+                    f"Using signature_type=1 (POLY_PROXY) for Magic Link wallet"
+                )
+
+                self._client = ClobClient(
+                    host,
+                    key=pk,
+                    creds=creds,
+                    chain_id=chain_id,
+                    signature_type=1,  # POLY_PROXY - Magic Link wallet (signer != funder)
+                    funder=proxy_wallet,  # The proxy wallet that holds funds
+                )
+                self._auth_level = 2
+                self._api_creds_set = True
+
+                self._logger.info(
+                    f"✅ Configured: Magic Link proxy wallet mode"
+                )
+            else:
+                self._logger.error(
+                    "API credentials found but PK is missing. "
+                    "PK is required for signing orders even with API credentials."
+                )
+                raise ValueError("PK is required when using API credentials for trading")
+
+            self._logger.info(
+                f"{OPERATION_EMOJIS['network']} Running with full authentication "
+                "(Level 2 - using provided API credentials)"
+            )
+        elif pk and proxy_wallet:
             self._logger.info(
                 f"{OPERATION_EMOJIS['network']} Initializing Polymarket client "
                 f"with Level 2 auth (proxy wallet: {proxy_wallet[:6]}...{proxy_wallet[-4:]})"
             )
-            # For proxy wallet trading, need signature_type=2 (POLY_PROXY) and funder
+            # According to Polymarket docs:
+            # - signature_type=0 (EOA): Standard wallet, funder = signer address
+            # - signature_type=1 (POLY_PROXY): Magic Link proxy wallet (signer != funder)
+            # - signature_type=2 (GNOSIS_SAFE): Gnosis Safe multisig wallet
+            #
+            # IMPORTANT: Check if signer address matches funder to determine wallet type
+            from eth_account import Account
+
+            # Derive signer address from private key
+            signer_address = Account.from_key(pk).address
+
+            # Check if proxy_wallet matches signer address
+            if signer_address.lower() != proxy_wallet.lower():
+                # This is a proxy wallet (Magic Link)
+                self._logger.info(
+                    f"Detected Magic Link proxy wallet: "
+                    f"signer={signer_address[:10]}...{signer_address[-4:]}, "
+                    f"funder={proxy_wallet[:10]}...{proxy_wallet[-4:]}"
+                )
+                signature_type = 1  # POLY_PROXY
+                funder_address = proxy_wallet
+                wallet_type = "Magic Link proxy wallet"
+            else:
+                # This is a standard EOA wallet
+                self._logger.info(
+                    f"Detected standard EOA wallet: {signer_address[:10]}...{signer_address[-4:]}"
+                )
+                signature_type = 0  # EOA
+                funder_address = signer_address
+                wallet_type = "Standard EOA wallet"
+
             self._client = ClobClient(
                 host,
                 key=pk,
                 chain_id=chain_id,
-                signature_type=2,  # POLY_PROXY for proxy wallet trading
-                funder=proxy_wallet,  # Address that holds funds
+                signature_type=signature_type,
+                funder=funder_address,
             )
             self._auth_level = 2
+
+            self._logger.info(
+                f"✅ Configured: {wallet_type} (signature_type={signature_type})"
+            )
 
             # Set API credentials for posting orders
             # Derive credentials from private key (most reliable method)

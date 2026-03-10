@@ -97,6 +97,19 @@ class PredictionResult(BaseModel):
         le=1,
         description="Edge (price gap) between prediction and market",
     )
+    # Detailed analysis fields for PredictionResult (transient, not saved to DB directly)
+    web_search_query: str | None = Field(
+        default=None, description="Web search query used for analysis"
+    )
+    web_search_summary: str | None = Field(
+        default=None, description="Web search results summary"
+    )
+    llm_prompt: str | None = Field(
+        default=None, description="Full LLM prompt sent for analysis"
+    )
+    llm_response: str | None = Field(
+        default=None, description="Full LLM response received"
+    )
 
 
 class Prediction(BaseModel):
@@ -164,6 +177,14 @@ class Prediction(BaseModel):
         default=None, description="Validation timestamp"
     )
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
+    # Detailed analysis fields
+    web_search_query: str | None = Field(default=None, description="Web search query used")
+    web_search_summary: str | None = Field(default=None, description="Web search results summary")
+    llm_prompt: str | None = Field(default=None, description="Full LLM prompt sent")
+    llm_response: str | None = Field(default=None, description="Full LLM response received")
+    trade_executed: bool | None = Field(default=None, description="Whether trade was executed")
+    trade_result: str | None = Field(default=None, description="Trade execution result")
+    trade_error: str | None = Field(default=None, description="Trade execution error if failed")
 
     @field_serializer("validated_at", "created_at")
     def serialize_datetime(self, dt: datetime | None, _info: Any) -> str | None:

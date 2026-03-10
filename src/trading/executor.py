@@ -245,8 +245,9 @@ class TradingExecutor:
                     """
                     INSERT INTO predictions (
                         market_id, predicted_probability, confidence,
-                        reasoning, key_assumptions, model_used, recommendation, edge
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        reasoning, key_assumptions, model_used, recommendation, edge,
+                        web_search_query, web_search_summary, llm_prompt, llm_response
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         market.id,
@@ -257,6 +258,10 @@ class TradingExecutor:
                         getattr(prediction, "model_used", "unknown"),
                         recommendation_str,
                         prediction.edge,
+                        getattr(prediction, "web_search_query", None),
+                        getattr(prediction, "web_search_summary", None),
+                        getattr(prediction, "llm_prompt", None),
+                        getattr(prediction, "llm_response", None),
                     ),
                 )
                 prediction_id = cursor.lastrowid or 0
@@ -290,7 +295,12 @@ class TradingExecutor:
             >>> if decision.success and decision.trade:
             ...     print(f"Trade ID: {decision.trade.id}")
         """
-        self._logger.info(f"Processing market: {market.id} - {market.title}")
+        self._logger.info(
+            f"\n{'='*80}\n"
+            f"🎯 [PROCESSING] {market.title}\n"
+            f"   Market ID: {market.id}\n"
+            f"{'='*80}"
+        )
 
         try:
             # 1. LLM Analysis
@@ -314,7 +324,34 @@ class TradingExecutor:
                 reason = (
                     risk_check.reasons[0] if risk_check.reasons else "Unknown reason"
                 )
-                self._logger.info(f"Trade rejected for market {market.id}: {reason}")
+                self._logger.warning(
+                    f"\n{'⚠️'*40}\n"
+                    f"⚠️  [TRADE REJECTED] {market.title}\n"
+                    f"    Reason: {reason}\n"
+                    f"{'⚠️'*40}"
+                )
+
+                # Update prediction with trade rejection info
+                if prediction_id:
+                    try:
+                        repo = self._get_prediction_repo()
+                        # Format all reasons as a single string
+                        error_message = "; ".join(risk_check.reasons)
+                        await repo.update_trade_info(
+                            prediction_id=prediction_id,
+                            trade_executed=False,
+                            trade_result=None,
+                            trade_error=error_message,
+                        )
+                        self._logger.debug(
+                            f"Updated prediction {prediction_id} with trade rejection info"
+                        )
+                    except Exception as e:
+                        self._logger.warning(
+                            f"Failed to update prediction {prediction_id} "
+                            f"with trade rejection info: {e}"
+                        )
+
                 return TradingDecision(
                     market_id=market.id,
                     success=True,
@@ -346,9 +383,30 @@ class TradingExecutor:
 
             if not result.success:
                 self._logger.error(
-                    f"Trade execution failed for market {market.id}: "
-                    f"{result.error_message}"
+                    f"\n{'❌'*40}\n"
+                    f"❌  [TRADE FAILED] {market.title}\n"
+                    f"    Error: {result.error_message}\n"
+                    f"{'❌'*40}"
                 )
+
+                # Update prediction with trade failure info
+                if prediction_id:
+                    try:
+                        repo = self._get_prediction_repo()
+                        await repo.update_trade_info(
+                            prediction_id=prediction_id,
+                            trade_executed=False,
+                            trade_result=None,
+                            trade_error=result.error_message or "Unknown error",
+                        )
+                        self._logger.debug(
+                            f"Updated prediction {prediction_id} with trade failure info"
+                        )
+                    except Exception as e:
+                        self._logger.warning(
+                            f"Failed to update prediction {prediction_id} "
+                            f"with trade failure info: {e}"
+                        )
 
                 # Story 9.3: Send failure notification
                 await self._notify_trade_failed(
@@ -366,11 +424,37 @@ class TradingExecutor:
             # 5. Log Success
             trade = result.trade
             assert trade is not None  # Type guard for mypy
+
+            # Update prediction with trade success info
+            if prediction_id:
+                try:
+                    repo = self._get_prediction_repo()
+                    trade_result_str = (
+                        f"{trade.trade_type.value}: {trade.shares:.2f} shares @ ${trade.price:.4f}"
+                    )
+                    await repo.update_trade_info(
+                        prediction_id=prediction_id,
+                        trade_executed=True,
+                        trade_result=trade_result_str,
+                        trade_error=None,
+                    )
+                    self._logger.debug(
+                        f"Updated prediction {prediction_id} with trade success info"
+                    )
+                except Exception as e:
+                    self._logger.warning(
+                        f"Failed to update prediction {prediction_id} "
+                        f"with trade success info: {e}"
+                    )
+
             self._logger.info(
-                f"Trade completed for market {market.id}: "
-                f"{trade.trade_type.value} "
-                f"{trade.shares:.2f} shares @ ${trade.price:.4f} "
-                f"= ${amount:.2f}"
+                f"\n{'💰'*40}\n"
+                f"💰  [TRADE SUCCESS] {market.title}\n"
+                f"    Type: {trade.trade_type.value}\n"
+                f"    Shares: {trade.shares:.2f} @ ${trade.price:.4f}\n"
+                f"    Amount: ${amount:.2f}\n"
+                f"    Trade ID: {trade.id}\n"
+                f"{'💰'*40}"
             )
 
             # Story 9.3: Send success notification

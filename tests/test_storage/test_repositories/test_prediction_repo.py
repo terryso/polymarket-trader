@@ -535,6 +535,108 @@ class TestPredictionRepository:
 
             assert "Failed to update prediction" in str(exc_info.value)
 
+    @pytest.mark.asyncio
+    async def test_update_trade_info_success(self, repo: PredictionRepository) -> None:
+        """Test successful update of trade info with rejection."""
+        mock_cursor = AsyncMock()
+        mock_cursor.rowcount = 1
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.update_trade_info(
+                prediction_id=1,
+                trade_executed=False,
+                trade_result=None,
+                trade_error="Edge too low: 6.75% < 10.00%; Trading is disabled in system state",
+            )
+
+            assert result is True
+            mock_conn.execute.assert_called_once()
+            call_args = mock_conn.execute.call_args
+            assert "UPDATE predictions" in call_args[0][0]
+            assert call_args[0][1][0] == 0  # trade_executed = FALSE
+            assert call_args[0][1][1] is None  # trade_result = NULL
+            assert "Edge too low" in call_args[0][1][2]
+
+    @pytest.mark.asyncio
+    async def test_update_trade_info_with_success(self, repo: PredictionRepository) -> None:
+        """Test successful update of trade info with executed trade."""
+        mock_cursor = AsyncMock()
+        mock_cursor.rowcount = 1
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.update_trade_info(
+                prediction_id=1,
+                trade_executed=True,
+                trade_result="BUY_YES: 10.50 shares @ $0.6543",
+                trade_error=None,
+            )
+
+            assert result is True
+            mock_conn.execute.assert_called_once()
+            call_args = mock_conn.execute.call_args
+            assert "UPDATE predictions" in call_args[0][0]
+            assert call_args[0][1][0] == 1  # trade_executed = TRUE
+            assert "BUY_YES" in call_args[0][1][1]
+            assert call_args[0][1][2] is None  # trade_error = NULL
+
+    @pytest.mark.asyncio
+    async def test_update_trade_info_not_found(self, repo: PredictionRepository) -> None:
+        """Test update when prediction not found."""
+        mock_cursor = AsyncMock()
+        mock_cursor.rowcount = 0
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            result = await repo.update_trade_info(
+                prediction_id=999,
+                trade_executed=False,
+                trade_error="Not found",
+            )
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_update_trade_info_database_error(
+        self, repo: PredictionRepository
+    ) -> None:
+        """Test that database errors are wrapped in DatabaseError."""
+        import aiosqlite
+
+        from src.exceptions import DatabaseError
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(side_effect=aiosqlite.Error("Database error"))
+
+        with patch(
+            "src.storage.repositories.prediction_repo.get_connection"
+        ) as mock_get_conn:
+            mock_get_conn.return_value.__aenter__.return_value = mock_conn
+
+            with pytest.raises(DatabaseError) as exc_info:
+                await repo.update_trade_info(1, False, None, "Error")
+
+            assert "Failed to update prediction" in str(exc_info.value)
+
     # ==================== _row_to_prediction edge cases ====================
 
     @pytest.mark.asyncio

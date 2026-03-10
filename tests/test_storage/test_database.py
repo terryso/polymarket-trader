@@ -243,6 +243,14 @@ class TestDatabaseSchema:
             "is_correct",
             "validated_at",
             "created_at",
+            # New detailed analysis fields
+            "web_search_query",
+            "web_search_summary",
+            "llm_prompt",
+            "llm_response",
+            "trade_executed",
+            "trade_result",
+            "trade_error",
         }
 
         async with initialized_db.get_connection() as conn:

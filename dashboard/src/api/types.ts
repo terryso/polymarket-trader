@@ -241,6 +241,14 @@ export interface PredictionResponse {
   is_correct: boolean | null;
   validated_at: string | null;
   created_at: string | null;
+  // Detailed analysis fields
+  web_search_query: string | null;
+  web_search_summary: string | null;
+  llm_prompt: string | null;
+  llm_response: string | null;
+  trade_executed: boolean | null;
+  trade_result: string | null;
+  trade_error: string | null;
 }
 
 export interface CategoryAccuracy {

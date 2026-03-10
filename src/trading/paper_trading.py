@@ -186,8 +186,14 @@ class PaperTradingExecutor:
             await self._trade_repo.save(saved_trade)
 
             self._logger.info(
-                f"✅ Paper trade completed: trade_id={saved_trade.id}, "
-                f"position_id={position.id}"
+                f"\n{'📝'*40}\n"
+                f"📝  [PAPER TRADE COMPLETED]\n"
+                f"    Trade ID: {saved_trade.id}\n"
+                f"    Position ID: {position.id}\n"
+                f"    Type: {trade_type.value}\n"
+                f"    Shares: {shares:.2f} @ ${price:.4f}\n"
+                f"    Amount: ${amount:.2f}\n"
+                f"{'📝'*40}"
             )
 
             return PaperTradeResult(
@@ -197,7 +203,12 @@ class PaperTradingExecutor:
             )
 
         except (ValidationError, TradingError) as e:
-            self._logger.error(f"❌ Paper trade failed: {e}")
+            self._logger.error(
+                f"\n{'❌'*40}\n"
+                f"❌  [PAPER TRADE FAILED]\n"
+                f"    Error: {e}\n"
+                f"{'❌'*40}"
+            )
             return PaperTradeResult(
                 trade=None,
                 position=None,
@@ -205,7 +216,12 @@ class PaperTradingExecutor:
                 error_message=str(e),
             )
         except Exception as e:
-            self._logger.error(f"❌ Unexpected error in paper trade: {e}")
+            self._logger.error(
+                f"\n{'❌'*40}\n"
+                f"❌  [PAPER TRADE UNEXPECTED ERROR]\n"
+                f"    Error: {e}\n"
+                f"{'❌'*40}"
+            )
             return PaperTradeResult(
                 trade=None,
                 position=None,
@@ -244,10 +260,32 @@ class PaperTradingExecutor:
         Returns:
             Price (0-1) or None if not available
         """
+        # Minimum price allowed by Polymarket CLOB (tick_size can be 0.001)
+        MIN_PRICE = 0.001
+        # Maximum price allowed by Polymarket CLOB
+        MAX_PRICE = 0.999
+
         if trade_type == TradeType.BUY_YES:
-            return market.yes_price
+            price = market.yes_price
         else:  # BUY_NO
-            return market.no_price
+            price = market.no_price
+
+        # Adjust price if outside valid range
+        if price is not None:
+            if price < MIN_PRICE:
+                self._logger.warning(
+                    f"Price {price} below minimum {MIN_PRICE}, adjusting to {MIN_PRICE} "
+                    f"for market {market.id[:10]}..."
+                )
+                price = MIN_PRICE
+            elif price > MAX_PRICE:
+                self._logger.warning(
+                    f"Price {price} above maximum {MAX_PRICE}, adjusting to {MAX_PRICE} "
+                    f"for market {market.id[:10]}..."
+                )
+                price = MAX_PRICE
+
+        return price
 
     def _calculate_shares(self, amount: float, price: float) -> float:
         """Calculate number of shares from amount and price.

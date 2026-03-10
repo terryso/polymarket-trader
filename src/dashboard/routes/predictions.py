@@ -233,6 +233,13 @@ async def get_prediction(
         is_correct=prediction.is_correct,
         validated_at=prediction.validated_at,
         created_at=prediction.created_at,
+        web_search_query=prediction.web_search_query,
+        web_search_summary=prediction.web_search_summary,
+        llm_prompt=prediction.llm_prompt,
+        llm_response=prediction.llm_response,
+        trade_executed=prediction.trade_executed,
+        trade_result=prediction.trade_result,
+        trade_error=prediction.trade_error,
     )
 
     return ApiResponse(success=True, data=response, error=None)

@@ -84,6 +84,13 @@ class PredictionResponse(BaseModel):
         is_correct: Whether prediction was correct (if validated)
         validated_at: Validation timestamp
         created_at: Prediction creation timestamp
+        web_search_query: Web search query used for analysis
+        web_search_summary: Summary of web search results
+        llm_prompt: Full LLM prompt sent for analysis
+        llm_response: Full LLM response received
+        trade_executed: Whether trade was executed based on this prediction
+        trade_result: Result of trade execution
+        trade_error: Error message if trade execution failed
     """
 
     id: int = Field(..., description="Prediction ID")
@@ -99,6 +106,14 @@ class PredictionResponse(BaseModel):
     is_correct: bool | None = Field(None, description="Prediction correctness")
     validated_at: datetime | None = Field(None, description="Validation timestamp")
     created_at: datetime | None = Field(None, description="Creation timestamp")
+    # Detailed analysis fields
+    web_search_query: str | None = Field(None, description="Web search query used")
+    web_search_summary: str | None = Field(None, description="Web search results summary")
+    llm_prompt: str | None = Field(None, description="Full LLM prompt sent")
+    llm_response: str | None = Field(None, description="Full LLM response received")
+    trade_executed: bool | None = Field(None, description="Whether trade was executed")
+    trade_result: str | None = Field(None, description="Trade execution result")
+    trade_error: str | None = Field(None, description="Trade execution error")
 
     @field_serializer("validated_at", "created_at")
     def serialize_datetime(self, dt: datetime | None, _info: Any) -> str | None:
